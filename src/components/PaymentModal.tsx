@@ -111,8 +111,13 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
 
   // Generate Preview Receipt No
   const currentYear = new Date().getFullYear();
-  const sequenceStr = String(schoolProfile.nextReceiptSequence).padStart(5, '0');
-  const previewReceiptNo = `${schoolProfile.receiptPrefix}-${currentYear}-${sequenceStr}`;
+  const sequenceStr = String(schoolProfile.nextReceiptSequence || 1).padStart(5, '0');
+  const previewReceiptNo =
+    selectedFeeType === 'BOOKS'
+      ? `B-${sequenceStr}`
+      : selectedFeeType === 'DRESS'
+      ? `D-${sequenceStr}`
+      : `${schoolProfile.receiptPrefix}-${currentYear}-${sequenceStr}`;
 
   // Automatically recalculate FIFO allocations whenever paymentAmount changes (unless manual override is enabled)
   useEffect(() => {

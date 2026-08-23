@@ -24,15 +24,46 @@ export const DualA5ReceiptModal: React.FC<DualA5ReceiptModalProps> = ({
   const currencySymbol = schoolProfile?.currencySymbol || '₹';
   const amountInWords = numberToWords(transaction.amount);
 
-  const isBooksOrDressTransaction =
+  const isBooksTransaction =
     transaction.allocations.some((a) => {
       const l = a.headName.toLowerCase();
-      return l.includes('book') || l.includes('dress') || l.includes('uniform') || l.includes('stationery');
+      return l.includes('book') || l.includes('stationery') || l.includes('kit');
     }) ||
     (transaction.remarks &&
       (transaction.remarks.toLowerCase().includes('book') ||
-        transaction.remarks.toLowerCase().includes('dress') ||
+        transaction.remarks.toLowerCase().includes('stationery')));
+
+  const isDressTransaction =
+    transaction.allocations.some((a) => {
+      const l = a.headName.toLowerCase();
+      return l.includes('dress') || l.includes('uniform');
+    }) ||
+    (transaction.remarks &&
+      (transaction.remarks.toLowerCase().includes('dress') ||
         transaction.remarks.toLowerCase().includes('uniform')));
+
+  const isBooksOrDressTransaction = isBooksTransaction || isDressTransaction;
+
+  // Derive standardized display receipt number (B-00001, D-00001, or School Prefix)
+  const displayReceiptNo = (() => {
+    if (isBooksTransaction) {
+      if (transaction.receiptNo.startsWith('B-')) return transaction.receiptNo;
+      const num = transaction.receiptNo.replace(/\D/g, '').slice(-5) || '00001';
+      return `B-${num.padStart(5, '0')}`;
+    }
+    if (isDressTransaction) {
+      if (transaction.receiptNo.startsWith('D-')) return transaction.receiptNo;
+      const num = transaction.receiptNo.replace(/\D/g, '').slice(-5) || '00001';
+      return `D-${num.padStart(5, '0')}`;
+    }
+    return transaction.receiptNo;
+  })();
+
+  const receiptTitle = isBooksTransaction
+    ? 'BOOKS & STATIONERY RECEIPT'
+    : isDressTransaction
+    ? 'SCHOOL UNIFORM & DRESS RECEIPT'
+    : schoolProfile.schoolName || 'Kakatiya School Boduppal';
 
   /**
    * Universal Print Handler:
@@ -65,7 +96,7 @@ export const DualA5ReceiptModal: React.FC<DualA5ReceiptModalProps> = ({
           <!DOCTYPE html>
           <html>
             <head>
-              <title>Receipt - ${transaction.receiptNo} - ${transaction.studentName}</title>
+              <title>Receipt - ${displayReceiptNo} - ${transaction.studentName}</title>
               <meta charset="utf-8" />
               <style>
                 @page {
@@ -228,7 +259,7 @@ export const DualA5ReceiptModal: React.FC<DualA5ReceiptModalProps> = ({
       <!DOCTYPE html>
       <html>
         <head>
-          <title>Fee Receipt - ${transaction.receiptNo} - ${transaction.studentName}</title>
+          <title>Fee Receipt - ${displayReceiptNo} - ${transaction.studentName}</title>
           <meta charset="utf-8" />
           <style>
             @page {
@@ -360,24 +391,23 @@ export const DualA5ReceiptModal: React.FC<DualA5ReceiptModalProps> = ({
   };
 
   // High-contrast, Black & White Professional Laser Receipt Copy
-  const SingleReceiptView = ({ copyType }: { copyType: 'STUDENT COPY' | 'PARENT COPY' }) => (
+  const SingleReceiptView = ({ copyType }: { copyType: 'PARENT COPY' | 'OFFICE COPY' }) => (
     <div className="receipt-card border-2 border-slate-900 bg-white p-3.5 sm:p-4 rounded-lg flex flex-col justify-between text-slate-900 text-xs shadow-none">
       <div>
         {/* Header Bar */}
         <div className="border-b-2 border-slate-900 pb-2 mb-2 flex items-start justify-between">
           <div>
-            {!isBooksOrDressTransaction ? (
-              <h2 className="text-sm sm:text-base font-black text-slate-950 uppercase tracking-tight leading-tight">
-                {schoolProfile.schoolName || 'Kakatiya School Boduppal'}
-              </h2>
-            ) : (
-              <h2 className="text-sm sm:text-base font-black text-slate-950 uppercase tracking-tight leading-tight">
-                OFFICIAL PAYMENT RECEIPT
-              </h2>
-            )}
+            <h2 className="text-sm sm:text-base font-black text-slate-950 uppercase tracking-tight leading-tight">
+              {receiptTitle}
+            </h2>
             {schoolProfile.phone && !isBooksOrDressTransaction && (
               <p className="text-[9.5px] text-slate-600 mt-0.5">
                 Contact: {schoolProfile.phone}
+              </p>
+            )}
+            {isBooksOrDressTransaction && schoolProfile.schoolName && (
+              <p className="text-[9.5px] text-slate-600 mt-0.5">
+                {schoolProfile.schoolName}
               </p>
             )}
           </div>
@@ -394,7 +424,7 @@ export const DualA5ReceiptModal: React.FC<DualA5ReceiptModalProps> = ({
             <div className="p-1.5 px-2">
               <span className="text-slate-600 font-medium">Receipt No: </span>
               <strong className="font-mono font-extrabold text-slate-950">
-                {transaction.receiptNo}
+                {displayReceiptNo}
               </strong>
             </div>
             <div className="p-1.5 px-2">
@@ -408,21 +438,21 @@ export const DualA5ReceiptModal: React.FC<DualA5ReceiptModalProps> = ({
               <strong className="font-bold text-slate-950">{transaction.studentName}</strong>
             </div>
             <div className="p-1.5 px-2">
-              <span className="text-slate-600 font-medium">Roll No / Reg: </span>
-              <strong className="font-mono font-bold text-slate-950">#{transaction.studentRollNo}</strong>
-            </div>
-          </div>
-          <div className="grid grid-cols-2 divide-x divide-slate-800 bg-slate-50/80">
-            <div className="p-1.5 px-2">
               <span className="text-slate-600 font-medium">Class & Section: </span>
               <strong className="font-bold text-slate-950">{transaction.studentClass}</strong>
             </div>
+          </div>
+          <div className="grid grid-cols-2 divide-x divide-slate-800 bg-slate-50/80">
             <div className="p-1.5 px-2">
               <span className="text-slate-600 font-medium">Payment Mode: </span>
               <strong className="font-mono font-bold text-slate-950">
                 {transaction.paymentMode.toUpperCase()}
                 {transaction.referenceNo ? ` [Ref: ${transaction.referenceNo}]` : ''}
               </strong>
+            </div>
+            <div className="p-1.5 px-2">
+              <span className="text-slate-600 font-medium">Roll No / Reg: </span>
+              <strong className="font-mono font-bold text-slate-950">#{transaction.studentRollNo}</strong>
             </div>
           </div>
         </div>
@@ -433,28 +463,38 @@ export const DualA5ReceiptModal: React.FC<DualA5ReceiptModalProps> = ({
             <thead className="bg-slate-100 border-b border-slate-900 text-slate-900 font-extrabold text-[10px] uppercase">
               <tr>
                 <th className="py-1 px-2 border-r border-slate-900 w-8 text-center">#</th>
-                <th className="py-1 px-2 border-r border-slate-900">Particulars (Fee Head & Installment)</th>
-                <th className="py-1 px-2 border-r border-slate-900 text-center">Due Date</th>
+                <th className="py-1 px-2 border-r border-slate-900">
+                  {isBooksOrDressTransaction ? 'Particulars (Item / Kit Description)' : 'Particulars (Fee Head & Installment)'}
+                </th>
+                <th className="py-1 px-2 border-r border-slate-900 text-center">
+                  {isBooksOrDressTransaction ? 'Date' : 'Due Date'}
+                </th>
                 <th className="py-1 px-2 text-right">Amount ({currencySymbol})</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800 font-mono text-[10.5px]">
-              {transaction.allocations.map((alloc, idx) => (
-                <tr key={idx} className="hover:bg-slate-50">
-                  <td className="py-1 px-2 border-r border-slate-800 text-center text-slate-500 font-medium">
-                    {idx + 1}
-                  </td>
-                  <td className="py-1 px-2 border-r border-slate-800 font-sans font-medium text-slate-950">
-                    {alloc.headName} (Installment #{alloc.installmentNumber})
-                  </td>
-                  <td className="py-1 px-2 border-r border-slate-800 text-center text-slate-700">
-                    {formatDate(alloc.dueDate)}
-                  </td>
-                  <td className="py-1 px-2 text-right font-bold text-slate-950">
-                    {formatCurrency(alloc.allocatedAmount, currencySymbol)}
-                  </td>
-                </tr>
-              ))}
+              {transaction.allocations.map((alloc, idx) => {
+                const displayName = isBooksOrDressTransaction
+                  ? alloc.headName.replace(/\(Installment #\d+\)/gi, '').trim()
+                  : `${alloc.headName} (Installment #${alloc.installmentNumber})`;
+
+                return (
+                  <tr key={idx} className="hover:bg-slate-50">
+                    <td className="py-1 px-2 border-r border-slate-800 text-center text-slate-500 font-medium">
+                      {idx + 1}
+                    </td>
+                    <td className="py-1 px-2 border-r border-slate-800 font-sans font-medium text-slate-950">
+                      {displayName}
+                    </td>
+                    <td className="py-1 px-2 border-r border-slate-800 text-center text-slate-700">
+                      {formatDate(alloc.dueDate || transaction.date)}
+                    </td>
+                    <td className="py-1 px-2 text-right font-bold text-slate-950">
+                      {formatCurrency(alloc.allocatedAmount, currencySymbol)}
+                    </td>
+                  </tr>
+                );
+              })}
               {/* Grand Total Row */}
               <tr className="bg-slate-100 border-t-2 border-slate-900 font-bold text-slate-950 text-xs">
                 <td colSpan={3} className="py-1.5 px-2 font-sans text-right uppercase tracking-wider">
@@ -474,21 +514,23 @@ export const DualA5ReceiptModal: React.FC<DualA5ReceiptModalProps> = ({
           <span className="italic font-medium">{amountInWords}</span>
         </div>
 
-        {/* Remaining Balance & Next Due Summary */}
-        <div className="flex items-center justify-between border border-slate-900 p-1.5 px-2 bg-slate-50 text-[10.5px] text-slate-900 mb-2">
-          <div>
-            <span className="font-semibold text-slate-700">Remaining Balance: </span>
-            <strong className="font-mono font-bold text-slate-950">
-              {formatCurrency(remainingDueBalance, currencySymbol)}
-            </strong>
-          </div>
-          {nextDueDate && (
+        {/* Remaining Balance & Next Due Summary - STRICTLY EXCLUDED FOR BOOKS & DRESS RECEIPTS */}
+        {!isBooksOrDressTransaction && (
+          <div className="flex items-center justify-between border border-slate-900 p-1.5 px-2 bg-slate-50 text-[10.5px] text-slate-900 mb-2">
             <div>
-              <span className="font-semibold text-slate-700">Next Due Date: </span>
-              <strong className="font-semibold text-slate-950">{formatDate(nextDueDate)}</strong>
+              <span className="font-semibold text-slate-700">Remaining Balance: </span>
+              <strong className="font-mono font-bold text-slate-950">
+                {formatCurrency(remainingDueBalance, currencySymbol)}
+              </strong>
             </div>
-          )}
-        </div>
+            {nextDueDate && (
+              <div>
+                <span className="font-semibold text-slate-700">Next Due Date: </span>
+                <strong className="font-semibold text-slate-950">{formatDate(nextDueDate)}</strong>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Footer Disclaimer & Signatures */}
@@ -525,7 +567,7 @@ export const DualA5ReceiptModal: React.FC<DualA5ReceiptModalProps> = ({
             </div>
             <div>
               <h2 className="text-sm font-bold text-slate-100">
-                Official Fee Receipt: #{transaction.receiptNo}
+                Official Fee Receipt: #{displayReceiptNo}
               </h2>
               <p className="text-[11px] text-slate-400">
                 {transaction.studentName} (#{transaction.studentRollNo}) • {transaction.studentClass}
@@ -574,8 +616,8 @@ export const DualA5ReceiptModal: React.FC<DualA5ReceiptModalProps> = ({
             id="printable-receipt-area"
             className="grid grid-cols-1 lg:grid-cols-2 gap-4 max-w-4xl mx-auto print:grid-cols-2 print:gap-4 print:max-w-none print:w-full"
           >
-            <SingleReceiptView copyType="STUDENT COPY" />
             <SingleReceiptView copyType="PARENT COPY" />
+            <SingleReceiptView copyType="OFFICE COPY" />
           </div>
         </div>
 

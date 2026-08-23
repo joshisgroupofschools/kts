@@ -294,7 +294,7 @@ export function computeStudentFinancials(
     concession,
     otherFees,
     totalPayable,
-    totalPaid,
+    totalPaid: regularPaid,
     totalDue,
     dueTillDate,
     expectedTillDate,
