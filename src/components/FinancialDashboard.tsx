@@ -193,17 +193,6 @@ export const FinancialDashboard: React.FC<FinancialDashboardProps> = ({
           <div>
             <h2 className="text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white flex items-center gap-2 flex-wrap">
               <span>Financial Analytics & Fee Health</span>
-              <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
-                Total: <strong className="text-slate-900 dark:text-white">{totalStudents}</strong>
-                <span className="mx-1.5 text-slate-300 dark:text-slate-600">•</span>
-                Active: <strong className="text-emerald-700 dark:text-emerald-400">{activeStudents}</strong>
-                {inactiveStudents > 0 && (
-                  <>
-                    <span className="mx-1.5 text-slate-300 dark:text-slate-600">•</span>
-                    Inactive: <strong className="text-slate-500">{inactiveStudents}</strong>
-                  </>
-                )}
-              </span>
             </h2>
           </div>
         </div>
@@ -236,7 +225,7 @@ export const FinancialDashboard: React.FC<FinancialDashboardProps> = ({
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
         
         {/* ============================================================ */}
-        {/* CARD 1: SET 1 (Active Students, Actual School Fees, Committed School Fees, Concession) */}
+        {/* CARD 1: SET 1 (Active Students, Actual School Fees, Committed School Fees, Concession, Committed Other Fees) */}
         {/* ============================================================ */}
         <div
           id="card-set-1"
@@ -262,7 +251,7 @@ export const FinancialDashboard: React.FC<FinancialDashboardProps> = ({
               </button>
             </div>
 
-            {/* 4 Sub-Items */}
+            {/* 5 Sub-Items */}
             <div className="space-y-2.5">
               {/* 1) Active Students */}
               <div className="bg-slate-50 dark:bg-slate-800/60 rounded-lg p-2 border border-slate-100 dark:border-slate-700/60">
@@ -330,12 +319,49 @@ export const FinancialDashboard: React.FC<FinancialDashboardProps> = ({
                   )}
                 </div>
               </div>
+
+              {/* 5) Committed Other Fees (Total + small font bifurcation of transport, old) */}
+              <div className="bg-amber-50/70 dark:bg-amber-950/30 rounded-lg p-2 border border-amber-200/70 dark:border-amber-900/40">
+                <div className="flex items-center justify-between text-[11px] font-semibold text-amber-900 dark:text-amber-300 mb-0.5">
+                  <span>5. Committed Other Fees</span>
+                  <span className="text-[10px] font-bold text-amber-700 dark:text-amber-400">Transport & Old</span>
+                </div>
+                {(() => {
+                  const transportCommitted = feeHeadMap.transport?.totalCommitted || 0;
+                  const oldFeeCommitted = feeHeadMap.oldDue?.totalCommitted || 0;
+                  const otherNonTuitionCommitted = headWiseBifurcation
+                    .filter((h) => !h.headName.toLowerCase().includes('school') && !h.headName.toLowerCase().includes('tuition') && !h.headName.toLowerCase().includes('book') && !h.headName.toLowerCase().includes('dress'))
+                    .reduce((sum, h) => sum + h.totalCommitted, 0);
+                  const totalOtherFees = otherNonTuitionCommitted > 0 ? otherNonTuitionCommitted : (transportCommitted + oldFeeCommitted);
+
+                  return (
+                    <>
+                      <div className="text-base font-black text-amber-800 dark:text-amber-300 font-mono">
+                        {isCardRevealed('set1') ? (
+                          formatCurrency(totalOtherFees, currencySymbol)
+                        ) : (
+                          <span className="text-amber-400/60 font-normal text-sm">••••••</span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 mt-1 pt-1 border-t border-amber-200/60 dark:border-amber-900/40 text-[9.5px] font-mono text-slate-600 dark:text-slate-300 flex-wrap">
+                        <span>
+                          Transport: <strong className="text-slate-900 dark:text-slate-100">{isCardRevealed('set1') ? formatCurrency(transportCommitted, currencySymbol) : '••'}</strong>
+                        </span>
+                        <span className="text-slate-400">•</span>
+                        <span>
+                          Old Fees: <strong className="text-slate-900 dark:text-slate-100">{isCardRevealed('set1') ? formatCurrency(oldFeeCommitted, currencySymbol) : '••'}</strong>
+                        </span>
+                      </div>
+                    </>
+                  );
+                })()}
+              </div>
             </div>
           </div>
         </div>
 
         {/* ============================================================ */}
-        {/* CARD 2: SET 2 (Total Collected with breakdowns, Total Due with breakdowns) */}
+        {/* CARD 2: SET 2 (Total Collected with Old Fees, Total Due without books/dress) */}
         {/* ============================================================ */}
         <div
           id="card-set-2"
@@ -379,7 +405,7 @@ export const FinancialDashboard: React.FC<FinancialDashboardProps> = ({
                   )}
                 </div>
                 
-                {/* Detailed Fee Head Breakdown */}
+                {/* Detailed Fee Head Breakdown including Old Fees */}
                 <div className="pt-1.5 border-t border-emerald-200/60 dark:border-emerald-900/40 grid grid-cols-2 gap-x-2 gap-y-1 text-[10px] font-mono text-emerald-800 dark:text-emerald-300">
                   <div>
                     <span className="text-slate-500 dark:text-slate-400">School: </span>
@@ -390,6 +416,10 @@ export const FinancialDashboard: React.FC<FinancialDashboardProps> = ({
                     <span className="text-slate-500 dark:text-slate-400">Transport: </span>
                     <strong className="font-bold">{isCardRevealed('set2') && feeHeadMap.transport ? formatCurrency(feeHeadMap.transport.totalCollected, currencySymbol) : '••'}</strong>
                     {isCardRevealed('set2') && feeHeadMap.transport && <span className="text-[9px] text-slate-500 ml-0.5">({feeHeadMap.transport.collectionRate}%)</span>}
+                  </div>
+                  <div>
+                    <span className="text-slate-500 dark:text-slate-400">Old Fees: </span>
+                    <strong className="font-bold">{isCardRevealed('set2') ? (feeHeadMap.oldDue ? formatCurrency(feeHeadMap.oldDue.totalCollected, currencySymbol) : `${currencySymbol}0`) : '••'}</strong>
                   </div>
                   <div>
                     <span className="text-slate-500 dark:text-slate-400">Books 📚: </span>
@@ -408,7 +438,7 @@ export const FinancialDashboard: React.FC<FinancialDashboardProps> = ({
                 </div>
               </div>
 
-              {/* 2) Total Due */}
+              {/* 2) Total Due (Books & Dress removed as requested, Old Fees included) */}
               <div className="bg-rose-50/80 dark:bg-rose-950/40 rounded-lg p-2.5 border border-rose-200 dark:border-rose-900/60">
                 <div className="flex items-center justify-between text-[11px] font-bold text-rose-800 dark:text-rose-300 mb-0.5">
                   <span>2. Total Due</span>
@@ -424,8 +454,8 @@ export const FinancialDashboard: React.FC<FinancialDashboardProps> = ({
                   )}
                 </div>
 
-                {/* Due Breakdown */}
-                <div className="pt-1.5 border-t border-rose-200/60 dark:border-rose-900/40 grid grid-cols-2 gap-x-2 gap-y-1 text-[10px] font-mono text-rose-800 dark:text-rose-300">
+                {/* Due Breakdown without books/dress, showing School, Transport, Old Fees */}
+                <div className="pt-1.5 border-t border-rose-200/60 dark:border-rose-900/40 grid grid-cols-3 gap-x-2 gap-y-1 text-[10px] font-mono text-rose-800 dark:text-rose-300">
                   <div>
                     <span className="text-slate-500 dark:text-slate-400">School Due: </span>
                     <strong className="font-bold">{isCardRevealed('set2') && feeHeadMap.school ? formatCurrency(feeHeadMap.school.totalBalanceDue, currencySymbol) : '••'}</strong>
@@ -435,12 +465,8 @@ export const FinancialDashboard: React.FC<FinancialDashboardProps> = ({
                     <strong className="font-bold">{isCardRevealed('set2') && feeHeadMap.transport ? formatCurrency(feeHeadMap.transport.totalBalanceDue, currencySymbol) : '••'}</strong>
                   </div>
                   <div>
-                    <span className="text-slate-500 dark:text-slate-400">Books Due: </span>
-                    <strong className="font-bold">{isCardRevealed('set2') ? (feeHeadMap.books ? formatCurrency(feeHeadMap.books.totalBalanceDue, currencySymbol) : `${currencySymbol}0`) : '••'}</strong>
-                  </div>
-                  <div>
-                    <span className="text-slate-500 dark:text-slate-400">Dress Due: </span>
-                    <strong className="font-bold">{isCardRevealed('set2') ? (feeHeadMap.dress ? formatCurrency(feeHeadMap.dress.totalBalanceDue, currencySymbol) : `${currencySymbol}0`) : '••'}</strong>
+                    <span className="text-slate-500 dark:text-slate-400">Old Fees Due: </span>
+                    <strong className="font-bold">{isCardRevealed('set2') ? (feeHeadMap.oldDue ? formatCurrency(feeHeadMap.oldDue.totalBalanceDue, currencySymbol) : `${currencySymbol}0`) : '••'}</strong>
                   </div>
                 </div>
               </div>

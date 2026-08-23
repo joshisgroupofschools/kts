@@ -49,8 +49,10 @@ export function computeSystemAnalytics(
     const statusRes = computeStudentStatus(student, fin, tolerance, currentDateString);
 
     if (student.isActive) {
-      totalActualRevenue += (fin.actualFees > 0 ? fin.actualFees : fin.committedFees) + (fin.otherFees || 0);
-      totalCommittedRevenue += fin.totalPayable;
+      // Pure School Fee Baseline (Standard Class Fee rate without other fees)
+      totalActualRevenue += (fin.actualFees > 0 ? fin.actualFees : fin.committedFees);
+      // Pure Committed School Fee
+      totalCommittedRevenue += (fin.committedFees > 0 ? fin.committedFees : (fin.totalPayable - fin.otherFees));
       totalExpectedTillDate += fin.expectedTillDate;
       totalCollectedTillDate += fin.totalPaid;
       totalOverdueDeficitTillDate += fin.dueTillDate;

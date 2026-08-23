@@ -117,25 +117,54 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   // Automatically recalculate FIFO allocations whenever paymentAmount changes (unless manual override is enabled)
   useEffect(() => {
     if (!isManualOverride) {
-      if (selectedFeeType === 'BOOKS' && bookStruct) {
-        const bookInsts = summary.installments.filter((i) => i.feeStructureId === bookStruct.id);
+      if (selectedFeeType === 'BOOKS') {
+        const bookInsts = bookStruct ? summary.installments.filter((i) => i.feeStructureId === bookStruct.id) : [];
         if (bookInsts.length > 0) {
           const computed = calculateFifoAllocations(bookInsts, paymentAmount);
           setAllocations(computed);
-          return;
+        } else {
+          // Dedicated spot Books allocation outside regular balance
+          setAllocations([
+            {
+              installmentId: `inst_spot_books_${student.id}`,
+              headName: 'Books & Stationery Fee',
+              installmentNumber: 1,
+              dueDate: paymentDate,
+              allocatedAmount: paymentAmount,
+            },
+          ]);
         }
-      } else if (selectedFeeType === 'DRESS' && dressStruct) {
-        const dressInsts = summary.installments.filter((i) => i.feeStructureId === dressStruct.id);
+        return;
+      }
+      
+      if (selectedFeeType === 'DRESS') {
+        const dressInsts = dressStruct ? summary.installments.filter((i) => i.feeStructureId === dressStruct.id) : [];
         if (dressInsts.length > 0) {
           const computed = calculateFifoAllocations(dressInsts, paymentAmount);
           setAllocations(computed);
-          return;
+        } else {
+          // Dedicated spot Dress allocation outside regular balance
+          setAllocations([
+            {
+              installmentId: `inst_spot_dress_${student.id}`,
+              headName: 'School Uniform & Dress Fee',
+              installmentNumber: 1,
+              dueDate: paymentDate,
+              allocatedAmount: paymentAmount,
+            },
+          ]);
         }
+        return;
       }
-      const computed = calculateFifoAllocations(summary.installments, paymentAmount);
+
+      // For regular school/tuition/all fees: allocate FIFO across standard installments
+      const nonSpotInsts = summary.installments.filter(
+        (i) => !i.headName.toLowerCase().includes('book') && !i.headName.toLowerCase().includes('dress')
+      );
+      const computed = calculateFifoAllocations(nonSpotInsts.length > 0 ? nonSpotInsts : summary.installments, paymentAmount);
       setAllocations(computed);
     }
-  }, [paymentAmount, summary.installments, isManualOverride, selectedFeeType, bookStruct, dressStruct]);
+  }, [paymentAmount, summary.installments, isManualOverride, selectedFeeType, bookStruct, dressStruct, paymentDate, student.id]);
 
   // Handle fee type toggle
   const handleFeeTypeChange = (type: 'ALL' | 'BOOKS' | 'DRESS') => {
@@ -424,99 +453,6 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
               </div>
             </div>
           </div>
-
-          {/* AUTOMATED PARTIAL PAYMENT CATEGORY PROMPT */}
-          {isPartialPayment && (
-            <div className="p-3.5 bg-amber-50/80 dark:bg-amber-950/40 rounded-xl border border-amber-200 dark:border-amber-900/60 space-y-3 animate-in fade-in duration-200">
-              <div className="flex items-center justify-between">
-                <span className="font-bold text-amber-900 dark:text-amber-200 text-xs flex items-center gap-1.5">
-                  <Sparkles className="w-4 h-4 text-amber-600" />
-                  Partial Payment Detected (Balance: {formatCurrency(summary.totalDue - paymentAmount)})
-                </span>
-                <span className="text-[10px] bg-amber-200/80 dark:bg-amber-900 text-amber-900 dark:text-amber-200 px-2 py-0.5 rounded-full font-bold">
-                  Set Clearance Tier
-                </span>
-              </div>
-
-              {/* 3 Action Options: ID Card, Permission Slip (Default), Action Required */}
-              <div className="grid grid-cols-3 gap-2">
-                <button
-                  type="button"
-                  onClick={() => setPartialCategory('permission')}
-                  className={`py-2 px-2.5 rounded-lg border text-center font-bold text-xs transition-all cursor-pointer flex flex-col items-center gap-1 ${
-                    partialCategory === 'permission'
-                      ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
-                      : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
-                  }`}
-                >
-                  <div className="flex items-center gap-1">
-                    <CalendarClock className="w-3.5 h-3.5" />
-                    <span>Permission Slip</span>
-                  </div>
-                  <span className={`text-[9.5px] font-normal ${partialCategory === 'permission' ? 'text-indigo-100' : 'text-slate-400'}`}>
-                    (Default 5-day cycle)
-                  </span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setPartialCategory('id_card')}
-                  className={`py-2 px-2.5 rounded-lg border text-center font-bold text-xs transition-all cursor-pointer flex flex-col items-center gap-1 ${
-                    partialCategory === 'id_card'
-                      ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
-                      : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
-                  }`}
-                >
-                  <div className="flex items-center gap-1">
-                    <Award className="w-3.5 h-3.5" />
-                    <span>Issue ID Card</span>
-                  </div>
-                  <span className={`text-[9.5px] font-normal ${partialCategory === 'id_card' ? 'text-emerald-100' : 'text-slate-400'}`}>
-                    (Manual Clearance)
-                  </span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setPartialCategory('action')}
-                  className={`py-2 px-2.5 rounded-lg border text-center font-bold text-xs transition-all cursor-pointer flex flex-col items-center gap-1 ${
-                    partialCategory === 'action'
-                      ? 'bg-rose-600 text-white border-rose-600 shadow-xs'
-                      : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
-                  }`}
-                >
-                  <div className="flex items-center gap-1">
-                    <Flame className="w-3.5 h-3.5" />
-                    <span>Action Required</span>
-                  </div>
-                  <span className={`text-[9.5px] font-normal ${partialCategory === 'action' ? 'text-rose-100' : 'text-slate-400'}`}>
-                    (Active Follow-up)
-                  </span>
-                </button>
-              </div>
-
-              {/* Permission Slip Settings Tab */}
-              {partialCategory === 'permission' && (
-                <div className="p-2.5 bg-white dark:bg-slate-900 rounded-lg border border-indigo-100 dark:border-indigo-900/60 space-y-2">
-                  <div className="flex items-center justify-between gap-2 flex-wrap">
-                    <label className="font-bold text-indigo-950 dark:text-indigo-200 text-xs flex items-center gap-1">
-                      <Calendar className="w-3.5 h-3.5 text-indigo-600" />
-                      <span>Give Permission Till Date:</span>
-                    </label>
-                    <input
-                      type="date"
-                      value={permissionDate}
-                      onChange={(e) => setPermissionDate(e.target.value)}
-                      className="px-2.5 py-1 bg-indigo-50/60 dark:bg-indigo-950/60 border border-indigo-300 dark:border-indigo-700 rounded-lg font-bold text-indigo-950 dark:text-indigo-200 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    />
-                  </div>
-                  <div className="text-[10px] text-indigo-700 dark:text-indigo-300 font-medium">
-                    ✨ Defaulted to <strong>{formatDate(permissionDate)}</strong> (next multiple of 5th).
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
 
           {/* Live Chronological Knock-off Allocations Preview */}
           <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">

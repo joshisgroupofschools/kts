@@ -75,7 +75,11 @@ export function computeStudentStatus(
   // 3. Resolve Action Tier (Strictly 3 Tiers: ID_CARD, PERMISSION_SLIP, ACTION_REQUIRED)
   let actionTier: ActionTier = 'ACTION_REQUIRED';
 
-  if (isPermissionExpired) {
+  // Rule: If student has paid their due till date or is within tolerance (STRONG_GREEN or LIGHT_GREEN),
+  // they are fully cleared to receive their ID CARD.
+  if (statusCategory === 'STRONG_GREEN' || statusCategory === 'LIGHT_GREEN') {
+    actionTier = 'ID_CARD';
+  } else if (isPermissionExpired) {
     // If student had a permission slip and it expired without full clearance, MUST require immediate action
     actionTier = 'ACTION_REQUIRED';
   } else if (student.manualCategoryOverride === 'id_card') {
@@ -84,15 +88,10 @@ export function computeStudentStatus(
     actionTier = 'PERMISSION_SLIP';
   } else if (student.manualCategoryOverride === 'action') {
     actionTier = 'ACTION_REQUIRED';
+  } else if (hasActivePermission) {
+    actionTier = 'PERMISSION_SLIP';
   } else {
-    // Automatic resolution based on active permission or fee health
-    if (hasActivePermission) {
-      actionTier = 'PERMISSION_SLIP';
-    } else if (statusCategory === 'STRONG_GREEN' || statusCategory === 'LIGHT_GREEN') {
-      actionTier = 'ID_CARD';
-    } else {
-      actionTier = 'ACTION_REQUIRED';
-    }
+    actionTier = 'ACTION_REQUIRED';
   }
 
   return {

@@ -20,6 +20,7 @@ import {
   ChevronLeft,
   ChevronRight,
   CreditCard,
+  Edit3,
   Eye,
   EyeOff,
   FileSpreadsheet,
@@ -34,12 +35,12 @@ import {
   UserCheck,
   UserX,
 } from 'lucide-react';
+import { EditStudentModal } from './EditStudentModal';
 
 export interface ColumnVisibilityState {
   sno: boolean;
   student: boolean;
   className: boolean;
-  category1: boolean;
   actualSchoolFee: boolean;
   discount: boolean;
   committedSchoolFee: boolean;
@@ -53,13 +54,12 @@ export interface ColumnVisibilityState {
   actions: boolean;
 }
 
-const STORAGE_KEY = 'school_fee_column_prefs_v5';
+const STORAGE_KEY = 'school_fee_column_prefs_v6';
 
 const DEFAULT_COLUMNS: ColumnVisibilityState = {
   sno: true,
   student: true,
   className: true,
-  category1: true,
   actualSchoolFee: true,
   discount: true,
   committedSchoolFee: true,
@@ -77,7 +77,6 @@ const COLUMN_LABELS: Record<keyof ColumnVisibilityState, string> = {
   sno: 'S.NO',
   student: 'Student Details',
   className: 'Class',
-  category1: 'Category 1 (Books/Dress)',
   actualSchoolFee: 'Actual School Fees',
   discount: 'Discount',
   committedSchoolFee: 'Committed School Fees',
@@ -95,7 +94,6 @@ export type SortField =
   | 'sno'
   | 'name'
   | 'class'
-  | 'category1'
   | 'actualSchoolFee'
   | 'discount'
   | 'committedSchoolFee'
@@ -110,11 +108,13 @@ export type SortField =
 interface MasterStudentTableProps {
   summaries: StudentFinancialSummary[];
   schoolProfile: SchoolProfile;
+  classList?: string[];
   onOpenCollectModal: (student: Student, initialFeeType?: 'ALL' | 'BOOKS' | 'DRESS') => void;
   onOpenPermissionModal: (student: Student) => void;
   onOpenLedgerModal: (student: Student) => void;
   onOpenReceiptModal: (transaction: PaymentTransaction) => void;
   onOpenFeeStructureModal: (student: Student) => void;
+  onEditStudent?: (student: Student) => void;
   onToggleStudentActive: (studentId: string, currentActive: boolean) => void;
   onUpdateActionStatus?: (
     studentId: string,
@@ -129,15 +129,65 @@ interface MasterStudentTableProps {
 // Helper to determine Books / Dress Category 1 status
 export function getCategory1Status(item: StudentFinancialSummary): 'BOTH' | 'BOOKS' | 'DRESS' | 'NONE' {
   const structures = item.structures || [];
-  const hasBooks = structures.some(
-    (s) => s.headName.toLowerCase().includes('book') || s.headName.toLowerCase().includes('kit')
-  );
-  const hasDress = structures.some(
-    (s) =>
-      s.headName.toLowerCase().includes('dress') ||
-      s.headName.toLowerCase().includes('uniform') ||
-      s.headName.toLowerCase().includes('cloth')
-  );
+  const transactions = item.transactions || [];
+  const installments = item.installments || [];
+
+  const hasBooks =
+    structures.some(
+      (s) =>
+        s.headName.toLowerCase().includes('book') ||
+        s.headName.toLowerCase().includes('kit') ||
+        s.headName.toLowerCase().includes('stationery')
+    ) ||
+    transactions.some(
+      (t) =>
+        !t.isCancelled &&
+        (t.allocations.some(
+          (a) =>
+            a.headName.toLowerCase().includes('book') ||
+            a.headName.toLowerCase().includes('kit') ||
+            a.headName.toLowerCase().includes('stationery')
+        ) ||
+          (t.remarks &&
+            (t.remarks.toLowerCase().includes('book') ||
+              t.remarks.toLowerCase().includes('kit') ||
+              t.remarks.toLowerCase().includes('stationery'))))
+    ) ||
+    installments.some(
+      (ins) =>
+        ins.headName.toLowerCase().includes('book') ||
+        ins.headName.toLowerCase().includes('kit') ||
+        ins.headName.toLowerCase().includes('stationery')
+    );
+
+  const hasDress =
+    structures.some(
+      (s) =>
+        s.headName.toLowerCase().includes('dress') ||
+        s.headName.toLowerCase().includes('uniform') ||
+        s.headName.toLowerCase().includes('cloth')
+    ) ||
+    transactions.some(
+      (t) =>
+        !t.isCancelled &&
+        (t.allocations.some(
+          (a) =>
+            a.headName.toLowerCase().includes('dress') ||
+            a.headName.toLowerCase().includes('uniform') ||
+            a.headName.toLowerCase().includes('cloth')
+        ) ||
+          (t.remarks &&
+            (t.remarks.toLowerCase().includes('dress') ||
+              t.remarks.toLowerCase().includes('uniform') ||
+              t.remarks.toLowerCase().includes('cloth'))))
+    ) ||
+    installments.some(
+      (ins) =>
+        ins.headName.toLowerCase().includes('dress') ||
+        ins.headName.toLowerCase().includes('uniform') ||
+        ins.headName.toLowerCase().includes('cloth')
+    );
+
   if (hasBooks && hasDress) return 'BOTH';
   if (hasBooks) return 'BOOKS';
   if (hasDress) return 'DRESS';
@@ -211,11 +261,13 @@ export function getStudentFeeBreakdown(item: StudentFinancialSummary) {
 export const MasterStudentTable: React.FC<MasterStudentTableProps> = ({
   summaries,
   schoolProfile,
+  classList = [],
   onOpenCollectModal,
   onOpenPermissionModal,
   onOpenLedgerModal,
   onOpenReceiptModal,
   onOpenFeeStructureModal,
+  onEditStudent,
   onToggleStudentActive,
   onUpdateActionStatus,
 }) => {
@@ -223,6 +275,7 @@ export const MasterStudentTable: React.FC<MasterStudentTableProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [category1Filter, setCategory1Filter] = useState<'ALL' | 'BOOKS' | 'DRESS' | 'BOTH' | 'NONE'>('ALL');
   const [activeStatusDropdownId, setActiveStatusDropdownId] = useState<string | null>(null);
+  const [selectedStudentToEdit, setSelectedStudentToEdit] = useState<Student | null>(null);
   const [selectedStatusDate, setSelectedStatusDate] = useState<string>(() =>
     getNextMultipleOfFiveDate(new Date())
   );
@@ -289,7 +342,6 @@ export const MasterStudentTable: React.FC<MasterStudentTableProps> = ({
       sno: true,
       student: true,
       className: true,
-      category1: true,
       actualSchoolFee: true,
       discount: true,
       committedSchoolFee: true,
@@ -320,8 +372,8 @@ export const MasterStudentTable: React.FC<MasterStudentTableProps> = ({
       // Category 1 filter
       if (category1Filter !== 'ALL') {
         const cat = getCategory1Status(item);
-        if (category1Filter === 'BOOKS' && cat !== 'BOOKS' && cat !== 'BOTH') return false;
-        if (category1Filter === 'DRESS' && cat !== 'DRESS' && cat !== 'BOTH') return false;
+        if (category1Filter === 'BOOKS' && cat !== 'BOOKS') return false;
+        if (category1Filter === 'DRESS' && cat !== 'DRESS') return false;
         if (category1Filter === 'BOTH' && cat !== 'BOTH') return false;
         if (category1Filter === 'NONE' && cat !== 'NONE') return false;
       }
@@ -401,12 +453,6 @@ export const MasterStudentTable: React.FC<MasterStudentTableProps> = ({
         case 'class': {
           const rankDiff = getClassSortIndex(a.student.className) - getClassSortIndex(b.student.className);
           diff = rankDiff !== 0 ? rankDiff : a.student.className.localeCompare(b.student.className);
-          break;
-        }
-        case 'category1': {
-          const catA = getCategory1Status(a);
-          const catB = getCategory1Status(b);
-          diff = catA.localeCompare(catB);
           break;
         }
         case 'actualSchoolFee':
@@ -717,9 +763,9 @@ export const MasterStudentTable: React.FC<MasterStudentTableProps> = ({
             )}
           </div>
 
-          {/* Category 1 (Books/Dress) Filter */}
+          {/* Books / Uniforms Purchase Filter */}
           <div className="flex items-center gap-1 text-xs text-slate-600 dark:text-slate-400">
-            <span className="hidden sm:inline font-semibold">Category 1:</span>
+            <span className="hidden sm:inline font-semibold">Filter Purchases:</span>
             <select
               id="select-category1-filter"
               value={category1Filter}
@@ -728,13 +774,13 @@ export const MasterStudentTable: React.FC<MasterStudentTableProps> = ({
                 setCurrentPage(1);
               }}
               className="bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-2 py-1 text-xs font-semibold text-slate-800 dark:text-slate-200 focus:outline-none cursor-pointer"
-              title="Filter by Books / Dress Category"
+              title="Filter students by Books / Dress purchase status"
             >
-              <option value="ALL">All Categories</option>
-              <option value="BOOKS">📚 Books Only</option>
-              <option value="DRESS">👗 Dress Only</option>
-              <option value="BOTH">📚+👗 Books & Dress</option>
-              <option value="NONE">Regular Fees</option>
+              <option value="ALL">All Students</option>
+              <option value="BOOKS">📚 Only Books Purchased</option>
+              <option value="DRESS">👗 Only Dress Purchased</option>
+              <option value="BOTH">📚👗 Both Books & Dress Purchased</option>
+              <option value="NONE">❌ Didn't Purchase Anything</option>
             </select>
           </div>
 
@@ -931,20 +977,6 @@ export const MasterStudentTable: React.FC<MasterStudentTableProps> = ({
                   <div className="flex items-center gap-1">
                     <span>Class</span>
                     {renderSortIndicator('class')}
-                  </div>
-                </th>
-              )}
-
-              {/* 3b. Category 1 (Books/Dress) */}
-              {columns.category1 && (
-                <th
-                  className="py-2.5 px-2 text-center cursor-pointer hover:text-emerald-600 transition-colors whitespace-nowrap"
-                  onClick={() => handleSort('category1')}
-                  title="Sort by Category 1 (Books / Dress Fees)"
-                >
-                  <div className="flex items-center justify-center gap-1">
-                    <span>Category 1</span>
-                    {renderSortIndicator('category1')}
                   </div>
                 </th>
               )}
@@ -1223,32 +1255,6 @@ export const MasterStudentTable: React.FC<MasterStudentTableProps> = ({
                       </td>
                     )}
 
-                    {/* 3b. Category 1 (Books/Dress) */}
-                    {columns.category1 && (
-                      <td className={`${cellPadding} px-2 text-center whitespace-nowrap`}>
-                        <div className="flex items-center justify-center gap-1">
-                          {getCategory1Status(item) === 'BOTH' && (
-                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 font-bold text-[10px] border border-purple-200 dark:border-purple-800">
-                              📚👗 Books & Dress
-                            </span>
-                          )}
-                          {getCategory1Status(item) === 'BOOKS' && (
-                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 font-bold text-[10px] border border-blue-200 dark:border-blue-800">
-                              📚 Books
-                            </span>
-                          )}
-                          {getCategory1Status(item) === 'DRESS' && (
-                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-pink-50 dark:bg-pink-950/60 text-pink-700 dark:text-pink-300 font-bold text-[10px] border border-pink-200 dark:border-pink-800">
-                              👗 Dress
-                            </span>
-                          )}
-                          {getCategory1Status(item) === 'NONE' && (
-                            <span className="text-slate-400 font-mono text-[10px]">—</span>
-                          )}
-                        </div>
-                      </td>
-                    )}
-
                     {/* 4. Actual School Fees */}
                     {columns.actualSchoolFee && (
                       <td
@@ -1372,40 +1378,50 @@ export const MasterStudentTable: React.FC<MasterStudentTableProps> = ({
                         className={`${cellPadding} px-3`}
                         onClick={(e) => e.stopPropagation()}
                       >
-                        <div className="flex items-center justify-center gap-1 relative">
-                          {/* 0a. Quick Collect Books Fee (if available) */}
-                          {(getCategory1Status(item) === 'BOOKS' || getCategory1Status(item) === 'BOTH') && (
-                            <button
-                              id={`btn-collect-books-${student.id}`}
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onOpenCollectModal(student, 'BOOKS');
-                              }}
-                              className="p-1.5 rounded-md bg-amber-50 hover:bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300 border border-amber-200 dark:border-amber-800 transition-colors cursor-pointer"
-                              title="Quick Collect Books Fee"
-                            >
-                              <BookOpen className="w-3.5 h-3.5" />
-                            </button>
-                          )}
+                        <div className="flex items-center justify-center gap-1.5 relative">
+                          {/* 1. Full Student Ledger Statement */}
+                          <button
+                            id={`btn-ledger-${student.id}`}
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onOpenLedgerModal(student);
+                            }}
+                            className="p-1.5 rounded-md bg-blue-50 hover:bg-blue-100 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300 border border-blue-200 dark:border-blue-800 transition-colors cursor-pointer"
+                            title="Student Financial Ledger & Audit Statement (📋)"
+                          >
+                            <FileSpreadsheet className="w-3.5 h-3.5" />
+                          </button>
 
-                          {/* 0b. Quick Collect Dress Fee (if available) */}
-                          {(getCategory1Status(item) === 'DRESS' || getCategory1Status(item) === 'BOTH') && (
-                            <button
-                              id={`btn-collect-dress-${student.id}`}
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onOpenCollectModal(student, 'DRESS');
-                              }}
-                              className="p-1.5 rounded-md bg-pink-50 hover:bg-pink-100 text-pink-800 dark:bg-pink-950/50 dark:text-pink-300 border border-pink-200 dark:border-pink-800 transition-colors cursor-pointer"
-                              title="Quick Collect Dress Fee"
-                            >
-                              <Shirt className="w-3.5 h-3.5" />
-                            </button>
-                          )}
+                          {/* 2. Books Button */}
+                          <button
+                            id={`btn-collect-books-${student.id}`}
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onOpenCollectModal(student, 'BOOKS');
+                            }}
+                            className="p-1.5 rounded-md bg-amber-50 hover:bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300 border border-amber-200 dark:border-amber-800 transition-colors cursor-pointer"
+                            title="Collect Books Fee (📚)"
+                          >
+                            <BookOpen className="w-3.5 h-3.5" />
+                          </button>
 
-                          {/* 0c. Change Action Status Button (ID Card / Permission / Action) */}
+                          {/* 3. Dress / Uniform Button */}
+                          <button
+                            id={`btn-collect-dress-${student.id}`}
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onOpenCollectModal(student, 'DRESS');
+                            }}
+                            className="p-1.5 rounded-md bg-pink-50 hover:bg-pink-100 text-pink-800 dark:bg-pink-950/50 dark:text-pink-300 border border-pink-200 dark:border-pink-800 transition-colors cursor-pointer"
+                            title="Collect Uniform / Dress Fee (👗)"
+                          >
+                            <Shirt className="w-3.5 h-3.5" />
+                          </button>
+
+                          {/* 4. Action Status Button */}
                           {onUpdateActionStatus && (
                             <div className="relative status-dropdown-container">
                               <button
@@ -1424,7 +1440,7 @@ export const MasterStudentTable: React.FC<MasterStudentTableProps> = ({
                                     ? 'bg-indigo-50 hover:bg-indigo-100 text-indigo-800 dark:bg-indigo-950/50 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800'
                                     : 'bg-rose-50 hover:bg-rose-100 text-rose-800 dark:bg-rose-950/50 dark:text-rose-300 border-rose-200 dark:border-rose-800'
                                 }`}
-                                title="Change Action Status (ID Card / Permission / Action)"
+                                title="Action Status (ID Card / Permission Slip / Action Required)"
                               >
                                 {actionTier === 'ID_CARD' ? (
                                   <Award className="w-3.5 h-3.5 text-emerald-600" />
@@ -1446,7 +1462,7 @@ export const MasterStudentTable: React.FC<MasterStudentTableProps> = ({
                                     <button
                                       type="button"
                                       onClick={() => setActiveStatusDropdownId(null)}
-                                      className="text-slate-400 hover:text-slate-600 font-bold"
+                                      className="text-slate-400 hover:text-slate-600 font-bold cursor-pointer"
                                     >
                                       ✕
                                     </button>
@@ -1460,7 +1476,7 @@ export const MasterStudentTable: React.FC<MasterStudentTableProps> = ({
                                         onUpdateActionStatus(student.id, undefined, undefined, 'id_card');
                                         setActiveStatusDropdownId(null);
                                       }}
-                                      className="w-full flex items-center gap-2 p-1.5 rounded-lg text-left hover:bg-emerald-50 dark:hover:bg-emerald-950/60 transition-colors font-medium text-emerald-800 dark:text-emerald-300"
+                                      className="w-full flex items-center gap-2 p-1.5 rounded-lg text-left hover:bg-emerald-50 dark:hover:bg-emerald-950/60 transition-colors font-medium text-emerald-800 dark:text-emerald-300 cursor-pointer"
                                     >
                                       <Award className="w-4 h-4 text-emerald-600 shrink-0" />
                                       <div>
@@ -1499,9 +1515,9 @@ export const MasterStudentTable: React.FC<MasterStudentTableProps> = ({
                                           );
                                           setActiveStatusDropdownId(null);
                                         }}
-                                        className="w-full py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded font-bold text-[11px] shadow-2xs"
+                                        className="w-full py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded font-bold text-[11px] shadow-2xs cursor-pointer"
                                       >
-                                        Apply Permission
+                                        Apply Permission Slip
                                       </button>
                                     </div>
 
@@ -1517,13 +1533,13 @@ export const MasterStudentTable: React.FC<MasterStudentTableProps> = ({
                                         );
                                         setActiveStatusDropdownId(null);
                                       }}
-                                      className="w-full flex items-center gap-2 p-1.5 rounded-lg text-left hover:bg-rose-50 dark:hover:bg-rose-950/60 transition-colors font-medium text-rose-800 dark:text-rose-300"
+                                      className="w-full flex items-center gap-2 p-1.5 rounded-lg text-left hover:bg-rose-50 dark:hover:bg-rose-950/60 transition-colors font-medium text-rose-800 dark:text-rose-300 cursor-pointer"
                                     >
                                       <Flame className="w-4 h-4 text-rose-600 shrink-0" />
                                       <div>
                                         <div className="font-bold">Action Required</div>
                                         <div className="text-[10px] text-slate-500 dark:text-slate-400">
-                                          Follow-up / stop card
+                                          Follow-up / withhold card
                                         </div>
                                       </div>
                                     </button>
@@ -1535,7 +1551,7 @@ export const MasterStudentTable: React.FC<MasterStudentTableProps> = ({
                                         onUpdateActionStatus(student.id, undefined, undefined, 'auto');
                                         setActiveStatusDropdownId(null);
                                       }}
-                                      className="w-full text-center py-1 text-[10px] text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 hover:underline"
+                                      className="w-full text-center py-1 text-[10px] text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 hover:underline cursor-pointer"
                                     >
                                       Reset to Auto Calculation
                                     </button>
@@ -1545,35 +1561,21 @@ export const MasterStudentTable: React.FC<MasterStudentTableProps> = ({
                             </div>
                           )}
 
-                          {/* 1. Full Ledger Statement */}
+                          {/* 4. Settings (Edit Student Details & Fee Structure) */}
                           <button
-                            id={`btn-ledger-${student.id}`}
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onOpenLedgerModal(student);
-                            }}
-                            className="p-1.5 rounded-md bg-blue-50 hover:bg-blue-100 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300 border border-blue-200 dark:border-blue-800 transition-colors cursor-pointer"
-                            title="View Full Student Ledger Statement"
-                          >
-                            <FileSpreadsheet className="w-3.5 h-3.5" />
-                          </button>
-
-                          {/* 2. Fee Structure & Discount Config */}
-                          <button
-                            id={`btn-fee-config-${student.id}`}
+                            id={`btn-settings-${student.id}`}
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation();
                               onOpenFeeStructureModal(student);
                             }}
                             className="p-1.5 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border border-slate-200 dark:border-slate-700 transition-colors cursor-pointer"
-                            title="Edit Fee Structure & Discount"
+                            title="Settings (Edit Student Profile, Fees & Discounts)"
                           >
                             <Settings className="w-3.5 h-3.5" />
                           </button>
 
-                          {/* 3. Print Latest Receipt */}
+                          {/* 5. Print Receipt */}
                           <button
                             id={`btn-receipt-${student.id}`}
                             type="button"
@@ -1596,25 +1598,12 @@ export const MasterStudentTable: React.FC<MasterStudentTableProps> = ({
                             <Printer className="w-3.5 h-3.5" />
                           </button>
 
-                          {/* 4. Issue Grace Permission */}
-                          <button
-                            id={`btn-permission-${student.id}`}
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onOpenPermissionModal(student);
-                            }}
-                            className="p-1.5 rounded-md bg-indigo-50 hover:bg-indigo-100 text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 transition-colors cursor-pointer"
-                            title="Issue Temporary Permission Slip"
-                          >
-                            <Calendar className="w-3.5 h-3.5" />
-                          </button>
-
-                          {/* 5. WhatsApp Reminder */}
-                          {student.phone && (
+                          {/* 6. WhatsApp Message */}
+                          {student.phone ? (
                             <a
+                              id={`btn-whatsapp-${student.id}`}
                               href={`https://wa.me/91${student.phone.replace(/\D/g, '')}?text=${encodeURIComponent(
-                                `Dear Parent, reminder from ${schoolProfile.schoolName || 'School'} regarding fee payment for ${student.name} (Class: ${student.className}). Overdue amount is ${formatCurrency(item.dueTillDate, currencySymbol)}. Total balance due: ${formatCurrency(item.totalDue, currencySymbol)}. Thank you.`
+                                `Dear Parent, reminder from ${schoolProfile.schoolName || schoolProfile.name || 'Kakatiya School'} regarding fee payment for ${student.name} of (Class ${student.className}). You total due till date ${new Date().toLocaleDateString('en-GB')} amount is ₹${item.dueTillDate.toLocaleString('en-IN')}. Thank you.`
                               )}`}
                               target="_blank"
                               rel="noreferrer"
@@ -1624,6 +1613,15 @@ export const MasterStudentTable: React.FC<MasterStudentTableProps> = ({
                             >
                               <MessageCircle className="w-3.5 h-3.5" />
                             </a>
+                          ) : (
+                            <button
+                              type="button"
+                              disabled
+                              className="p-1.5 rounded-md bg-slate-100 text-slate-300 dark:bg-slate-800 dark:text-slate-600 border border-slate-200 dark:border-slate-700 opacity-40 cursor-not-allowed"
+                              title="No mobile number registered"
+                            >
+                              <MessageCircle className="w-3.5 h-3.5" />
+                            </button>
                           )}
                         </div>
                       </td>
@@ -1646,7 +1644,6 @@ export const MasterStudentTable: React.FC<MasterStudentTableProps> = ({
                   </td>
                 )}
                 {columns.className && <td className="py-2.5 px-2.5"></td>}
-                {columns.category1 && <td className="py-2.5 px-2"></td>}
 
                 {/* 4. Actual School Fees Total */}
                 {columns.actualSchoolFee && (
@@ -1769,6 +1766,20 @@ export const MasterStudentTable: React.FC<MasterStudentTableProps> = ({
             </button>
           </div>
         </div>
+      )}
+      {/* Edit Student Details Modal */}
+      {selectedStudentToEdit && (
+        <EditStudentModal
+          student={selectedStudentToEdit}
+          classList={classList}
+          onSave={(updated) => {
+            if (onEditStudent) {
+              onEditStudent(updated);
+            }
+            setSelectedStudentToEdit(null);
+          }}
+          onClose={() => setSelectedStudentToEdit(null)}
+        />
       )}
     </div>
   );

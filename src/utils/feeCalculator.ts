@@ -230,10 +230,12 @@ export function computeStudentFinancials(
 
   // School Fee (Non-spot / main head)
   const schoolFeeStructures = studentStructures.filter(
-    (s) => !s.isSpotFee && s.headName.toLowerCase().includes('school')
+    (s) => !s.isSpotFee && (s.headName.toLowerCase().includes('school') || s.headName.toLowerCase().includes('tuition') || s.headName.toLowerCase().includes('academic'))
   );
+  
+  // Other recurring fees (Transport, Old Due) - strictly excluding spot purchases like Books & Uniform/Dress
   const otherFeeStructures = studentStructures.filter(
-    (s) => s.isSpotFee || !s.headName.toLowerCase().includes('school')
+    (s) => !s.isSpotFee && !s.headName.toLowerCase().includes('school') && !s.headName.toLowerCase().includes('tuition') && !s.headName.toLowerCase().includes('academic') && !s.headName.toLowerCase().includes('book') && !s.headName.toLowerCase().includes('dress') && !s.headName.toLowerCase().includes('uniform')
   );
 
   const actualFees = schoolFeeStructures.reduce((sum, s) => sum + s.actualFee, 0);
@@ -243,20 +245,35 @@ export function computeStudentFinancials(
 
   const totalPayable = committedFees + otherFees;
 
+  // Regular school ledger transactions (excluding dedicated spot Books and Dress purchases)
+  const regularTransactions = studentTransactions.filter((t) => {
+    const isBookOrDress = t.allocations.some((a) => {
+      const h = (a.headName || '').toLowerCase();
+      return h.includes('book') || h.includes('dress') || h.includes('uniform') || h.includes('stationery') || h.includes('kit');
+    }) || (t.remarks && (t.remarks.toLowerCase().includes('book') || t.remarks.toLowerCase().includes('dress') || t.remarks.toLowerCase().includes('uniform')));
+    return !isBookOrDress;
+  });
+
+  const regularPaid = regularTransactions.reduce((sum, t) => sum + t.amount, 0);
+
   // If student is inactive: whatever paid shows, unpaid future dues disappear
-  let totalDue = Math.max(0, totalPayable - totalPaid);
+  let totalDue = Math.max(0, totalPayable - regularPaid);
   if (!isActive) {
     totalDue = 0;
   }
 
-  // Calculate Expected Till Date
-  const expectedTillDate = studentInstallments
+  // Calculate Expected Till Date (from regular scheduled installments)
+  const regularInstallments = studentInstallments.filter((inst) => {
+    const h = (inst.headName || '').toLowerCase();
+    return !h.includes('book') && !h.includes('dress') && !h.includes('uniform') && !h.includes('stationery') && !h.includes('kit');
+  });
+
+  const expectedTillDate = regularInstallments
     .filter((inst) => inst.dueDate <= asOfDate)
     .reduce((sum, inst) => sum + inst.amount, 0);
 
-  // Calculate Due Till Date
-  // Due till date is the sum of unpaid balance for all installments due on or before today
-  let dueTillDate = studentInstallments
+  // Calculate Due Till Date (sum of unpaid balance for regular installments due on or before today)
+  let dueTillDate = regularInstallments
     .filter((inst) => inst.dueDate <= asOfDate)
     .reduce((sum, inst) => sum + inst.balanceAmount, 0);
 
@@ -265,7 +282,7 @@ export function computeStudentFinancials(
   }
 
   // Find next upcoming due date (first installment with balance > 0 and dueDate >= asOfDate)
-  const upcomingInst = studentInstallments
+  const upcomingInst = regularInstallments
     .filter((inst) => inst.balanceAmount > 0 && inst.dueDate >= asOfDate)
     .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime())[0];
 

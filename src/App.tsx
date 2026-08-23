@@ -63,6 +63,7 @@ import { SchoolSettingsModal } from './components/SchoolSettingsModal';
 import { HelpModal } from './components/HelpModal';
 import { BulkUploadModal } from './components/BulkUploadModal';
 import { TrialVerificationView } from './components/TrialVerificationView';
+import { PasscodeGate } from './components/PasscodeGate';
 import { generateStructuredRealData } from './data/trialSpreadsheetData';
 import { FileSpreadsheet, Sparkles, CheckCircle2 } from 'lucide-react';
 
@@ -631,8 +632,9 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-100 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col font-sans transition-colors">
-      {/* 1. Global Navigation Bar */}
+    <PasscodeGate schoolProfile={safeSchoolProfile}>
+      <div className="min-h-screen bg-slate-100 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col font-sans transition-colors">
+        {/* 1. Global Navigation Bar */}
       <Navbar
         schoolProfile={safeSchoolProfile}
         tolerance={tolerance}
@@ -741,6 +743,15 @@ export default function App() {
             <MasterStudentTable
               summaries={filteredStudentSummaries}
               schoolProfile={safeSchoolProfile}
+              classList={classList}
+              onEditStudent={(updatedStudent) => {
+                setStudents((prev) =>
+                  prev.map((s) => (s.id === updatedStudent.id ? updatedStudent : s))
+                );
+                saveStudents(
+                  students.map((s) => (s.id === updatedStudent.id ? updatedStudent : s))
+                );
+              }}
               onOpenCollectModal={(student, initialFeeType = 'ALL') => {
                 setSelectedStudentId(student.id);
                 setCollectInitialFeeType(initialFeeType);
@@ -910,6 +921,7 @@ export default function App() {
           onClose={() => setActiveModal('NONE')}
         />
       )}
-    </div>
+      </div>
+    </PasscodeGate>
   );
 }
