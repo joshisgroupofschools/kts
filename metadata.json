@@ -1,0 +1,6 @@
+{
+  "name": "Fee Collection Management System",
+  "description": "Smart school fee collection software with installment mapping, chronological due allocation, permission tracking, and ledger management.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

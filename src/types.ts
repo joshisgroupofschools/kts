@@ -1,0 +1,219 @@
+export type PaymentMode = 'Cash' | 'UPI' | 'Cheque' | 'Bank Transfer' | 'Draft' | 'Other';
+
+export type StatusCategory = 'STRONG_GREEN' | 'LIGHT_GREEN' | 'LIGHT_YELLOW' | 'LIGHT_RED' | 'STRONG_RED';
+
+export type ActionTier = 'ID_CARD' | 'PERMISSION_SLIP' | 'ACTION_REQUIRED';
+
+export interface Student {
+  id: string;
+  rollNo: string;
+  name: string;
+  classId: string;
+  className: string;
+  section: string;
+  parentName: string;
+  phone: string;
+  altPhone?: string;
+  address?: string;
+  admissionDate: string;
+  isActive: boolean;
+  notes?: string;
+  permissionExpiresAt?: string; // ISO date string (YYYY-MM-DD)
+  permissionReason?: string;
+  manualCategoryOverride?: 'auto' | 'id_card' | 'permission' | 'action';
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface FeeHeadDefinition {
+  id: string;
+  headName: string;
+  isMandatory: boolean;
+  isSpotFee?: boolean;
+  description?: string;
+}
+
+export interface ClassFeeConfig {
+  id: string;
+  className: string;
+  actualFee: number;
+  defaultInstallments: number;
+  defaultDueDayOfMonth: number; // e.g. 10th of the month
+  startMonth: number; // 0-indexed (e.g., 5 for June in Indian academic year)
+}
+
+export interface Installment {
+  id: string;
+  feeStructureId: string;
+  studentId: string;
+  headName: string;
+  installmentNumber: number;
+  totalInstallments: number;
+  amount: number;
+  dueDate: string; // YYYY-MM-DD
+  paidAmount: number;
+  balanceAmount: number;
+  status: 'unpaid' | 'partial' | 'paid';
+}
+
+export interface StudentFeeStructure {
+  id: string;
+  studentId: string;
+  headName: string;
+  actualFee: number;
+  committedFee: number;
+  concession: number;
+  concessionReason?: string;
+  commitmentReceiptNo?: string;
+  commitmentDate: string;
+  installmentsCount: number;
+  isSpotFee?: boolean;
+  remarks?: string;
+}
+
+export interface PaymentAllocation {
+  installmentId: string;
+  headName: string;
+  installmentNumber: number;
+  dueDate: string;
+  allocatedAmount: number;
+}
+
+export interface PaymentTransaction {
+  id: string;
+  receiptNo: string;
+  studentId: string;
+  studentName: string;
+  studentRollNo: string;
+  studentClass: string;
+  date: string; // YYYY-MM-DD HH:mm
+  amount: number;
+  paymentMode: PaymentMode;
+  referenceNo?: string;
+  remarks?: string;
+  allocations: PaymentAllocation[];
+  isCancelled: boolean;
+  cancellationReason?: string;
+  cancelledAt?: string;
+  collectedBy?: string;
+}
+
+export interface ToleranceConfig {
+  mode: 'percentage' | 'fixed_amount';
+  value: number; // e.g. 25 for 25% or 500 for ₹500
+}
+
+export interface SchoolProfile {
+  schoolName: string;
+  tagline: string;
+  affiliationNo: string;
+  address: string;
+  phone: string;
+  email: string;
+  academicYear: string;
+  receiptPrefix: string;
+  nextReceiptSequence: number;
+  currencySymbol: string;
+  receiptDisclaimer: string;
+  enabledReceiptFields: {
+    showRollNo: boolean;
+    showParentName: boolean;
+    showPhone: boolean;
+    showRemarks: boolean;
+    showInstallmentBreakdown: boolean;
+    showSignatures: boolean;
+    showDualCopy: boolean;
+  };
+  mandatoryStudentFields: {
+    rollNo: boolean;
+    parentName: boolean;
+    phone: boolean;
+    address: boolean;
+    section: boolean;
+  };
+}
+
+export interface StudentFinancialSummary {
+  student: Student;
+  actualFees: number;
+  committedFees: number;
+  concession: number;
+  otherFees: number;
+  totalPayable: number;
+  totalPaid: number;
+  totalDue: number;
+  dueTillDate: number;
+  expectedTillDate: number;
+  statusCategory: StatusCategory;
+  actionTier: ActionTier;
+  nextDueDate: string | null;
+  daysRemainingOnPermission: number | null;
+  isPermissionExpired: boolean;
+  hasUncommittedFee: boolean;
+  installments: Installment[];
+  structures: StudentFeeStructure[];
+  transactions: PaymentTransaction[];
+}
+
+export interface StudentFilterState {
+  searchQuery: string;
+  selectedClass: string;
+  selectedStatus: StatusCategory | 'ALL';
+  selectedCategory: ActionTier | 'ALL';
+  sortBy: 'rollNo' | 'name' | 'dueTillDate' | 'totalDue' | 'status';
+  sortOrder: 'asc' | 'desc';
+}
+
+export interface FeeHeadBifurcation {
+  headName: string;
+  totalCommitted: number;
+  totalExpectedTillDate: number;
+  totalCollected: number;
+  totalDueTillDate: number;
+  totalBalanceDue: number;
+  activeStudentsCount: number;
+  collectionRate: number;
+  isSpotFee?: boolean;
+}
+
+export interface AnalyticsSummary {
+  totalStudents: number;
+  activeStudents: number;
+  inactiveStudents: number;
+  totalActualRevenue: number;
+  totalCommittedRevenue: number;
+  totalExpectedTillDate: number;
+  totalCollectedTillDate: number;
+  totalCashCollected: number;
+  totalUpiCollected: number;
+  totalOverdueDeficitTillDate: number;
+  totalOverallDue: number;
+  collectionEfficiencyPercent: number;
+  todayCollection: number;
+  todayCash: number;
+  todayUpi: number;
+  todayOther: number;
+  totalConcessionGiven: number;
+  concessionStudentsCount: number;
+  totalTransactionsCount: number;
+  averageReceiptAmount: number;
+  dailyTargetRunRate: {
+    targetDailyAmount: number;
+    daysRemainingInCycle: number;
+    suggestedStudentsPerDay: number;
+    backlogGap: number;
+  };
+  categoryCounts: {
+    strongGreen: number;
+    lightGreen: number;
+    lightYellow: number;
+    lightRed: number;
+    strongRed: number;
+  };
+  actionTierCounts: {
+    idCardEligible: number;
+    onPermission: number;
+    actionRequired: number;
+  };
+  headWiseBifurcation: FeeHeadBifurcation[];
+}
