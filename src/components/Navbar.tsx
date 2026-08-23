@@ -129,51 +129,18 @@ export const Navbar: React.FC<NavbarProps> = ({
                 )}
               </div>
 
-              {/* Theme Toggle Button */}
-              <button
-                id="btn-toggle-theme"
-                type="button"
-                onClick={onToggleTheme}
-                className="p-2 sm:px-2.5 sm:py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5"
-                title={theme === 'dark' ? 'Switch to Light Theme' : 'Switch to Dark Theme'}
-              >
-                {theme === 'dark' ? (
-                  <>
-                    <Sun className="w-4 h-4 text-amber-400" />
-                    <span className="hidden sm:inline">Light</span>
-                  </>
-                ) : (
-                  <>
-                    <Moon className="w-4 h-4 text-slate-600" />
-                    <span className="hidden sm:inline">Dark</span>
-                  </>
-                )}
-              </button>
-
-              {/* Add Student Primary Action */}
-              <button
-                id="btn-add-student-nav"
-                type="button"
-                onClick={onOpenAddStudent}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-sm active:scale-95 cursor-pointer"
-              >
-                <Plus className="w-4 h-4" />
-                <span className="hidden sm:inline">Add Student</span>
-                <span className="sm:hidden">Add</span>
-              </button>
-
               {/* Hamburger Menu Button */}
               <button
                 id="btn-navbar-hamburger"
                 type="button"
                 onClick={() => setShowDrawer(true)}
-                className="relative flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-100 border border-slate-300 dark:border-slate-700 text-xs font-bold transition-colors cursor-pointer"
-                title="Open Navigation Menu, Fee Schedule & Settings"
+                className="relative flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-sm active:scale-95 cursor-pointer"
+                title="Open Navigation Menu & Controls"
               >
                 <Menu className="w-4 h-4" />
-                <span className="hidden sm:inline">Menu</span>
+                <span>Menu</span>
                 {isDateSimulated && (
-                  <span className="w-2 h-2 rounded-full bg-amber-500 absolute -top-0.5 -right-0.5" />
+                  <span className="w-2 h-2 rounded-full bg-amber-300 absolute -top-0.5 -right-0.5" />
                 )}
               </button>
             </div>
@@ -218,6 +185,40 @@ export const Navbar: React.FC<NavbarProps> = ({
 
             {/* Drawer Content */}
             <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4 text-xs">
+              {/* Primary Actions: Add Student & Theme Toggle */}
+              <div className="grid grid-cols-2 gap-2 pb-2 border-b border-slate-200 dark:border-slate-800">
+                <button
+                  id="btn-add-student-drawer"
+                  type="button"
+                  onClick={() => {
+                    setShowDrawer(false);
+                    onOpenAddStudent();
+                  }}
+                  className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs active:scale-95 transition-all cursor-pointer"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Add Student</span>
+                </button>
+
+                <button
+                  id="btn-toggle-theme-drawer"
+                  type="button"
+                  onClick={onToggleTheme}
+                  className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-100 border border-slate-200 dark:border-slate-700 font-bold text-xs transition-all cursor-pointer"
+                >
+                  {theme === 'dark' ? (
+                    <>
+                      <Sun className="w-4 h-4 text-amber-400" />
+                      <span>Light Mode</span>
+                    </>
+                  ) : (
+                    <>
+                      <Moon className="w-4 h-4 text-slate-600" />
+                      <span>Dark Mode</span>
+                    </>
+                  )}
+                </button>
+              </div>
               {/* As-Of Date Section */}
               <div className="bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl p-3.5 space-y-2">
                 <div className="flex items-center justify-between">

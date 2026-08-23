@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import confetti from 'canvas-confetti';
 import {
   Installment,
@@ -10,49 +10,104 @@ import {
   StudentFinancialSummary,
 } from '../types';
 import { calculateFifoAllocations } from '../utils/feeCalculator';
-import { formatCurrency, formatDate } from '../utils/numberToWords';
+import { formatCurrency, formatDate, getNextMultipleOfFiveDate } from '../utils/numberToWords';
 import {
   AlertCircle,
+  Award,
   Banknote,
+  BookOpen,
+  Calendar,
+  CalendarClock,
   Check,
   CheckCircle,
   Clock,
   CreditCard,
+  Flame,
   Layers,
   Printer,
   QrCode,
+  Shirt,
   Sparkles,
   User,
   X,
 } from 'lucide-react';
 
+export interface PartialPaymentStatusUpdate {
+  manualCategoryOverride: 'auto' | 'id_card' | 'permission' | 'action';
+  permissionExpiresAt?: string;
+  permissionReason?: string;
+}
+
 interface PaymentModalProps {
   student: Student;
   summary: StudentFinancialSummary;
   schoolProfile: SchoolProfile;
+  initialFeeType?: 'ALL' | 'BOOKS' | 'DRESS';
   onClose: () => void;
-  onSavePayment: (transaction: PaymentTransaction, customAllocations: PaymentAllocation[]) => void;
+  onSavePayment: (
+    transaction: PaymentTransaction,
+    customAllocations: PaymentAllocation[],
+    partialStatusUpdate?: PartialPaymentStatusUpdate
+  ) => void;
 }
 
 export const PaymentModal: React.FC<PaymentModalProps> = ({
   student,
   summary,
   schoolProfile,
+  initialFeeType = 'ALL',
   onClose,
   onSavePayment,
 }) => {
-  const [paymentAmount, setPaymentAmount] = useState<number>(
-    summary.dueTillDate > 0 ? summary.dueTillDate : summary.totalDue
+  const [selectedFeeType, setSelectedFeeType] = useState<'ALL' | 'BOOKS' | 'DRESS'>(initialFeeType);
+
+  // Find book / dress structures if present
+  const bookStruct = summary.structures.find((s) => s.headName.toLowerCase().includes('book'));
+  const dressStruct = summary.structures.find(
+    (s) => s.headName.toLowerCase().includes('dress') || s.headName.toLowerCase().includes('uniform')
   );
+
+  const initialAmount = useMemo(() => {
+    if (initialFeeType === 'BOOKS') {
+      return bookStruct ? bookStruct.committedFee : 3000;
+    }
+    if (initialFeeType === 'DRESS') {
+      return dressStruct ? dressStruct.committedFee : 2500;
+    }
+    return summary.dueTillDate > 0 ? summary.dueTillDate : summary.totalDue;
+  }, [initialFeeType, bookStruct, dressStruct, summary.dueTillDate, summary.totalDue]);
+
+  const [paymentAmount, setPaymentAmount] = useState<number>(initialAmount);
   const [paymentMode, setPaymentMode] = useState<PaymentMode>('Cash');
   const [referenceNo, setReferenceNo] = useState('');
-  const [remarks, setRemarks] = useState('');
+  const [remarks, setRemarks] = useState(
+    initialFeeType === 'BOOKS'
+      ? 'Books & Notebooks Fee'
+      : initialFeeType === 'DRESS'
+      ? 'School Dress & Uniform Fee'
+      : ''
+  );
   const [paymentDate, setPaymentDate] = useState<string>(
     new Date().toISOString().split('T')[0]
   );
   const [allocations, setAllocations] = useState<PaymentAllocation[]>([]);
   const [isManualOverride, setIsManualOverride] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // Partial Payment Automated Category Prompt State (Default: Permission Slip)
+  const [partialCategory, setPartialCategory] = useState<'permission' | 'id_card' | 'action'>('permission');
+  const [permissionDate, setPermissionDate] = useState<string>(() =>
+    getNextMultipleOfFiveDate(new Date())
+  );
+  const [permissionReason, setPermissionReason] = useState<string>('');
+
+  // Update permissionDate whenever paymentDate changes
+  useEffect(() => {
+    const d = new Date(paymentDate);
+    if (!isNaN(d.getTime())) {
+      setPermissionDate(getNextMultipleOfFiveDate(d));
+    }
+  }, [paymentDate]);
 
   // Generate Preview Receipt No
   const currentYear = new Date().getFullYear();
@@ -62,10 +117,43 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   // Automatically recalculate FIFO allocations whenever paymentAmount changes (unless manual override is enabled)
   useEffect(() => {
     if (!isManualOverride) {
+      if (selectedFeeType === 'BOOKS' && bookStruct) {
+        const bookInsts = summary.installments.filter((i) => i.feeStructureId === bookStruct.id);
+        if (bookInsts.length > 0) {
+          const computed = calculateFifoAllocations(bookInsts, paymentAmount);
+          setAllocations(computed);
+          return;
+        }
+      } else if (selectedFeeType === 'DRESS' && dressStruct) {
+        const dressInsts = summary.installments.filter((i) => i.feeStructureId === dressStruct.id);
+        if (dressInsts.length > 0) {
+          const computed = calculateFifoAllocations(dressInsts, paymentAmount);
+          setAllocations(computed);
+          return;
+        }
+      }
       const computed = calculateFifoAllocations(summary.installments, paymentAmount);
       setAllocations(computed);
     }
-  }, [paymentAmount, summary.installments, isManualOverride]);
+  }, [paymentAmount, summary.installments, isManualOverride, selectedFeeType, bookStruct, dressStruct]);
+
+  // Handle fee type toggle
+  const handleFeeTypeChange = (type: 'ALL' | 'BOOKS' | 'DRESS') => {
+    setSelectedFeeType(type);
+    setIsManualOverride(false);
+    if (type === 'BOOKS') {
+      const amt = bookStruct ? bookStruct.committedFee : 3000;
+      setPaymentAmount(amt);
+      setRemarks('Books & Study Material Fee');
+    } else if (type === 'DRESS') {
+      const amt = dressStruct ? dressStruct.committedFee : 2500;
+      setPaymentAmount(amt);
+      setRemarks('School Dress & Uniform Fee');
+    } else {
+      setPaymentAmount(summary.dueTillDate > 0 ? summary.dueTillDate : summary.totalDue);
+      setRemarks('');
+    }
+  };
 
   // Handle manual adjustment of a single allocation
   const handleAllocationChange = (installmentId: string, newAllocAmount: number) => {
@@ -89,18 +177,40 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
     setAllocations(computed);
   };
 
+  const isPartialPayment = paymentAmount > 0 && paymentAmount < summary.totalDue;
+
   const handleConfirm = () => {
     if (paymentAmount <= 0) {
       setErrorMsg('Payment amount must be greater than 0.');
       return;
     }
-    if (paymentAmount > summary.totalDue) {
+    if (paymentAmount > summary.totalDue && selectedFeeType === 'ALL') {
       setErrorMsg(`Cannot accept payment greater than total outstanding balance of ${formatCurrency(summary.totalDue)}.`);
       return;
     }
 
     const totalAllocated = allocations.reduce((sum, a) => sum + a.allocatedAmount, 0);
-    if (totalAllocated !== paymentAmount) {
+    let finalAllocations = allocations;
+
+    // If spot/book/dress without pre-existing installment in list, synthesize allocation
+    if (totalAllocated === 0 && paymentAmount > 0) {
+      const headLabel =
+        selectedFeeType === 'BOOKS'
+          ? 'Books & Stationery Fee'
+          : selectedFeeType === 'DRESS'
+          ? 'School Uniform & Dress Fee'
+          : 'School Tuition Fee';
+
+      finalAllocations = [
+        {
+          installmentId: `inst_spot_${Date.now()}`,
+          headName: headLabel,
+          installmentNumber: 1,
+          dueDate: paymentDate,
+          allocatedAmount: paymentAmount,
+        },
+      ];
+    } else if (totalAllocated !== paymentAmount && selectedFeeType === 'ALL') {
       setErrorMsg(`Total allocated amount (${formatCurrency(totalAllocated)}) does not match payment amount (${formatCurrency(paymentAmount)}).`);
       return;
     }
@@ -128,11 +238,35 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
       paymentMode,
       referenceNo: referenceNo.trim() || undefined,
       remarks: remarks.trim() || undefined,
-      allocations,
+      allocations: finalAllocations,
       isCancelled: false,
     };
 
-    onSavePayment(newTransaction, allocations);
+    // Prepare partial payment status update
+    let partialStatusUpdate: PartialPaymentStatusUpdate | undefined;
+    if (isPartialPayment) {
+      if (partialCategory === 'permission') {
+        partialStatusUpdate = {
+          manualCategoryOverride: 'permission',
+          permissionExpiresAt: permissionDate,
+          permissionReason:
+            permissionReason.trim() ||
+            `Partial payment of ${formatCurrency(paymentAmount)} received. Balance granted till ${formatDate(permissionDate)}.`,
+        };
+      } else if (partialCategory === 'id_card') {
+        partialStatusUpdate = {
+          manualCategoryOverride: 'id_card',
+          permissionReason: permissionReason.trim() || 'Approved for ID Card issue.',
+        };
+      } else if (partialCategory === 'action') {
+        partialStatusUpdate = {
+          manualCategoryOverride: 'action',
+          permissionReason: permissionReason.trim() || 'Action required for balance collection.',
+        };
+      }
+    }
+
+    onSavePayment(newTransaction, finalAllocations, partialStatusUpdate);
   };
 
   return (
@@ -146,24 +280,64 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
             </div>
             <div>
               <h2 className="text-base font-bold text-slate-100 flex items-center gap-2">
-                Collect Fees (FIFO Knock-off)
+                Fee Collection & Receipt
               </h2>
               <p className="text-xs text-slate-400">
-                Receipt #{previewReceiptNo} • {student.name} (#{student.rollNo})
+                Receipt #{previewReceiptNo} • {student.name} (#{student.rollNo}) • {student.className}
               </p>
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+            className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Modal Body */}
-        <div className="p-5 space-y-5 text-xs text-slate-700 dark:text-slate-300 max-h-[75vh] overflow-y-auto">
+        <div className="p-5 space-y-4 text-xs text-slate-700 dark:text-slate-300 max-h-[75vh] overflow-y-auto">
+          {/* Fee Collection Category Selector (Standard, Books, Dress) */}
+          <div className="flex items-center gap-2 p-1.5 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
+            <span className="text-[11px] font-bold text-slate-600 dark:text-slate-400 px-2">
+              Collection Head:
+            </span>
+            <button
+              type="button"
+              onClick={() => handleFeeTypeChange('ALL')}
+              className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                selectedFeeType === 'ALL'
+                  ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs border border-slate-200 dark:border-slate-700'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+              }`}
+            >
+              🎓 School & Transport
+            </button>
+            <button
+              type="button"
+              onClick={() => handleFeeTypeChange('BOOKS')}
+              className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                selectedFeeType === 'BOOKS'
+                  ? 'bg-emerald-600 text-white shadow-xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+              }`}
+            >
+              📚 Books Fee
+            </button>
+            <button
+              type="button"
+              onClick={() => handleFeeTypeChange('DRESS')}
+              className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                selectedFeeType === 'DRESS'
+                  ? 'bg-indigo-600 text-white shadow-xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+              }`}
+            >
+              👗 Dress / Uniform
+            </button>
+          </div>
+
           {/* Student Balance Summary Ribbon */}
           <div className="grid grid-cols-4 gap-2 bg-slate-50 dark:bg-slate-800/50 p-3 rounded-xl border border-slate-200 dark:border-slate-700">
             <div>
@@ -222,14 +396,14 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
 
               {/* Quick Fill Buttons */}
               <div className="flex items-center gap-1 shrink-0">
-                {summary.dueTillDate > 0 && (
+                {summary.dueTillDate > 0 && selectedFeeType === 'ALL' && (
                   <button
                     type="button"
                     onClick={() => {
                       setIsManualOverride(false);
                       setPaymentAmount(summary.dueTillDate);
                     }}
-                    className="px-2.5 py-2 bg-rose-100 hover:bg-rose-200 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300 font-semibold rounded-xl text-xs transition-colors border border-rose-200 dark:border-rose-800"
+                    className="px-2.5 py-2 bg-rose-100 hover:bg-rose-200 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300 font-semibold rounded-xl text-xs transition-colors border border-rose-200 dark:border-rose-800 cursor-pointer"
                     title="Fill exact amount overdue till date"
                   >
                     Due Till Date ({formatCurrency(summary.dueTillDate)})
@@ -242,7 +416,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                     setIsManualOverride(false);
                     setPaymentAmount(summary.totalDue);
                   }}
-                  className="px-2.5 py-2 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 font-semibold rounded-xl text-xs transition-colors border border-emerald-200 dark:border-emerald-800"
+                  className="px-2.5 py-2 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 font-semibold rounded-xl text-xs transition-colors border border-emerald-200 dark:border-emerald-800 cursor-pointer"
                   title="Pay full remaining balance for the whole year"
                 >
                   Full Balance ({formatCurrency(summary.totalDue)})
@@ -250,6 +424,99 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
               </div>
             </div>
           </div>
+
+          {/* AUTOMATED PARTIAL PAYMENT CATEGORY PROMPT */}
+          {isPartialPayment && (
+            <div className="p-3.5 bg-amber-50/80 dark:bg-amber-950/40 rounded-xl border border-amber-200 dark:border-amber-900/60 space-y-3 animate-in fade-in duration-200">
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-amber-900 dark:text-amber-200 text-xs flex items-center gap-1.5">
+                  <Sparkles className="w-4 h-4 text-amber-600" />
+                  Partial Payment Detected (Balance: {formatCurrency(summary.totalDue - paymentAmount)})
+                </span>
+                <span className="text-[10px] bg-amber-200/80 dark:bg-amber-900 text-amber-900 dark:text-amber-200 px-2 py-0.5 rounded-full font-bold">
+                  Set Clearance Tier
+                </span>
+              </div>
+
+              {/* 3 Action Options: ID Card, Permission Slip (Default), Action Required */}
+              <div className="grid grid-cols-3 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setPartialCategory('permission')}
+                  className={`py-2 px-2.5 rounded-lg border text-center font-bold text-xs transition-all cursor-pointer flex flex-col items-center gap-1 ${
+                    partialCategory === 'permission'
+                      ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
+                      : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+                  }`}
+                >
+                  <div className="flex items-center gap-1">
+                    <CalendarClock className="w-3.5 h-3.5" />
+                    <span>Permission Slip</span>
+                  </div>
+                  <span className={`text-[9.5px] font-normal ${partialCategory === 'permission' ? 'text-indigo-100' : 'text-slate-400'}`}>
+                    (Default 5-day cycle)
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setPartialCategory('id_card')}
+                  className={`py-2 px-2.5 rounded-lg border text-center font-bold text-xs transition-all cursor-pointer flex flex-col items-center gap-1 ${
+                    partialCategory === 'id_card'
+                      ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
+                      : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+                  }`}
+                >
+                  <div className="flex items-center gap-1">
+                    <Award className="w-3.5 h-3.5" />
+                    <span>Issue ID Card</span>
+                  </div>
+                  <span className={`text-[9.5px] font-normal ${partialCategory === 'id_card' ? 'text-emerald-100' : 'text-slate-400'}`}>
+                    (Manual Clearance)
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setPartialCategory('action')}
+                  className={`py-2 px-2.5 rounded-lg border text-center font-bold text-xs transition-all cursor-pointer flex flex-col items-center gap-1 ${
+                    partialCategory === 'action'
+                      ? 'bg-rose-600 text-white border-rose-600 shadow-xs'
+                      : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+                  }`}
+                >
+                  <div className="flex items-center gap-1">
+                    <Flame className="w-3.5 h-3.5" />
+                    <span>Action Required</span>
+                  </div>
+                  <span className={`text-[9.5px] font-normal ${partialCategory === 'action' ? 'text-rose-100' : 'text-slate-400'}`}>
+                    (Active Follow-up)
+                  </span>
+                </button>
+              </div>
+
+              {/* Permission Slip Settings Tab */}
+              {partialCategory === 'permission' && (
+                <div className="p-2.5 bg-white dark:bg-slate-900 rounded-lg border border-indigo-100 dark:border-indigo-900/60 space-y-2">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <label className="font-bold text-indigo-950 dark:text-indigo-200 text-xs flex items-center gap-1">
+                      <Calendar className="w-3.5 h-3.5 text-indigo-600" />
+                      <span>Give Permission Till Date:</span>
+                    </label>
+                    <input
+                      type="date"
+                      value={permissionDate}
+                      onChange={(e) => setPermissionDate(e.target.value)}
+                      className="px-2.5 py-1 bg-indigo-50/60 dark:bg-indigo-950/60 border border-indigo-300 dark:border-indigo-700 rounded-lg font-bold text-indigo-950 dark:text-indigo-200 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                  </div>
+                  <div className="text-[10px] text-indigo-700 dark:text-indigo-300 font-medium">
+                    ✨ Defaulted to <strong>{formatDate(permissionDate)}</strong> (next multiple of 5th).
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Live Chronological Knock-off Allocations Preview */}
           <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">
@@ -267,7 +534,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                 <button
                   type="button"
                   onClick={handleResetToAutoFifo}
-                  className="text-[11px] text-indigo-600 dark:text-indigo-400 hover:underline font-semibold"
+                  className="text-[11px] text-indigo-600 dark:text-indigo-400 hover:underline font-semibold cursor-pointer"
                 >
                   Auto-Reset FIFO
                 </button>
@@ -279,7 +546,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                 Enter an amount above to preview chronological installment allocation.
               </div>
             ) : (
-              <div className="divide-y divide-slate-100 dark:divide-slate-800 max-h-48 overflow-y-auto">
+              <div className="divide-y divide-slate-100 dark:divide-slate-800 max-h-40 overflow-y-auto">
                 <table className="w-full text-left text-xs">
                   <thead className="bg-slate-50 dark:bg-slate-800/50 text-slate-500 font-semibold">
                     <tr>
@@ -383,7 +650,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
               </div>
             )}
 
-            <div className={paymentMode === 'UPI' ? 'sm:col-span-2' : 'sm:col-span-2'}>
+            <div className="sm:col-span-2">
               <label className="block text-slate-700 dark:text-slate-300 font-bold mb-1">
                 Remarks / Notes (Optional):
               </label>
@@ -412,7 +679,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 dark:bg-slate-700 dark:text-slate-200 rounded-xl font-semibold text-xs transition-colors"
+            className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 dark:bg-slate-700 dark:text-slate-200 rounded-xl font-semibold text-xs transition-colors cursor-pointer"
           >
             Cancel
           </button>
@@ -421,7 +688,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
             id="btn-confirm-payment"
             type="button"
             onClick={handleConfirm}
-            className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold text-xs shadow-md transition-all flex items-center gap-2 active:scale-95"
+            className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold text-xs shadow-md transition-all flex items-center gap-2 active:scale-95 cursor-pointer"
           >
             <CheckCircle className="w-4 h-4" />
             <span>Save & Generate Dual A5 Receipt</span>

@@ -91,7 +91,7 @@ export const FinancialDashboard: React.FC<FinancialDashboardProps> = ({
     });
   };
 
-  const allCardKeys = ['set1', 'set2', 'set3', 'set4'];
+  const allCardKeys = ['set1', 'set2', 'set3'];
 
   const areAllCardsRevealed = useMemo(() => {
     return allCardKeys.every((k) => !!revealedCards[k]);
@@ -143,6 +143,17 @@ export const FinancialDashboard: React.FC<FinancialDashboardProps> = ({
 
   // Actual fee fallback
   const actualStandardFeeSum = totalActualRevenue > 0 ? totalActualRevenue : totalCommittedRevenue + totalConcessionGiven;
+
+  // Headwise breakdown maps for Set 2
+  const feeHeadMap = useMemo(() => {
+    const school = headWiseBifurcation.find((h) => h.headName.toLowerCase().includes('school') || h.headName.toLowerCase().includes('tuition'));
+    const transport = headWiseBifurcation.find((h) => h.headName.toLowerCase().includes('transport') || h.headName.toLowerCase().includes('bus'));
+    const books = headWiseBifurcation.find((h) => h.headName.toLowerCase().includes('book'));
+    const dress = headWiseBifurcation.find((h) => h.headName.toLowerCase().includes('dress') || h.headName.toLowerCase().includes('uniform'));
+    const oldDue = headWiseBifurcation.find((h) => h.headName.toLowerCase().includes('old') || h.headName.toLowerCase().includes('due'));
+
+    return { school, transport, books, dress, oldDue };
+  }, [headWiseBifurcation]);
 
   // Percentage calculations
   const allTimeCashPct = totalCollectedTillDate > 0 ? Math.round((totalCashCollected / totalCollectedTillDate) * 100) : 0;
@@ -221,11 +232,11 @@ export const FinancialDashboard: React.FC<FinancialDashboardProps> = ({
         </div>
       </div>
 
-      {/* EXACT 4 MAIN CARDS GRID (WITH EMBEDDED SUB-CARDS) */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3.5">
+      {/* EXACT 3 MAIN CARDS GRID */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
         
         {/* ============================================================ */}
-        {/* CARD 1: SET 1 (Active Students, Actual Collection, Committed Collection, Concession) */}
+        {/* CARD 1: SET 1 (Active Students, Actual School Fees, Committed School Fees, Concession) */}
         {/* ============================================================ */}
         <div
           id="card-set-1"
@@ -273,10 +284,10 @@ export const FinancialDashboard: React.FC<FinancialDashboardProps> = ({
                 </div>
               </div>
 
-              {/* 2) Actual Collection (Standard Class Fee Baseline) */}
+              {/* 2) Actual School Fees (Standard Class Fee Baseline) */}
               <div className="bg-slate-50 dark:bg-slate-800/60 rounded-lg p-2 border border-slate-100 dark:border-slate-700/60">
                 <div className="flex items-center justify-between text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-0.5">
-                  <span>2. Actual Collection</span>
+                  <span>2. Actual School Fees</span>
                   <span className="text-[10px] font-medium text-slate-500">Standard Rate</span>
                 </div>
                 <div className="text-base font-black text-slate-900 dark:text-white font-mono">
@@ -288,10 +299,10 @@ export const FinancialDashboard: React.FC<FinancialDashboardProps> = ({
                 </div>
               </div>
 
-              {/* 3) Committed Collection */}
+              {/* 3) Committed School Fees */}
               <div className="bg-slate-50 dark:bg-slate-800/60 rounded-lg p-2 border border-slate-100 dark:border-slate-700/60">
                 <div className="flex items-center justify-between text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-0.5">
-                  <span>3. Committed Collection</span>
+                  <span>3. Committed School Fees</span>
                   <span className="text-[10px] font-medium text-blue-600 dark:text-blue-400">Agreed Fees</span>
                 </div>
                 <div className="text-base font-black text-blue-700 dark:text-blue-400 font-mono">
@@ -324,7 +335,7 @@ export const FinancialDashboard: React.FC<FinancialDashboardProps> = ({
         </div>
 
         {/* ============================================================ */}
-        {/* CARD 2: SET 2 (Total Collected, Total Due) */}
+        {/* CARD 2: SET 2 (Total Collected with breakdowns, Total Due with breakdowns) */}
         {/* ============================================================ */}
         <div
           id="card-set-2"
@@ -337,7 +348,7 @@ export const FinancialDashboard: React.FC<FinancialDashboardProps> = ({
               <div className="flex items-center gap-1.5">
                 <Wallet className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                 <span className="text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white">
-                  SET 2: Realized & Due
+                  SET 2: Collections & Dues
                 </span>
               </div>
               <button
@@ -350,17 +361,17 @@ export const FinancialDashboard: React.FC<FinancialDashboardProps> = ({
               </button>
             </div>
 
-            {/* 2 Sub-Items */}
+            {/* 2 Sub-Items with rich headwise breakdown */}
             <div className="space-y-3">
               {/* 1) Total Collected */}
-              <div className="bg-emerald-50/80 dark:bg-emerald-950/40 rounded-lg p-3 border border-emerald-200 dark:border-emerald-900/60">
-                <div className="flex items-center justify-between text-[11.5px] font-bold text-emerald-800 dark:text-emerald-300 mb-1">
+              <div className="bg-emerald-50/80 dark:bg-emerald-950/40 rounded-lg p-2.5 border border-emerald-200 dark:border-emerald-900/60">
+                <div className="flex items-center justify-between text-[11px] font-bold text-emerald-800 dark:text-emerald-300 mb-0.5">
                   <span>1. Total Collected</span>
-                  <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-emerald-200/70 dark:bg-emerald-900 text-emerald-900 dark:text-emerald-200 font-mono">
-                    {isCardRevealed('set2') ? `${collectionEfficiencyPercent}% Eff.` : '••%'}
+                  <span className="text-[10px] font-black px-1.5 py-0.2 rounded bg-emerald-200/70 dark:bg-emerald-900 text-emerald-900 dark:text-emerald-200 font-mono">
+                    {isCardRevealed('set2') ? `${collectionEfficiencyPercent}% Collected` : '••%'}
                   </span>
                 </div>
-                <div className="text-xl font-black text-emerald-700 dark:text-emerald-400 font-mono tracking-tight mb-2">
+                <div className="text-lg font-black text-emerald-700 dark:text-emerald-400 font-mono tracking-tight mb-1.5">
                   {isCardRevealed('set2') ? (
                     formatCurrency(totalCollectedTillDate, currencySymbol)
                   ) : (
@@ -368,41 +379,69 @@ export const FinancialDashboard: React.FC<FinancialDashboardProps> = ({
                   )}
                 </div>
                 
-                {/* Cash vs UPI Breakdown */}
-                <div className="pt-2 border-t border-emerald-200/60 dark:border-emerald-900/40 grid grid-cols-2 gap-1 text-[10.5px] font-mono text-emerald-800 dark:text-emerald-300">
+                {/* Detailed Fee Head Breakdown */}
+                <div className="pt-1.5 border-t border-emerald-200/60 dark:border-emerald-900/40 grid grid-cols-2 gap-x-2 gap-y-1 text-[10px] font-mono text-emerald-800 dark:text-emerald-300">
                   <div>
-                    <span className="text-slate-500 dark:text-slate-400">Cash: </span>
-                    <strong className="font-bold">{isCardRevealed('set2') ? formatCurrency(totalCashCollected, currencySymbol) : '••'}</strong>
-                    {isCardRevealed('set2') && <span className="text-[9.5px] text-slate-500 block">({allTimeCashPct}%)</span>}
+                    <span className="text-slate-500 dark:text-slate-400">School: </span>
+                    <strong className="font-bold">{isCardRevealed('set2') && feeHeadMap.school ? formatCurrency(feeHeadMap.school.totalCollected, currencySymbol) : '••'}</strong>
+                    {isCardRevealed('set2') && feeHeadMap.school && <span className="text-[9px] text-slate-500 ml-0.5">({feeHeadMap.school.collectionRate}%)</span>}
                   </div>
                   <div>
-                    <span className="text-slate-500 dark:text-slate-400">UPI: </span>
-                    <strong className="font-bold">{isCardRevealed('set2') ? formatCurrency(totalUpiCollected, currencySymbol) : '••'}</strong>
-                    {isCardRevealed('set2') && <span className="text-[9.5px] text-slate-500 block">({allTimeUpiPct}%)</span>}
+                    <span className="text-slate-500 dark:text-slate-400">Transport: </span>
+                    <strong className="font-bold">{isCardRevealed('set2') && feeHeadMap.transport ? formatCurrency(feeHeadMap.transport.totalCollected, currencySymbol) : '••'}</strong>
+                    {isCardRevealed('set2') && feeHeadMap.transport && <span className="text-[9px] text-slate-500 ml-0.5">({feeHeadMap.transport.collectionRate}%)</span>}
                   </div>
+                  <div>
+                    <span className="text-slate-500 dark:text-slate-400">Books 📚: </span>
+                    <strong className="font-bold">{isCardRevealed('set2') ? (feeHeadMap.books ? formatCurrency(feeHeadMap.books.totalCollected, currencySymbol) : `${currencySymbol}0`) : '••'}</strong>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 dark:text-slate-400">Dress 👗: </span>
+                    <strong className="font-bold">{isCardRevealed('set2') ? (feeHeadMap.dress ? formatCurrency(feeHeadMap.dress.totalCollected, currencySymbol) : `${currencySymbol}0`) : '••'}</strong>
+                  </div>
+                </div>
+
+                {/* Cash vs UPI Sub-bar */}
+                <div className="mt-1.5 pt-1 border-t border-emerald-200/40 dark:border-emerald-900/30 flex items-center justify-between text-[9.5px] font-mono text-slate-500 dark:text-slate-400">
+                  <span>Cash: <strong className="text-slate-700 dark:text-slate-300">{isCardRevealed('set2') ? formatCurrency(totalCashCollected, currencySymbol) : '••'}</strong> ({allTimeCashPct}%)</span>
+                  <span>UPI: <strong className="text-slate-700 dark:text-slate-300">{isCardRevealed('set2') ? formatCurrency(totalUpiCollected, currencySymbol) : '••'}</strong> ({allTimeUpiPct}%)</span>
                 </div>
               </div>
 
               {/* 2) Total Due */}
-              <div className="bg-rose-50/80 dark:bg-rose-950/40 rounded-lg p-3 border border-rose-200 dark:border-rose-900/60">
-                <div className="flex items-center justify-between text-[11.5px] font-bold text-rose-800 dark:text-rose-300 mb-1">
+              <div className="bg-rose-50/80 dark:bg-rose-950/40 rounded-lg p-2.5 border border-rose-200 dark:border-rose-900/60">
+                <div className="flex items-center justify-between text-[11px] font-bold text-rose-800 dark:text-rose-300 mb-0.5">
                   <span>2. Total Due</span>
                   <span className="text-[10px] font-semibold text-rose-600 dark:text-rose-400">
                     All Cycles
                   </span>
                 </div>
-                <div className="text-xl font-black text-rose-600 dark:text-rose-400 font-mono tracking-tight mb-1">
+                <div className="text-lg font-black text-rose-600 dark:text-rose-400 font-mono tracking-tight mb-1.5">
                   {isCardRevealed('set2') ? (
                     formatCurrency(totalOverallDue, currencySymbol)
                   ) : (
                     <span className="text-rose-400/60 font-normal text-base">••••••••</span>
                   )}
                 </div>
-                <div className="text-[10.5px] text-slate-500 dark:text-slate-400 flex items-center justify-between">
-                  <span>Receipts Issued:</span>
-                  <strong className="font-mono text-slate-800 dark:text-slate-200">
-                    {isCardRevealed('set2') ? `${totalTransactionsCount} txns` : '••'}
-                  </strong>
+
+                {/* Due Breakdown */}
+                <div className="pt-1.5 border-t border-rose-200/60 dark:border-rose-900/40 grid grid-cols-2 gap-x-2 gap-y-1 text-[10px] font-mono text-rose-800 dark:text-rose-300">
+                  <div>
+                    <span className="text-slate-500 dark:text-slate-400">School Due: </span>
+                    <strong className="font-bold">{isCardRevealed('set2') && feeHeadMap.school ? formatCurrency(feeHeadMap.school.totalBalanceDue, currencySymbol) : '••'}</strong>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 dark:text-slate-400">Transport Due: </span>
+                    <strong className="font-bold">{isCardRevealed('set2') && feeHeadMap.transport ? formatCurrency(feeHeadMap.transport.totalBalanceDue, currencySymbol) : '••'}</strong>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 dark:text-slate-400">Books Due: </span>
+                    <strong className="font-bold">{isCardRevealed('set2') ? (feeHeadMap.books ? formatCurrency(feeHeadMap.books.totalBalanceDue, currencySymbol) : `${currencySymbol}0`) : '••'}</strong>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 dark:text-slate-400">Dress Due: </span>
+                    <strong className="font-bold">{isCardRevealed('set2') ? (feeHeadMap.dress ? formatCurrency(feeHeadMap.dress.totalBalanceDue, currencySymbol) : `${currencySymbol}0`) : '••'}</strong>
+                  </div>
                 </div>
               </div>
             </div>
@@ -410,7 +449,7 @@ export const FinancialDashboard: React.FC<FinancialDashboardProps> = ({
         </div>
 
         {/* ============================================================ */}
-        {/* CARD 3: SET 3 (Payable till date, Due Till date, Todays collection target / Run-Rate) */}
+        {/* CARD 3: SET 3 (Due Till Date, Today's Target / Run-Rate) */}
         {/* ============================================================ */}
         <div
           id="card-set-3"
@@ -436,44 +475,35 @@ export const FinancialDashboard: React.FC<FinancialDashboardProps> = ({
               </button>
             </div>
 
-            {/* 3 Sub-Items */}
+            {/* 2 Main Sub-Items */}
             <div className="space-y-2.5">
-              {/* 1) Payable till date */}
-              <div className="bg-slate-50 dark:bg-slate-800/60 rounded-lg p-2 border border-slate-100 dark:border-slate-700/60">
-                <div className="flex items-center justify-between text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-0.5">
-                  <span>1. Payable Till Date</span>
-                  <span className="text-[10px] text-slate-500">Matured Installments</span>
-                </div>
-                <div className="text-base font-black text-slate-900 dark:text-white font-mono">
-                  {isCardRevealed('set3') ? (
-                    formatCurrency(totalExpectedTillDate, currencySymbol)
-                  ) : (
-                    <span className="text-slate-400 font-normal text-sm">••••••</span>
-                  )}
-                </div>
-              </div>
-
-              {/* 2) Due Till date */}
-              <div className="bg-rose-50/70 dark:bg-rose-950/30 rounded-lg p-2 border border-rose-100 dark:border-rose-900/40">
+              {/* 1) Due Till Date */}
+              <div className="bg-rose-50/70 dark:bg-rose-950/30 rounded-lg p-2.5 border border-rose-100 dark:border-rose-900/40">
                 <div className="flex items-center justify-between text-[11px] font-semibold text-rose-800 dark:text-rose-300 mb-0.5">
-                  <span>2. Due Till Date</span>
+                  <span>1. Due Till Date</span>
                   <span className="text-[10px] font-bold text-rose-700 dark:text-rose-300">Overdue Deficit</span>
                 </div>
-                <div className="text-base font-black text-rose-600 dark:text-rose-400 font-mono">
+                <div className="text-lg font-black text-rose-600 dark:text-rose-400 font-mono">
                   {isCardRevealed('set3') ? (
                     formatCurrency(totalOverdueDeficitTillDate, currencySymbol)
                   ) : (
                     <span className="text-rose-400/60 font-normal text-sm">••••••</span>
                   )}
                 </div>
+                <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-1 flex items-center justify-between">
+                  <span>Payable Till Date:</span>
+                  <strong className="font-mono text-slate-800 dark:text-slate-200">
+                    {isCardRevealed('set3') ? formatCurrency(totalExpectedTillDate, currencySymbol) : '••'}
+                  </strong>
+                </div>
               </div>
 
-              {/* 3) Todays collection target (Run-Rate Features) */}
+              {/* 2) Today's collection target (Run-Rate Features) */}
               <div className="bg-slate-900 text-white rounded-lg p-2.5 border border-slate-800">
                 <div className="flex items-center justify-between text-[11px] font-bold text-amber-300 mb-1">
                   <span className="flex items-center gap-1">
                     <Flame className="w-3.5 h-3.5 text-amber-400" />
-                    3. Today's Target (Run-Rate)
+                    2. Today's Target (Run-Rate)
                   </span>
                   <span className="text-[10px] text-slate-400">
                     {dailyTargetRunRate.daysRemainingInCycle}d left
@@ -494,78 +524,6 @@ export const FinancialDashboard: React.FC<FinancialDashboardProps> = ({
                   <span>Goal: <strong>{isCardRevealed('set3') ? `~${dailyTargetRunRate.suggestedStudentsPerDay} stds/d` : '••'}</strong></span>
                 </div>
               </div>
-            </div>
-          </div>
-        </div>
-
-        {/* ============================================================ */}
-        {/* CARD 4: SET 4 (Headwise report in small table type) */}
-        {/* ============================================================ */}
-        <div
-          id="card-set-4"
-          onClick={() => toggleCardReveal('set4')}
-          className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3.5 shadow-xs flex flex-col justify-between hover:border-slate-300 dark:hover:border-slate-700 transition-all cursor-pointer select-none"
-        >
-          <div className="flex flex-col h-full">
-            {/* Header */}
-            <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800 mb-2">
-              <div className="flex items-center gap-1.5">
-                <Table className="w-4 h-4 text-purple-600 dark:text-purple-400" />
-                <span className="text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white">
-                  SET 4: Headwise Report
-                </span>
-              </div>
-              <button
-                type="button"
-                onClick={(e) => toggleCardReveal('set4', e)}
-                className="p-1 rounded-md bg-purple-50 dark:bg-purple-950/50 text-purple-600 dark:text-purple-400 hover:bg-purple-100 transition-colors"
-                title={isCardRevealed('set4') ? 'Hide SET 4 stats' : 'Show SET 4 stats'}
-              >
-                {isCardRevealed('set4') ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-              </button>
-            </div>
-
-            {/* Small Table Type View */}
-            <div className="overflow-x-auto overflow-y-auto max-h-[220px] rounded-lg border border-slate-100 dark:border-slate-800">
-              <table className="w-full text-left text-[10.5px]">
-                <thead className="bg-slate-50 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 font-bold sticky top-0 border-b border-slate-200 dark:border-slate-700">
-                  <tr>
-                    <th className="py-1 px-1.5">Head</th>
-                    <th className="py-1 px-1.5 text-right">Collectable</th>
-                    <th className="py-1 px-1.5 text-right text-rose-600 dark:text-rose-400">Due Till Date</th>
-                    <th className="py-1 px-1.5 text-right">Total Due</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                  {headWiseBifurcation.map((head) => (
-                    <tr key={head.headName} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
-                      <td className="py-1.5 px-1.5 font-medium text-slate-900 dark:text-slate-100 flex items-center gap-1">
-                        {getHeadIcon(head.headName)}
-                        <span className="truncate max-w-[70px] sm:max-w-[85px]" title={head.headName}>
-                          {head.headName.replace('Fee', '').trim()}
-                        </span>
-                      </td>
-                      <td className="py-1.5 px-1.5 text-right font-mono font-semibold text-slate-800 dark:text-slate-200">
-                        {isCardRevealed('set4') ? formatCurrency(head.totalCommitted, currencySymbol) : '••'}
-                      </td>
-                      <td className="py-1.5 px-1.5 text-right font-mono font-bold text-rose-600 dark:text-rose-400 bg-rose-50/30 dark:bg-rose-950/20">
-                        {isCardRevealed('set4') ? formatCurrency(head.totalDueTillDate, currencySymbol) : '••'}
-                      </td>
-                      <td className="py-1.5 px-1.5 text-right font-mono font-semibold text-slate-700 dark:text-slate-300">
-                        {isCardRevealed('set4') ? formatCurrency(head.totalBalanceDue, currencySymbol) : '••'}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Mini Summary Footer */}
-            <div className="mt-2 pt-1.5 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-[10.5px] text-slate-500 dark:text-slate-400 font-medium">
-              <span>{headWiseBifurcation.length} Fee Heads active</span>
-              <span className="font-bold text-slate-700 dark:text-slate-300 font-mono">
-                {isCardRevealed('set4') ? `${collectionEfficiencyPercent}% Collected` : '••% Collected'}
-              </span>
             </div>
           </div>
         </div>

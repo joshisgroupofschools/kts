@@ -24,6 +24,16 @@ export const DualA5ReceiptModal: React.FC<DualA5ReceiptModalProps> = ({
   const currencySymbol = schoolProfile?.currencySymbol || '₹';
   const amountInWords = numberToWords(transaction.amount);
 
+  const isBooksOrDressTransaction =
+    transaction.allocations.some((a) => {
+      const l = a.headName.toLowerCase();
+      return l.includes('book') || l.includes('dress') || l.includes('uniform') || l.includes('stationery');
+    }) ||
+    (transaction.remarks &&
+      (transaction.remarks.toLowerCase().includes('book') ||
+        transaction.remarks.toLowerCase().includes('dress') ||
+        transaction.remarks.toLowerCase().includes('uniform')));
+
   /**
    * Universal Print Handler:
    * Works reliably in sandboxed iframes by injecting an isolated printing iframe,
@@ -66,14 +76,15 @@ export const DualA5ReceiptModal: React.FC<DualA5ReceiptModalProps> = ({
                   box-sizing: border-box;
                   margin: 0;
                   padding: 0;
+                  -webkit-print-color-adjust: exact !important;
+                  print-color-adjust: exact !important;
+                  color-adjust: exact !important;
                 }
                 body {
                   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
                   color: #000000;
                   background: #ffffff;
                   padding: 8px;
-                  -webkit-print-color-adjust: exact;
-                  print-color-adjust: exact;
                 }
                 .receipt-grid {
                   display: grid;
@@ -82,18 +93,18 @@ export const DualA5ReceiptModal: React.FC<DualA5ReceiptModalProps> = ({
                   width: 100%;
                 }
                 .receipt-card {
-                  border: 1.5px solid #000000;
+                  border: 2px solid #000000 !important;
                   padding: 12px 14px;
-                  border-radius: 4px;
+                  border-radius: 6px;
                   display: flex;
                   flex-direction: column;
                   justify-content: space-between;
-                  background: #ffffff;
+                  background: #ffffff !important;
                   font-size: 11px;
                   line-height: 1.35;
                 }
                 .receipt-header {
-                  border-bottom: 1.5px solid #000000;
+                  border-bottom: 2px solid #000000 !important;
                   padding-bottom: 6px;
                   margin-bottom: 6px;
                   display: flex;
@@ -102,57 +113,55 @@ export const DualA5ReceiptModal: React.FC<DualA5ReceiptModalProps> = ({
                 }
                 .school-title {
                   font-size: 15px;
-                  font-weight: 800;
+                  font-weight: 900;
                   text-transform: uppercase;
                   letter-spacing: 0.5px;
                   color: #000000;
                 }
-                .school-sub {
-                  font-size: 10px;
-                  color: #222222;
-                }
                 .copy-badge {
-                  border: 1.5px solid #000000;
+                  border: 1.5px solid #000000 !important;
                   padding: 2px 6px;
                   font-size: 10px;
                   font-weight: 800;
                   text-transform: uppercase;
-                  background: #f0f0f0;
+                  background: #f0f0f0 !important;
+                  border-radius: 3px;
                 }
                 table {
                   width: 100%;
                   border-collapse: collapse;
                   margin-bottom: 6px;
-                  border: 1px solid #000000;
+                  border: 1.5px solid #000000 !important;
                 }
                 th {
-                  border: 1px solid #000000;
+                  border: 1px solid #000000 !important;
                   padding: 4px 6px;
-                  background: #f4f4f4;
+                  background: #f2f2f2 !important;
                   font-size: 10px;
-                  font-weight: 700;
+                  font-weight: 800;
                   text-align: left;
+                  text-transform: uppercase;
                 }
                 td {
-                  border: 1px solid #000000;
+                  border: 1px solid #000000 !important;
                   padding: 3.5px 6px;
                   font-size: 11px;
                 }
                 .words-box {
-                  border: 1px dashed #000000;
+                  border: 1px dashed #000000 !important;
                   padding: 4px 6px;
                   font-size: 10.5px;
                   margin-bottom: 6px;
-                  background: #fafafa;
+                  background: #fafafa !important;
                 }
                 .balance-box {
                   display: flex;
                   justify-content: space-between;
-                  border: 1px solid #000000;
+                  border: 1px solid #000000 !important;
                   padding: 4px 8px;
                   font-size: 10.5px;
                   margin-bottom: 6px;
-                  background: #f5f5f5;
+                  background: #f5f5f5 !important;
                 }
                 .sign-container {
                   display: flex;
@@ -161,12 +170,13 @@ export const DualA5ReceiptModal: React.FC<DualA5ReceiptModalProps> = ({
                   padding-right: 8px;
                 }
                 .sign-line {
-                  border-top: 1.5px solid #000000;
+                  border-top: 1.5px solid #000000 !important;
                   width: 160px;
                   text-align: center;
                   font-size: 10px;
-                  font-weight: 700;
+                  font-weight: 800;
                   padding-top: 3px;
+                  text-transform: uppercase;
                 }
               </style>
             </head>
@@ -229,14 +239,14 @@ export const DualA5ReceiptModal: React.FC<DualA5ReceiptModalProps> = ({
               box-sizing: border-box;
               margin: 0;
               padding: 0;
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
             }
             body {
               font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
               color: #000000;
               background: #ffffff;
               padding: 10px;
-              -webkit-print-color-adjust: exact;
-              print-color-adjust: exact;
             }
             .receipt-grid {
               display: grid;
@@ -245,18 +255,18 @@ export const DualA5ReceiptModal: React.FC<DualA5ReceiptModalProps> = ({
               width: 100%;
             }
             .receipt-card {
-              border: 1.5px solid #000000;
+              border: 2px solid #000000 !important;
               padding: 14px;
-              border-radius: 4px;
+              border-radius: 6px;
               display: flex;
               flex-direction: column;
               justify-content: space-between;
-              background: #ffffff;
+              background: #ffffff !important;
               font-size: 11px;
               line-height: 1.35;
             }
             .receipt-header {
-              border-bottom: 1.5px solid #000000;
+              border-bottom: 2px solid #000000 !important;
               padding-bottom: 6px;
               margin-bottom: 6px;
               display: flex;
@@ -265,62 +275,58 @@ export const DualA5ReceiptModal: React.FC<DualA5ReceiptModalProps> = ({
             }
             .school-title {
               font-size: 15px;
-              font-weight: 800;
+              font-weight: 900;
               text-transform: uppercase;
               letter-spacing: 0.5px;
               color: #000000;
             }
-            .school-sub {
-              font-size: 10px;
-              color: #222222;
-            }
             .copy-badge {
-              border: 1.5px solid #000000;
+              border: 1.5px solid #000000 !important;
               padding: 2px 6px;
               font-size: 10px;
               font-weight: 800;
               text-transform: uppercase;
-              background: #f0f0f0;
+              background: #f0f0f0 !important;
             }
             table {
               width: 100%;
               border-collapse: collapse;
               margin-bottom: 8px;
-              border: 1.5px solid #000000;
+              border: 1.5px solid #000000 !important;
             }
             th {
-              border: 1px solid #000000;
+              border: 1px solid #000000 !important;
               padding: 4px 6px;
-              background: #f4f4f4;
+              background: #f4f4f4 !important;
               font-size: 10px;
-              font-weight: 700;
+              font-weight: 800;
               text-align: left;
             }
             td {
-              border: 1px solid #000000;
+              border: 1px solid #000000 !important;
               padding: 4px 6px;
               font-size: 11px;
             }
             tr.total-row td {
-              font-weight: 800;
+              font-weight: 900;
               font-size: 12px;
-              background: #f9f9f9;
+              background: #f9f9f9 !important;
             }
             .words-box {
-              border: 1px dashed #000000;
+              border: 1px dashed #000000 !important;
               padding: 4px 6px;
               font-size: 10.5px;
               margin-bottom: 6px;
-              background: #fafafa;
+              background: #fafafa !important;
             }
             .balance-box {
               display: flex;
               justify-content: space-between;
-              border: 1px solid #000000;
+              border: 1px solid #000000 !important;
               padding: 4px 8px;
               font-size: 10.5px;
               margin-bottom: 6px;
-              background: #f5f5f5;
+              background: #f5f5f5 !important;
             }
             .sign-container {
               display: flex;
@@ -329,11 +335,11 @@ export const DualA5ReceiptModal: React.FC<DualA5ReceiptModalProps> = ({
               padding-right: 8px;
             }
             .sign-line {
-              border-top: 1.5px solid #000000;
+              border-top: 1.5px solid #000000 !important;
               width: 160px;
               text-align: center;
               font-size: 10px;
-              font-weight: 700;
+              font-weight: 800;
               padding-top: 3px;
             }
           </style>
@@ -360,13 +366,18 @@ export const DualA5ReceiptModal: React.FC<DualA5ReceiptModalProps> = ({
         {/* Header Bar */}
         <div className="border-b-2 border-slate-900 pb-2 mb-2 flex items-start justify-between">
           <div>
-            <h2 className="text-sm sm:text-base font-black text-slate-950 uppercase tracking-tight leading-tight">
-              {schoolProfile.schoolName || 'Kakatiya School Boduppal'}
-            </h2>
-            {schoolProfile.address && (
+            {!isBooksOrDressTransaction ? (
+              <h2 className="text-sm sm:text-base font-black text-slate-950 uppercase tracking-tight leading-tight">
+                {schoolProfile.schoolName || 'Kakatiya School Boduppal'}
+              </h2>
+            ) : (
+              <h2 className="text-sm sm:text-base font-black text-slate-950 uppercase tracking-tight leading-tight">
+                OFFICIAL PAYMENT RECEIPT
+              </h2>
+            )}
+            {schoolProfile.phone && !isBooksOrDressTransaction && (
               <p className="text-[9.5px] text-slate-600 mt-0.5">
-                {schoolProfile.address}
-                {schoolProfile.phone ? ` • Phone: ${schoolProfile.phone}` : ''}
+                Contact: {schoolProfile.phone}
               </p>
             )}
           </div>

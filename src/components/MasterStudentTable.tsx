@@ -6,12 +6,13 @@ import {
   Student,
   StudentFinancialSummary,
 } from '../types';
-import { formatCurrency, formatDate } from '../utils/numberToWords';
+import { formatCurrency, formatDate, getNextMultipleOfFiveDate } from '../utils/numberToWords';
 import { getStatusCategoryMeta } from '../utils/statusResolver';
 import { getClassSortIndex } from '../utils/classOrder';
 import { lookupStandardClassFee } from '../data/trialSpreadsheetData';
 import {
   Award,
+  BookOpen,
   Calendar,
   CalendarClock,
   Check,
@@ -28,6 +29,7 @@ import {
   Printer,
   Search,
   Settings,
+  Shirt,
   Sparkles,
   UserCheck,
   UserX,
@@ -37,6 +39,7 @@ export interface ColumnVisibilityState {
   sno: boolean;
   student: boolean;
   className: boolean;
+  category1: boolean;
   actualSchoolFee: boolean;
   discount: boolean;
   committedSchoolFee: boolean;
@@ -50,12 +53,13 @@ export interface ColumnVisibilityState {
   actions: boolean;
 }
 
-const STORAGE_KEY = 'school_fee_column_prefs_v4';
+const STORAGE_KEY = 'school_fee_column_prefs_v5';
 
 const DEFAULT_COLUMNS: ColumnVisibilityState = {
   sno: true,
   student: true,
   className: true,
+  category1: true,
   actualSchoolFee: true,
   discount: true,
   committedSchoolFee: true,
@@ -73,6 +77,7 @@ const COLUMN_LABELS: Record<keyof ColumnVisibilityState, string> = {
   sno: 'S.NO',
   student: 'Student Details',
   className: 'Class',
+  category1: 'Category 1 (Books/Dress)',
   actualSchoolFee: 'Actual School Fees',
   discount: 'Discount',
   committedSchoolFee: 'Committed School Fees',
@@ -90,6 +95,7 @@ export type SortField =
   | 'sno'
   | 'name'
   | 'class'
+  | 'category1'
   | 'actualSchoolFee'
   | 'discount'
   | 'committedSchoolFee'
@@ -104,14 +110,38 @@ export type SortField =
 interface MasterStudentTableProps {
   summaries: StudentFinancialSummary[];
   schoolProfile: SchoolProfile;
-  onOpenCollectModal: (student: Student) => void;
+  onOpenCollectModal: (student: Student, initialFeeType?: 'ALL' | 'BOOKS' | 'DRESS') => void;
   onOpenPermissionModal: (student: Student) => void;
   onOpenLedgerModal: (student: Student) => void;
   onOpenReceiptModal: (transaction: PaymentTransaction) => void;
   onOpenFeeStructureModal: (student: Student) => void;
   onToggleStudentActive: (studentId: string, currentActive: boolean) => void;
+  onUpdateActionStatus?: (
+    studentId: string,
+    permissionExpiresAt: string | undefined,
+    permissionReason: string | undefined,
+    manualCategoryOverride: 'auto' | 'id_card' | 'permission' | 'action'
+  ) => void;
   onOpenAddStudent?: () => void;
   onOpenBulkUpload?: () => void;
+}
+
+// Helper to determine Books / Dress Category 1 status
+export function getCategory1Status(item: StudentFinancialSummary): 'BOTH' | 'BOOKS' | 'DRESS' | 'NONE' {
+  const structures = item.structures || [];
+  const hasBooks = structures.some(
+    (s) => s.headName.toLowerCase().includes('book') || s.headName.toLowerCase().includes('kit')
+  );
+  const hasDress = structures.some(
+    (s) =>
+      s.headName.toLowerCase().includes('dress') ||
+      s.headName.toLowerCase().includes('uniform') ||
+      s.headName.toLowerCase().includes('cloth')
+  );
+  if (hasBooks && hasDress) return 'BOTH';
+  if (hasBooks) return 'BOOKS';
+  if (hasDress) return 'DRESS';
+  return 'NONE';
 }
 
 // Helper to compute individual student headwise breakdown
@@ -187,9 +217,15 @@ export const MasterStudentTable: React.FC<MasterStudentTableProps> = ({
   onOpenReceiptModal,
   onOpenFeeStructureModal,
   onToggleStudentActive,
+  onUpdateActionStatus,
 }) => {
   const currencySymbol = schoolProfile?.currencySymbol || '₹';
   const [searchQuery, setSearchQuery] = useState('');
+  const [category1Filter, setCategory1Filter] = useState<'ALL' | 'BOOKS' | 'DRESS' | 'BOTH' | 'NONE'>('ALL');
+  const [activeStatusDropdownId, setActiveStatusDropdownId] = useState<string | null>(null);
+  const [selectedStatusDate, setSelectedStatusDate] = useState<string>(() =>
+    getNextMultipleOfFiveDate(new Date())
+  );
   const [sortBy, setSortBy] = useState<SortField>('dueTillDate');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [pageSize, setPageSize] = useState<number>(0); // 0 = All rows
@@ -212,16 +248,22 @@ export const MasterStudentTable: React.FC<MasterStudentTableProps> = ({
 
   const columnMenuRef = useRef<HTMLDivElement>(null);
 
-  // Close column menu when clicking outside
+  // Close column menu and status dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (columnMenuRef.current && !columnMenuRef.current.contains(event.target as Node)) {
         setShowColumnMenu(false);
       }
+      if (
+        activeStatusDropdownId &&
+        !(event.target as HTMLElement)?.closest?.('.status-dropdown-container')
+      ) {
+        setActiveStatusDropdownId(null);
+      }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+  }, [activeStatusDropdownId]);
 
   const handleToggleColumn = (col: keyof ColumnVisibilityState) => {
     const updated = { ...columns, [col]: !columns[col] };
@@ -247,6 +289,7 @@ export const MasterStudentTable: React.FC<MasterStudentTableProps> = ({
       sno: true,
       student: true,
       className: true,
+      category1: true,
       actualSchoolFee: true,
       discount: true,
       committedSchoolFee: true,
@@ -267,13 +310,24 @@ export const MasterStudentTable: React.FC<MasterStudentTableProps> = ({
     }
   };
 
-  // Filter students based on search query
+  // Filter students based on search query and category1 filter
   const filteredSummaries = useMemo(() => {
     const q = searchQuery.toLowerCase().trim();
-    if (!q) return summaries;
 
     return summaries.filter((item) => {
       const student = item.student;
+
+      // Category 1 filter
+      if (category1Filter !== 'ALL') {
+        const cat = getCategory1Status(item);
+        if (category1Filter === 'BOOKS' && cat !== 'BOOKS' && cat !== 'BOTH') return false;
+        if (category1Filter === 'DRESS' && cat !== 'DRESS' && cat !== 'BOTH') return false;
+        if (category1Filter === 'BOTH' && cat !== 'BOTH') return false;
+        if (category1Filter === 'NONE' && cat !== 'NONE') return false;
+      }
+
+      if (!q) return true;
+
       const matchesBasic =
         student.name.toLowerCase().includes(q) ||
         student.rollNo.toLowerCase().includes(q) ||
@@ -285,7 +339,7 @@ export const MasterStudentTable: React.FC<MasterStudentTableProps> = ({
 
       if (matchesBasic) return true;
 
-      // Smart fee head search (e.g. "transport", "bus", "old", "concession")
+      // Smart fee head search (e.g. "transport", "bus", "old", "concession", "book", "dress")
       if (item.structures && item.structures.length > 0) {
         const matchesHead = item.structures.some((s) => {
           const headLower = s.headName.toLowerCase();
@@ -302,6 +356,18 @@ export const MasterStudentTable: React.FC<MasterStudentTableProps> = ({
           ) {
             return true;
           }
+          if (
+            (q.includes('book') || q.includes('kit')) &&
+            (headLower.includes('book') || headLower.includes('kit'))
+          ) {
+            return true;
+          }
+          if (
+            (q.includes('dress') || q.includes('uniform')) &&
+            (headLower.includes('dress') || headLower.includes('uniform'))
+          ) {
+            return true;
+          }
           return false;
         });
         if (matchesHead) return true;
@@ -313,7 +379,7 @@ export const MasterStudentTable: React.FC<MasterStudentTableProps> = ({
 
       return false;
     });
-  }, [summaries, searchQuery]);
+  }, [summaries, searchQuery, category1Filter]);
 
   // Sort summaries on any column
   const sortedSummaries = useMemo(() => {
@@ -335,6 +401,12 @@ export const MasterStudentTable: React.FC<MasterStudentTableProps> = ({
         case 'class': {
           const rankDiff = getClassSortIndex(a.student.className) - getClassSortIndex(b.student.className);
           diff = rankDiff !== 0 ? rankDiff : a.student.className.localeCompare(b.student.className);
+          break;
+        }
+        case 'category1': {
+          const catA = getCategory1Status(a);
+          const catB = getCategory1Status(b);
+          diff = catA.localeCompare(catB);
           break;
         }
         case 'actualSchoolFee':
@@ -645,6 +717,27 @@ export const MasterStudentTable: React.FC<MasterStudentTableProps> = ({
             )}
           </div>
 
+          {/* Category 1 (Books/Dress) Filter */}
+          <div className="flex items-center gap-1 text-xs text-slate-600 dark:text-slate-400">
+            <span className="hidden sm:inline font-semibold">Category 1:</span>
+            <select
+              id="select-category1-filter"
+              value={category1Filter}
+              onChange={(e) => {
+                setCategory1Filter(e.target.value as any);
+                setCurrentPage(1);
+              }}
+              className="bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-2 py-1 text-xs font-semibold text-slate-800 dark:text-slate-200 focus:outline-none cursor-pointer"
+              title="Filter by Books / Dress Category"
+            >
+              <option value="ALL">All Categories</option>
+              <option value="BOOKS">📚 Books Only</option>
+              <option value="DRESS">👗 Dress Only</option>
+              <option value="BOTH">📚+👗 Books & Dress</option>
+              <option value="NONE">Regular Fees</option>
+            </select>
+          </div>
+
           {/* Headwise Toggle Button */}
           <button
             id="btn-toggle-headwise"
@@ -838,6 +931,20 @@ export const MasterStudentTable: React.FC<MasterStudentTableProps> = ({
                   <div className="flex items-center gap-1">
                     <span>Class</span>
                     {renderSortIndicator('class')}
+                  </div>
+                </th>
+              )}
+
+              {/* 3b. Category 1 (Books/Dress) */}
+              {columns.category1 && (
+                <th
+                  className="py-2.5 px-2 text-center cursor-pointer hover:text-emerald-600 transition-colors whitespace-nowrap"
+                  onClick={() => handleSort('category1')}
+                  title="Sort by Category 1 (Books / Dress Fees)"
+                >
+                  <div className="flex items-center justify-center gap-1">
+                    <span>Category 1</span>
+                    {renderSortIndicator('category1')}
                   </div>
                 </th>
               )}
@@ -1116,6 +1223,32 @@ export const MasterStudentTable: React.FC<MasterStudentTableProps> = ({
                       </td>
                     )}
 
+                    {/* 3b. Category 1 (Books/Dress) */}
+                    {columns.category1 && (
+                      <td className={`${cellPadding} px-2 text-center whitespace-nowrap`}>
+                        <div className="flex items-center justify-center gap-1">
+                          {getCategory1Status(item) === 'BOTH' && (
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 font-bold text-[10px] border border-purple-200 dark:border-purple-800">
+                              📚👗 Books & Dress
+                            </span>
+                          )}
+                          {getCategory1Status(item) === 'BOOKS' && (
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 font-bold text-[10px] border border-blue-200 dark:border-blue-800">
+                              📚 Books
+                            </span>
+                          )}
+                          {getCategory1Status(item) === 'DRESS' && (
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-pink-50 dark:bg-pink-950/60 text-pink-700 dark:text-pink-300 font-bold text-[10px] border border-pink-200 dark:border-pink-800">
+                              👗 Dress
+                            </span>
+                          )}
+                          {getCategory1Status(item) === 'NONE' && (
+                            <span className="text-slate-400 font-mono text-[10px]">—</span>
+                          )}
+                        </div>
+                      </td>
+                    )}
+
                     {/* 4. Actual School Fees */}
                     {columns.actualSchoolFee && (
                       <td
@@ -1233,13 +1366,185 @@ export const MasterStudentTable: React.FC<MasterStudentTableProps> = ({
                       </td>
                     )}
 
-                    {/* 14. Actions (Quick icons without redundant Collect button) */}
+                    {/* 14. Actions */}
                     {columns.actions && (
                       <td
                         className={`${cellPadding} px-3`}
                         onClick={(e) => e.stopPropagation()}
                       >
-                        <div className="flex items-center justify-center gap-1">
+                        <div className="flex items-center justify-center gap-1 relative">
+                          {/* 0a. Quick Collect Books Fee (if available) */}
+                          {(getCategory1Status(item) === 'BOOKS' || getCategory1Status(item) === 'BOTH') && (
+                            <button
+                              id={`btn-collect-books-${student.id}`}
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onOpenCollectModal(student, 'BOOKS');
+                              }}
+                              className="p-1.5 rounded-md bg-amber-50 hover:bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300 border border-amber-200 dark:border-amber-800 transition-colors cursor-pointer"
+                              title="Quick Collect Books Fee"
+                            >
+                              <BookOpen className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+
+                          {/* 0b. Quick Collect Dress Fee (if available) */}
+                          {(getCategory1Status(item) === 'DRESS' || getCategory1Status(item) === 'BOTH') && (
+                            <button
+                              id={`btn-collect-dress-${student.id}`}
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onOpenCollectModal(student, 'DRESS');
+                              }}
+                              className="p-1.5 rounded-md bg-pink-50 hover:bg-pink-100 text-pink-800 dark:bg-pink-950/50 dark:text-pink-300 border border-pink-200 dark:border-pink-800 transition-colors cursor-pointer"
+                              title="Quick Collect Dress Fee"
+                            >
+                              <Shirt className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+
+                          {/* 0c. Change Action Status Button (ID Card / Permission / Action) */}
+                          {onUpdateActionStatus && (
+                            <div className="relative status-dropdown-container">
+                              <button
+                                id={`btn-change-status-${student.id}`}
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setActiveStatusDropdownId(
+                                    activeStatusDropdownId === student.id ? null : student.id
+                                  );
+                                }}
+                                className={`p-1.5 rounded-md border transition-colors cursor-pointer ${
+                                  actionTier === 'ID_CARD'
+                                    ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
+                                    : actionTier === 'PERMISSION_SLIP'
+                                    ? 'bg-indigo-50 hover:bg-indigo-100 text-indigo-800 dark:bg-indigo-950/50 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800'
+                                    : 'bg-rose-50 hover:bg-rose-100 text-rose-800 dark:bg-rose-950/50 dark:text-rose-300 border-rose-200 dark:border-rose-800'
+                                }`}
+                                title="Change Action Status (ID Card / Permission / Action)"
+                              >
+                                {actionTier === 'ID_CARD' ? (
+                                  <Award className="w-3.5 h-3.5 text-emerald-600" />
+                                ) : actionTier === 'PERMISSION_SLIP' ? (
+                                  <CalendarClock className="w-3.5 h-3.5 text-indigo-600" />
+                                ) : (
+                                  <Flame className="w-3.5 h-3.5 text-rose-600" />
+                                )}
+                              </button>
+
+                              {/* Status Override Popover */}
+                              {activeStatusDropdownId === student.id && (
+                                <div
+                                  className="absolute right-0 top-full mt-1.5 w-60 bg-white dark:bg-slate-850 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl z-50 p-2.5 text-xs text-slate-800 dark:text-slate-200 animate-fadeIn"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <div className="font-bold text-slate-900 dark:text-white pb-1.5 mb-1.5 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between">
+                                    <span>Change Action Status</span>
+                                    <button
+                                      type="button"
+                                      onClick={() => setActiveStatusDropdownId(null)}
+                                      className="text-slate-400 hover:text-slate-600 font-bold"
+                                    >
+                                      ✕
+                                    </button>
+                                  </div>
+
+                                  <div className="space-y-1.5">
+                                    {/* 1. ID Card */}
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        onUpdateActionStatus(student.id, undefined, undefined, 'id_card');
+                                        setActiveStatusDropdownId(null);
+                                      }}
+                                      className="w-full flex items-center gap-2 p-1.5 rounded-lg text-left hover:bg-emerald-50 dark:hover:bg-emerald-950/60 transition-colors font-medium text-emerald-800 dark:text-emerald-300"
+                                    >
+                                      <Award className="w-4 h-4 text-emerald-600 shrink-0" />
+                                      <div>
+                                        <div className="font-bold">Issue ID Card</div>
+                                        <div className="text-[10px] text-slate-500 dark:text-slate-400">
+                                          Permit full clearance
+                                        </div>
+                                      </div>
+                                    </button>
+
+                                    {/* 2. Permission Slip */}
+                                    <div className="p-1.5 rounded-lg bg-indigo-50/60 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-800/60">
+                                      <div className="flex items-center gap-1.5 font-bold text-indigo-900 dark:text-indigo-200 mb-1">
+                                        <CalendarClock className="w-3.5 h-3.5 text-indigo-600" />
+                                        <span>Permission Slip</span>
+                                      </div>
+                                      <div className="text-[10px] text-slate-600 dark:text-slate-400 mb-1.5">
+                                        Issue till next 5th multiple:
+                                      </div>
+                                      <div className="flex items-center gap-1.5 mb-1.5">
+                                        <input
+                                          type="date"
+                                          value={selectedStatusDate}
+                                          onChange={(e) => setSelectedStatusDate(e.target.value)}
+                                          className="w-full px-2 py-1 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded text-xs text-slate-800 dark:text-slate-200"
+                                        />
+                                      </div>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          onUpdateActionStatus(
+                                            student.id,
+                                            selectedStatusDate,
+                                            'Manual permission grace granted',
+                                            'permission'
+                                          );
+                                          setActiveStatusDropdownId(null);
+                                        }}
+                                        className="w-full py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded font-bold text-[11px] shadow-2xs"
+                                      >
+                                        Apply Permission
+                                      </button>
+                                    </div>
+
+                                    {/* 3. Action Required */}
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        onUpdateActionStatus(
+                                          student.id,
+                                          undefined,
+                                          undefined,
+                                          'action'
+                                        );
+                                        setActiveStatusDropdownId(null);
+                                      }}
+                                      className="w-full flex items-center gap-2 p-1.5 rounded-lg text-left hover:bg-rose-50 dark:hover:bg-rose-950/60 transition-colors font-medium text-rose-800 dark:text-rose-300"
+                                    >
+                                      <Flame className="w-4 h-4 text-rose-600 shrink-0" />
+                                      <div>
+                                        <div className="font-bold">Action Required</div>
+                                        <div className="text-[10px] text-slate-500 dark:text-slate-400">
+                                          Follow-up / stop card
+                                        </div>
+                                      </div>
+                                    </button>
+
+                                    {/* 4. Reset to Auto */}
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        onUpdateActionStatus(student.id, undefined, undefined, 'auto');
+                                        setActiveStatusDropdownId(null);
+                                      }}
+                                      className="w-full text-center py-1 text-[10px] text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 hover:underline"
+                                    >
+                                      Reset to Auto Calculation
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          )}
+
                           {/* 1. Full Ledger Statement */}
                           <button
                             id={`btn-ledger-${student.id}`}
@@ -1341,6 +1646,7 @@ export const MasterStudentTable: React.FC<MasterStudentTableProps> = ({
                   </td>
                 )}
                 {columns.className && <td className="py-2.5 px-2.5"></td>}
+                {columns.category1 && <td className="py-2.5 px-2"></td>}
 
                 {/* 4. Actual School Fees Total */}
                 {columns.actualSchoolFee && (

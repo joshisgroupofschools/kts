@@ -150,6 +150,7 @@ export default function App() {
   >('NONE');
 
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
+  const [collectInitialFeeType, setCollectInitialFeeType] = useState<'ALL' | 'BOOKS' | 'DRESS'>('ALL');
   const [activeReceiptTransaction, setActiveReceiptTransaction] = useState<PaymentTransaction | null>(null);
 
   // -------------------------------------------------------------
@@ -277,8 +278,31 @@ export default function App() {
   // -------------------------------------------------------------
   const handleSavePayment = (
     transaction: PaymentTransaction,
-    allocations: PaymentAllocation[]
+    allocations: PaymentAllocation[],
+    partialStatusUpdate?: {
+      manualCategoryOverride: 'auto' | 'id_card' | 'permission' | 'action';
+      permissionExpiresAt?: string;
+      permissionReason?: string;
+    }
   ) => {
+    // If partial payment clearance status was selected, update the student record
+    if (partialStatusUpdate && selectedStudentId) {
+      setStudents((prev) =>
+        prev.map((s) => {
+          if (s.id === selectedStudentId) {
+            return {
+              ...s,
+              manualCategoryOverride: partialStatusUpdate.manualCategoryOverride,
+              permissionExpiresAt: partialStatusUpdate.permissionExpiresAt,
+              permissionReason: partialStatusUpdate.permissionReason,
+              updatedAt: new Date().toISOString(),
+            };
+          }
+          return s;
+        })
+      );
+    }
+
     // Update Installments balances
     const updatedInstallments = installments.map((inst) => {
       const matched = allocations.find((a) => a.installmentId === inst.id);
@@ -717,8 +741,9 @@ export default function App() {
             <MasterStudentTable
               summaries={filteredStudentSummaries}
               schoolProfile={safeSchoolProfile}
-              onOpenCollectModal={(student) => {
+              onOpenCollectModal={(student, initialFeeType = 'ALL') => {
                 setSelectedStudentId(student.id);
+                setCollectInitialFeeType(initialFeeType);
                 setActiveModal('PAYMENT');
               }}
               onOpenPermissionModal={(student) => {
@@ -742,6 +767,7 @@ export default function App() {
                   prev.map((s) => (s.id === studentId ? { ...s, isActive: !currentActive } : s))
                 );
               }}
+              onUpdateActionStatus={handleSavePermission}
               onOpenAddStudent={() => setActiveModal('ADD_STUDENT')}
               onOpenBulkUpload={() => setActiveModal('BULK_UPLOAD')}
             />
@@ -755,6 +781,7 @@ export default function App() {
           student={selectedStudent}
           summary={selectedSummary}
           schoolProfile={safeSchoolProfile}
+          initialFeeType={collectInitialFeeType}
           onClose={() => setActiveModal('NONE')}
           onSavePayment={handleSavePayment}
         />

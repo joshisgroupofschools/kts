@@ -244,16 +244,20 @@ export const FeeStructureModal: React.FC<FeeStructureModalProps> = ({
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
-                <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Actual / Assigned Fee ({schoolProfile.currencySymbol}):
+                <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1 flex items-center justify-between">
+                  <span>Actual / Assigned Fee ({schoolProfile.currencySymbol}):</span>
+                  <span className="text-[10px] text-amber-600 dark:text-amber-400 font-bold">🔒 Locked</span>
                 </label>
-                <input
-                  type="number"
-                  min="0"
-                  value={actualFee || ''}
-                  onChange={(e) => setActualFee(parseFloat(e.target.value) || 0)}
-                  className="w-full px-3 py-1.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg font-mono font-bold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                />
+                <div className="relative">
+                  <input
+                    type="number"
+                    readOnly
+                    disabled
+                    value={actualFee || ''}
+                    className="w-full px-3 py-1.5 bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-lg font-mono font-bold text-slate-600 dark:text-slate-300 cursor-not-allowed select-none"
+                    title="Actual standard class baseline fee is locked and cannot be changed directly"
+                  />
+                </div>
               </div>
 
               <div>

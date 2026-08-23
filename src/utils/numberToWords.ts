@@ -65,10 +65,10 @@ export function formatDate(dateString: string): string {
 }
 
 /**
- * Calculates the next multiple of 5 calendar date.
- * E.g., if today is the 21st, returns the 25th of the current month.
- * If 25th -> 30th.
- * If 30th/31st -> 5th of next month.
+ * Calculates the next multiple of 5 calendar date according to the 5-day cycle:
+ * If today is 21st or 22nd -> issues till 25th.
+ * If today is 23rd, 24th, 25th, 26th, 27th -> issues till 30th.
+ * If today is 28th-31st -> issues till 5th of next month.
  */
 export function getNextMultipleOfFiveDate(baseDateInput?: string | Date): string {
   const d = baseDateInput ? new Date(baseDateInput) : new Date();
@@ -78,22 +78,41 @@ export function getNextMultipleOfFiveDate(baseDateInput?: string | Date): string
   const month = d.getMonth();
   const day = d.getDate();
 
-  // Target next multiple of 5 strictly greater than today
-  const nextTargetDay = Math.floor(day / 5) * 5 + 5;
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  let targetDay: number;
+  let targetMonth = month;
+  let targetYear = year;
 
-  if (nextTargetDay <= daysInMonth) {
-    const targetDate = new Date(year, month, nextTargetDay);
-    const y = targetDate.getFullYear();
-    const m = String(targetDate.getMonth() + 1).padStart(2, '0');
-    const dayStr = String(targetDate.getDate()).padStart(2, '0');
-    return `${y}-${m}-${dayStr}`;
+  if (day <= 2) {
+    targetDay = 5;
+  } else if (day <= 7) {
+    targetDay = 10;
+  } else if (day <= 12) {
+    targetDay = 15;
+  } else if (day <= 17) {
+    targetDay = 20;
+  } else if (day <= 22) {
+    targetDay = 25;
+  } else if (day <= 27) {
+    targetDay = 30;
   } else {
-    // Spill over to 5th of next month
-    const targetDate = new Date(year, month + 1, 5);
-    const y = targetDate.getFullYear();
-    const m = String(targetDate.getMonth() + 1).padStart(2, '0');
-    const dayStr = String(targetDate.getDate()).padStart(2, '0');
-    return `${y}-${m}-${dayStr}`;
+    // 28th to 31st -> 5th of next month
+    targetDay = 5;
+    targetMonth = month + 1;
+    if (targetMonth > 11) {
+      targetMonth = 0;
+      targetYear = year + 1;
+    }
   }
+
+  // Cap targetDay at the maximum days in target month if targetDay is 30 but month is February
+  const daysInTargetMonth = new Date(targetYear, targetMonth + 1, 0).getDate();
+  if (targetDay > daysInTargetMonth) {
+    targetDay = daysInTargetMonth;
+  }
+
+  const targetDate = new Date(targetYear, targetMonth, targetDay);
+  const y = targetDate.getFullYear();
+  const m = String(targetDate.getMonth() + 1).padStart(2, '0');
+  const dayStr = String(targetDate.getDate()).padStart(2, '0');
+  return `${y}-${m}-${dayStr}`;
 }
