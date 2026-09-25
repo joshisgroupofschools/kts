@@ -96,7 +96,7 @@ export const TodaysReceiptsModal: React.FC<TodaysReceiptsModalProps> = ({
 
   // Aggregate stats
   const stats = useMemo(() => {
-    let totalAchieved = 0;
+    let totalCollected = 0;
     let cashTotal = 0;
     let upiTotal = 0;
     let otherTotal = 0;
@@ -104,7 +104,7 @@ export const TodaysReceiptsModal: React.FC<TodaysReceiptsModalProps> = ({
     let pendingCount = 0;
 
     dayTransactions.forEach((tx) => {
-      totalAchieved += tx.amount || 0;
+      totalCollected += tx.amount || 0;
       if (tx.paymentMode === 'Cash') {
         cashTotal += tx.amount || 0;
       } else if (tx.paymentMode === 'UPI') {
@@ -127,23 +127,52 @@ export const TodaysReceiptsModal: React.FC<TodaysReceiptsModalProps> = ({
       }
     });
 
-    const target = dailyTarget > 0 ? dailyTarget : 50000;
-    const achievedPercent = Math.min(999, (totalAchieved / target) * 100);
+    // Automatic target calculation based on total remaining due divided by 30 days (or run rate)
+    let autoTarget = dailyTarget;
+    if (!autoTarget || autoTarget <= 0) {
+      let totalRemainingDue = 0;
+      Object.values(studentSummaries).forEach((s: any) => {
+        totalRemainingDue += Number(s.totalDue) || 0;
+      });
+      autoTarget = Math.round(totalRemainingDue / 30) || 133970;
+    }
+    const target = autoTarget;
+    const collectionPercent = Math.min(999, (totalCollected / target) * 100);
     const canCloseDay = dayTransactions.length > 0 && pendingCount === 0;
 
     return {
-      totalAchieved,
+      totalCollected,
       cashTotal,
       upiTotal,
       otherTotal,
       totalCount: dayTransactions.length,
-      achievedPercent,
+      collectionPercent,
       target,
       verifiedCount,
       pendingCount,
       canCloseDay,
     };
   }, [dayTransactions, dailyTarget, studentSummaries]);
+
+  // Month stats for month target & month collected
+  const monthStats = useMemo(() => {
+    const [y, m] = selectedDate.split('-');
+    let monthCollected = 0;
+    transactions.forEach((tx) => {
+      if (tx.isCancelled) return;
+      const txDate = tx.date.split(' ')[0];
+      if (txDate.startsWith(`${y}-${m}`)) {
+        monthCollected += tx.amount || 0;
+      }
+    });
+    const monthTarget = stats.target * 30;
+    const monthCollectionPercent = Math.min(999, (monthCollected / monthTarget) * 100);
+    return {
+      monthCollected,
+      monthTarget,
+      monthCollectionPercent,
+    };
+  }, [transactions, selectedDate, stats.target]);
 
   // Check if day is already closed
   const existingDayClose = dayCloseRecords[selectedDate];
@@ -302,13 +331,13 @@ export const TodaysReceiptsModal: React.FC<TodaysReceiptsModalProps> = ({
           </div>
         )}
 
-        {/* Top Summary Cards (TARGET, TOTAL ACHIEVED, ACHIEVED %, UPI, CASH) */}
+        {/* Top Summary Cards (TARGET, TOTAL ACHIEVED, ACHIEVED %, UPI, CASH, MONTH) */}
         <div className="p-4 sm:p-5 bg-slate-50 dark:bg-slate-850/50 border-b border-slate-200 dark:border-slate-800">
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3">
             {/* 1. TARGET */}
             <div className="p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-2xs">
               <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 text-[11px] font-bold uppercase tracking-wider mb-1">
-                <span>Target</span>
+                <span>Daily Target</span>
                 <button
                   type="button"
                   onClick={() => {
@@ -344,29 +373,29 @@ export const TodaysReceiptsModal: React.FC<TodaysReceiptsModalProps> = ({
               )}
             </div>
 
-            {/* 2. TOTAL ACHIEVED */}
+            {/* 2. TOTAL COLLECTED */}
             <div className="p-3 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/80 rounded-xl shadow-2xs">
               <span className="text-emerald-700 dark:text-emerald-300 text-[11px] font-bold uppercase tracking-wider block mb-1">
-                Total Achieved
+                Total Collected
               </span>
               <div className="text-base sm:text-lg font-black font-mono text-emerald-700 dark:text-emerald-300">
-                {formatCurrency(stats.totalAchieved, currencySymbol)}
+                {formatCurrency(stats.totalCollected, currencySymbol)}
               </div>
             </div>
 
-            {/* 3. ACHIEVED % */}
+            {/* 3. COLLECTION % */}
             <div className="p-3 bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800/80 rounded-xl shadow-2xs">
               <div className="flex items-center justify-between text-indigo-700 dark:text-indigo-300 text-[11px] font-bold uppercase tracking-wider mb-1">
-                <span>Achieved %</span>
-                <span className="text-[10px] font-mono">{stats.achievedPercent.toFixed(1)}%</span>
+                <span>Collection %</span>
+                <span className="text-[10px] font-mono">{stats.collectionPercent.toFixed(1)}%</span>
               </div>
               <div className="text-base sm:text-lg font-black font-mono text-indigo-700 dark:text-indigo-300">
-                {stats.achievedPercent.toFixed(1)}%
+                {stats.collectionPercent.toFixed(1)}%
               </div>
               <div className="w-full bg-indigo-200 dark:bg-indigo-900 h-1.5 rounded-full mt-1.5 overflow-hidden">
                 <div
                   className="bg-indigo-600 dark:bg-indigo-400 h-full rounded-full transition-all duration-500"
-                  style={{ width: `${Math.min(100, stats.achievedPercent)}%` }}
+                  style={{ width: `${Math.min(100, stats.collectionPercent)}%` }}
                 />
               </div>
             </div>
@@ -391,7 +420,27 @@ export const TodaysReceiptsModal: React.FC<TodaysReceiptsModalProps> = ({
               </div>
             </div>
 
-            {/* 6. RECEIPTS COUNT & SLIP STATUS */}
+            {/* 6. MONTHLY TARGET & COLLECTED */}
+            <div className="p-3 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800/80 rounded-xl shadow-2xs col-span-2 sm:col-span-1">
+              <div className="flex items-center justify-between text-blue-700 dark:text-blue-300 text-[10.5px] font-bold uppercase tracking-wider mb-1">
+                <span>Month Target & Collected</span>
+                <span className="text-[9.5px] font-mono">{monthStats.monthCollectionPercent.toFixed(1)}%</span>
+              </div>
+              <div className="text-sm font-black font-mono text-blue-800 dark:text-blue-200">
+                {formatCurrency(monthStats.monthCollected, currencySymbol)}
+              </div>
+              <div className="text-[10px] text-blue-600 dark:text-blue-400 font-mono truncate">
+                Target: {formatCurrency(monthStats.monthTarget, currencySymbol)}
+              </div>
+              <div className="w-full bg-blue-200 dark:bg-blue-900 h-1.5 rounded-full mt-1 overflow-hidden">
+                <div
+                  className="bg-blue-600 dark:bg-blue-400 h-full rounded-full transition-all duration-500"
+                  style={{ width: `${Math.min(100, monthStats.monthCollectionPercent)}%` }}
+                />
+              </div>
+            </div>
+
+            {/* 7. RECEIPTS COUNT & SLIP STATUS */}
             <div className="p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-2xs">
               <span className="text-slate-500 dark:text-slate-400 text-[11px] font-bold uppercase tracking-wider block mb-1">
                 Receipts / Slips
@@ -401,9 +450,9 @@ export const TodaysReceiptsModal: React.FC<TodaysReceiptsModalProps> = ({
               </div>
               <div className="text-[10px] font-bold mt-0.5">
                 {stats.pendingCount > 0 ? (
-                  <span className="text-rose-600 dark:text-rose-400">⚠️ {stats.pendingCount} slip updates pending</span>
+                  <span className="text-rose-600 dark:text-rose-400">⚠️ {stats.pendingCount} slip pending</span>
                 ) : (
-                  <span className="text-emerald-600 dark:text-emerald-400">✓ All slips verified</span>
+                  <span className="text-emerald-600 dark:text-emerald-400">✓ All verified</span>
                 )}
               </div>
             </div>

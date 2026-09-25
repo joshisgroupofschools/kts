@@ -4,17 +4,25 @@ import { SchoolProfile } from '../types';
 
 interface PasscodeGateProps {
   schoolProfile: SchoolProfile;
+  requiredPasscode?: string;
+  title?: string;
+  subtitle?: string;
   onBackToLedger?: () => void;
   children: React.ReactNode;
 }
 
-const REQUIRED_PASSCODE = '2026';
-const PASSCODE_STORAGE_KEY = 'sfc_analytics_passcode_authenticated_2026';
-
-export const PasscodeGate: React.FC<PasscodeGateProps> = ({ schoolProfile, onBackToLedger, children }) => {
+export const PasscodeGate: React.FC<PasscodeGateProps> = ({
+  schoolProfile,
+  requiredPasscode = '2025',
+  title = 'Kakatiya School Administration',
+  subtitle = 'Protected Area • Enter 4-digit PIN to access software',
+  onBackToLedger,
+  children,
+}) => {
+  const passcodeKey = `sfc_passcode_auth_${requiredPasscode}`;
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
     try {
-      return sessionStorage.getItem(PASSCODE_STORAGE_KEY) === 'true';
+      return sessionStorage.getItem(passcodeKey) === 'true';
     } catch {
       return false;
     }
@@ -34,7 +42,7 @@ export const PasscodeGate: React.FC<PasscodeGateProps> = ({ schoolProfile, onBac
 
     // Auto-advance to next input
     if (cleanValue && index < 3) {
-      const nextInput = document.getElementById(`pin-input-${index + 1}`);
+      const nextInput = document.getElementById(`pin-input-${requiredPasscode}-${index + 1}`);
       if (nextInput) nextInput.focus();
     }
 
@@ -47,7 +55,7 @@ export const PasscodeGate: React.FC<PasscodeGateProps> = ({ schoolProfile, onBac
 
   const handleKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Backspace' && !digits[index] && index > 0) {
-      const prevInput = document.getElementById(`pin-input-${index - 1}`);
+      const prevInput = document.getElementById(`pin-input-${requiredPasscode}-${index - 1}`);
       if (prevInput) {
         prevInput.focus();
         const newDigits = [...digits];
@@ -71,27 +79,27 @@ export const PasscodeGate: React.FC<PasscodeGateProps> = ({ schoolProfile, onBac
       if (pasted.length === 4) {
         verifyPasscode(pasted);
       } else {
-        const nextInput = document.getElementById(`pin-input-${pasted.length}`);
+        const nextInput = document.getElementById(`pin-input-${requiredPasscode}-${pasted.length}`);
         if (nextInput) nextInput.focus();
       }
     }
   };
 
   const verifyPasscode = (code: string) => {
-    if (code === REQUIRED_PASSCODE) {
+    if (code === requiredPasscode) {
       try {
-        sessionStorage.setItem(PASSCODE_STORAGE_KEY, 'true');
+        sessionStorage.setItem(passcodeKey, 'true');
       } catch {
         // ignore
       }
       setIsAuthenticated(true);
     } else {
       setIsShaking(true);
-      setError('Incorrect Passcode. Please try again.');
+      setError('Incorrect Passcode. Access denied.');
       setTimeout(() => {
         setIsShaking(false);
         setDigits(['', '', '', '']);
-        const firstInput = document.getElementById('pin-input-0');
+        const firstInput = document.getElementById(`pin-input-${requiredPasscode}-0`);
         if (firstInput) firstInput.focus();
       }, 600);
     }
@@ -110,7 +118,7 @@ export const PasscodeGate: React.FC<PasscodeGateProps> = ({ schoolProfile, onBac
         const newDigits = [...digits];
         newDigits[i] = '';
         setDigits(newDigits);
-        const input = document.getElementById(`pin-input-${i}`);
+        const input = document.getElementById(`pin-input-${requiredPasscode}-${i}`);
         if (input) input.focus();
         break;
       }
@@ -120,7 +128,7 @@ export const PasscodeGate: React.FC<PasscodeGateProps> = ({ schoolProfile, onBac
   // Focus first input on mount
   useEffect(() => {
     if (!isAuthenticated) {
-      const firstInput = document.getElementById('pin-input-0');
+      const firstInput = document.getElementById(`pin-input-${requiredPasscode}-0`);
       if (firstInput) firstInput.focus();
     }
   }, [isAuthenticated]);
@@ -144,10 +152,10 @@ export const PasscodeGate: React.FC<PasscodeGateProps> = ({ schoolProfile, onBac
 
           <div>
             <h1 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900 dark:text-white">
-              Financial Analytics & Fee Health
+              {title}
             </h1>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 font-medium">
-              Protected Area • Enter 4-digit PIN to access executive analytics
+              {subtitle}
             </p>
           </div>
 
@@ -166,7 +174,7 @@ export const PasscodeGate: React.FC<PasscodeGateProps> = ({ schoolProfile, onBac
               {digits.map((digit, idx) => (
                 <input
                   key={idx}
-                  id={`pin-input-${idx}`}
+                  id={`pin-input-${requiredPasscode}-${idx}`}
                   type="password"
                   inputMode="numeric"
                   maxLength={1}

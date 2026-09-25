@@ -59,23 +59,23 @@ export interface ColumnVisibilityState {
   actions: boolean;
 }
 
-const STORAGE_KEY = 'school_fee_column_prefs_v7';
+const STORAGE_KEY = 'school_fee_column_prefs_v8';
 
 const DEFAULT_COLUMNS: ColumnVisibilityState = {
-  sno: true,
+  sno: false,
   student: true,
   className: true,
-  actualSchoolFee: true,
-  discount: true,
-  committedSchoolFee: true,
-  oldFee: true,
-  transportFee: true,
-  netPayable: true,
-  totalPaid: true,
-  totalDue: true,
-  payableTillDate: true,
+  actualSchoolFee: false,
+  discount: false,
+  committedSchoolFee: false,
+  oldFee: false,
+  transportFee: false,
+  netPayable: false,
+  totalPaid: false,
+  totalDue: false,
+  payableTillDate: false,
   dueTillDate: true,
-  feeHealth: true,
+  feeHealth: false,
   actions: true,
 };
 
@@ -789,62 +789,62 @@ export const MasterStudentTable: React.FC<MasterStudentTableProps> = ({
             )}
           </div>
 
-          {/* Center: Workflow Tiers (ID Card / Permission Slip / Action Required) */}
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <span className="text-[11px] font-black uppercase text-slate-500 tracking-wider mr-1">
-              Workflow Tiers:
-            </span>
+          {/* Center: Fee Status, Stats & Monthwise Due Dropdowns */}
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* 1. Fee Status (Workflow Tiers) Dropdown */}
+            <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-1 text-xs">
+              <span className="font-bold text-slate-500 text-[11px] uppercase shrink-0">Fee Status:</span>
+              <select
+                value={selectedTier}
+                onChange={(e) => setSelectedTier(e.target.value as any)}
+                className="bg-transparent text-slate-800 dark:text-slate-200 font-bold text-xs focus:outline-none cursor-pointer"
+              >
+                <option value="ALL">All Tiers ({tierCounts.all})</option>
+                <option value="ID_CARD">ID Card ({tierCounts.idCard})</option>
+                <option value="PERMISSION_SLIP">Permission Slip ({tierCounts.permission})</option>
+                <option value="ACTION_REQUIRED">Action Required ({tierCounts.action})</option>
+              </select>
+            </div>
 
-            <button
-              type="button"
-              onClick={() => setSelectedTier('ALL')}
-              className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                selectedTier === 'ALL'
-                  ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 shadow-xs'
-                  : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-100'
-              }`}
-            >
-              All ({tierCounts.all})
-            </button>
+            {/* 2. Stats (Status Breakdown) Dropdown */}
+            <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-1 text-xs">
+              <span className="font-bold text-slate-500 text-[11px] uppercase shrink-0">Stats:</span>
+              <select
+                value={selectedStatus}
+                onChange={(e) => setSelectedStatus(e.target.value as any)}
+                className="bg-transparent text-slate-800 dark:text-slate-200 font-bold text-xs focus:outline-none cursor-pointer"
+              >
+                <option value="ALL">All Stats</option>
+                <option value="STRONG_GREEN">Cleared (0 Due): {statusCounts.strongGreen}</option>
+                <option value="LIGHT_GREEN">{getStatusCategoryMeta('LIGHT_GREEN', tolerance, currencySymbol).label}: {statusCounts.lightGreen}</option>
+                <option value="LIGHT_YELLOW">{getStatusCategoryMeta('LIGHT_YELLOW', tolerance, currencySymbol).label}: {statusCounts.lightYellow}</option>
+                <option value="LIGHT_RED">Zero Paid: {statusCounts.lightRed}</option>
+                <option value="STRONG_RED">Uncommitted Fee: {statusCounts.strongRed}</option>
+              </select>
+            </div>
 
-            <button
-              type="button"
-              onClick={() => setSelectedTier(selectedTier === 'ID_CARD' ? 'ALL' : 'ID_CARD')}
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                selectedTier === 'ID_CARD'
-                  ? 'bg-emerald-600 text-white shadow-xs'
-                  : 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100'
-              }`}
-            >
-              <Award className="w-3.5 h-3.5" />
-              <span>ID Card ({tierCounts.idCard})</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setSelectedTier(selectedTier === 'PERMISSION_SLIP' ? 'ALL' : 'PERMISSION_SLIP')}
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                selectedTier === 'PERMISSION_SLIP'
-                  ? 'bg-indigo-600 text-white shadow-xs'
-                  : 'bg-indigo-50 dark:bg-indigo-950/40 text-indigo-800 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100'
-              }`}
-            >
-              <CalendarClock className="w-3.5 h-3.5" />
-              <span>Permission Slip ({tierCounts.permission})</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setSelectedTier(selectedTier === 'ACTION_REQUIRED' ? 'ALL' : 'ACTION_REQUIRED')}
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                selectedTier === 'ACTION_REQUIRED'
-                  ? 'bg-rose-600 text-white shadow-xs'
-                  : 'bg-rose-50 dark:bg-rose-950/40 text-rose-800 dark:text-rose-300 border border-rose-200 dark:border-rose-800 hover:bg-rose-100'
-              }`}
-            >
-              <Flame className="w-3.5 h-3.5" />
-              <span>Action ({tierCounts.action})</span>
-            </button>
+            {/* 3. Monthwise Due Dropdown */}
+            <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-1 text-xs">
+              <span className="font-bold text-slate-500 text-[11px] uppercase shrink-0">Month:</span>
+              <select
+                value={selectedDueMonth}
+                onChange={(e) => {
+                  setSelectedDueMonth(e.target.value as any);
+                  setCurrentPage(1);
+                }}
+                className="bg-transparent text-slate-800 dark:text-slate-200 font-bold text-xs focus:outline-none cursor-pointer"
+              >
+                <option value="ALL">All Months ({summaries.length})</option>
+                {ACADEMIC_MONTHS.map((m) => {
+                  const counts = monthDueCounts[m.key];
+                  return (
+                    <option key={m.key} value={m.key}>
+                      {m.label} ({counts.total})
+                    </option>
+                  );
+                })}
+              </select>
+            </div>
           </div>
 
           {/* Right: Column Visibility */}
@@ -860,9 +860,6 @@ export const MasterStudentTable: React.FC<MasterStudentTableProps> = ({
               >
                 <Eye className="w-3.5 h-3.5 text-slate-500" />
                 <span>Columns</span>
-                <span className="px-1.5 py-0.2 bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 rounded text-[9.5px] font-bold">
-                  {totalVisibleCols}/14
-                </span>
                 <ChevronDown className="w-3 h-3 text-slate-400" />
               </button>
 

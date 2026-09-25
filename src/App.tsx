@@ -723,7 +723,12 @@ export default function App() {
   };
 
   return (
-    <PasscodeGate schoolProfile={safeSchoolProfile}>
+    <PasscodeGate
+      schoolProfile={safeSchoolProfile}
+      requiredPasscode="2025"
+      title="Kakatiya School Administration"
+      subtitle="Protected Area • Enter 4-digit PIN (2025) to access software"
+    >
       <div className="min-h-screen bg-slate-100 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col font-sans transition-colors">
         {/* 1. Global Navigation Bar */}
       <Navbar
@@ -817,19 +822,27 @@ export default function App() {
             onBackToApp={() => handleSetCurrentView('LEDGER')}
           />
         ) : currentView === 'ANALYTICS' ? (
-          <FinancialDashboard
-            analytics={analytics}
+          <PasscodeGate
             schoolProfile={safeSchoolProfile}
-            tolerance={tolerance}
-            selectedStatusFilter={filters.selectedStatus}
-            onSelectStatusFilter={(status) => setFilters((prev) => ({ ...prev, selectedStatus: status }))}
-            selectedActionFilter={filters.selectedCategory}
-            onSelectActionFilter={(cat) => setFilters((prev) => ({ ...prev, selectedCategory: cat }))}
-            selectedClassFilter={filters.selectedClass}
-            onSelectClassFilter={(cls) => setFilters((prev) => ({ ...prev, selectedClass: cls }))}
-            classList={classList}
-            onNavigateToLedger={() => handleSetCurrentView('LEDGER')}
-          />
+            requiredPasscode="2027"
+            title="Financial Analytics & Fee Health"
+            subtitle="Executive Fee Health & Analytics • Enter 4-digit PIN (2027) to access"
+            onBackToLedger={() => handleSetCurrentView('LEDGER')}
+          >
+            <FinancialDashboard
+              analytics={analytics}
+              schoolProfile={safeSchoolProfile}
+              tolerance={tolerance}
+              selectedStatusFilter={filters.selectedStatus}
+              onSelectStatusFilter={(status) => setFilters((prev) => ({ ...prev, selectedStatus: status }))}
+              selectedActionFilter={filters.selectedCategory}
+              onSelectActionFilter={(cat) => setFilters((prev) => ({ ...prev, selectedCategory: cat }))}
+              selectedClassFilter={filters.selectedClass}
+              onSelectClassFilter={(cls) => setFilters((prev) => ({ ...prev, selectedClass: cls }))}
+              classList={classList}
+              onNavigateToLedger={() => handleSetCurrentView('LEDGER')}
+            />
+          </PasscodeGate>
         ) : (
           <div className="space-y-4">
             {/* Master Student Ledger Table */}

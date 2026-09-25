@@ -464,7 +464,9 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                    {summary.installments.map((inst) => {
+                    {(() => {
+                      const sortedInstallments = [...summary.installments].sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+                      return sortedInstallments.map((inst) => {
                       const alloc = allocations.find((a) => a.installmentId === inst.id);
                       const allocatedAmt = alloc ? alloc.allocatedAmount : 0;
                       const displayName = getInstallmentDisplayName(
@@ -520,7 +522,8 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                           </td>
                         </tr>
                       );
-                    })}
+                    });
+                    })()}
                   </tbody>
                   <tfoot className="bg-slate-50 dark:bg-slate-800/90 font-bold border-t border-slate-200 dark:border-slate-700 text-xs">
                     <tr>
