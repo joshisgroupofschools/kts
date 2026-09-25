@@ -236,4 +236,48 @@ export interface AnalyticsSummary {
   headWiseBifurcation: FeeHeadBifurcation[];
 }
 
+export type BackendMode = 'GOOGLE_SHEETS' | 'LOCAL_CACHE';
+
+export interface AuditLogEntry {
+  eventId: string;
+  timestamp: string;
+  action: string;
+  entityType: string;
+  entityId: string;
+  studentId?: string;
+  receiptNo?: string;
+  operator?: string;
+  deviceId?: string;
+  beforeSummary?: string;
+  afterSummary?: string;
+  success: boolean;
+  errorMessage?: string;
+}
+
+export interface GoogleSheetsResponse<T = any> {
+  success: boolean;
+  data?: T;
+  message?: string;
+  error?: string;
+  serverTime?: string;
+  syncedAt?: string;
+}
+
+export interface MigrationVerificationReport {
+  studentCount: number;
+  feeStructureCount: number;
+  installmentCount: number;
+  transactionCount: number;
+  allocationCount: number;
+  duplicateIds: string[];
+  duplicateReceiptNumbers: string[];
+  orphanInstallments: string[];
+  orphanTransactions: string[];
+  missingAllocationInstallmentIds: string[];
+  highestReceiptNumber: string;
+  nextReceiptSequence: number;
+  isValid: boolean;
+  errors: string[];
+}
+
 export type AppView = 'LEDGER' | 'ANALYTICS' | 'TRIAL_VERIFICATION';

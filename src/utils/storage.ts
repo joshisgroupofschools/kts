@@ -8,12 +8,26 @@ import {
   Student,
   StudentFeeStructure,
   ToleranceConfig,
+  BackendMode,
 } from '../types';
 import { generateStructuredRealData, lookupStandardClassFee } from '../data/trialSpreadsheetData';
 import { DEFAULT_SCRIPT_WEBAPP_URL } from './googleSheetsScript';
 
 const CURRENT_DATA_VERSION = 'v2_kakatiya_actual_sept_2026';
 const DATA_VERSION_KEY = 'sfc_app_data_version';
+const BACKEND_MODE_KEY = 'sfc_backend_mode_v3';
+
+export function getBackendMode(): BackendMode {
+  const stored = localStorage.getItem(BACKEND_MODE_KEY);
+  if (stored === 'GOOGLE_SHEETS' || stored === 'LOCAL_CACHE') {
+    return stored as BackendMode;
+  }
+  return 'GOOGLE_SHEETS';
+}
+
+export function saveBackendMode(mode: BackendMode) {
+  localStorage.setItem(BACKEND_MODE_KEY, mode);
+}
 
 const STORAGE_KEYS = {
   STUDENTS: 'sfc_students_v2',

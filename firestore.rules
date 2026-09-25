@@ -1,7 +1,14 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    // Legacy document access for migration
     match /kakatiya_school_ledger_v2/main_data_state {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // Schools kakatiya collection path
+    match /schools/kakatiya/{allPaths=**} {
       allow read, write: if true;
     }
   }

@@ -206,17 +206,17 @@ export const GoogleSheetsSyncModal: React.FC<GoogleSheetsSyncModalProps> = ({
               </div>
             </div>
 
-            {isConnected && (
+            <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
                 disabled={isSyncing}
                 onClick={handleManualPush}
-                className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-bold text-xs shadow-xs transition-all flex items-center gap-1.5 shrink-0"
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold text-xs shadow-md transition-all flex items-center gap-2 shrink-0"
               >
-                <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
-                <span>Sync Now</span>
+                <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
+                <span>📤 Populate / Push All Data to Google Sheet</span>
               </button>
-            )}
+            </div>
           </div>
 
           {/* Web App URL Input */}
