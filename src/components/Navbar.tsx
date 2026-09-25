@@ -120,7 +120,6 @@ export const Navbar: React.FC<NavbarProps> = ({
             <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
               {/* As-Of Date Indicator (Desktop) */}
               <div className="hidden md:flex items-center bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-1 gap-1.5 text-xs">
-                <Calendar className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400 shrink-0" />
                 <input
                   id="input-system-date"
                   type="date"

@@ -1,0 +1,39 @@
+{
+  "entities": {
+    "SchoolLedger": {
+      "title": "School Ledger Data",
+      "description": "Stores students, transactions, installments, and school profile",
+      "type": "object",
+      "properties": {
+        "students": {
+          "type": "array",
+          "description": "List of students"
+        },
+        "transactions": {
+          "type": "array",
+          "description": "List of transactions"
+        },
+        "installments": {
+          "type": "array",
+          "description": "List of installments"
+        },
+        "schoolProfile": {
+          "type": "object",
+          "description": "School profile settings"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    }
+  },
+  "firestore": {
+    "/kakatiya_school_ledger_v2/main_data_state": {
+      "schema": {
+        "$ref": "#/entities/SchoolLedger"
+      },
+      "description": "Main application state document for multi-device sync"
+    }
+  }
+}

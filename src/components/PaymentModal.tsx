@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import confetti from 'canvas-confetti';
+import { getKolkataToday } from '../utils/dateUtils';
 import {
   PaymentAllocation,
   PaymentMode,
@@ -35,6 +36,8 @@ interface PaymentModalProps {
   student: Student;
   summary: StudentFinancialSummary;
   schoolProfile: SchoolProfile;
+  initialFeeType?: 'ALL' | 'BOOKS' | 'DRESS' | string;
+  currentDate?: string;
   onClose: () => void;
   onSavePayment: (
     transaction: PaymentTransaction,
@@ -47,19 +50,41 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   student,
   summary,
   schoolProfile,
+  initialFeeType = 'ALL',
+  currentDate,
   onClose,
   onSavePayment,
 }) => {
+  const filteredInstallments = useMemo(() => {
+    if (initialFeeType === 'BOOKS') {
+      return summary.installments.filter(
+        (i) => i.headName.toLowerCase().includes('book') || i.headName.toLowerCase().includes('stationery')
+      );
+    }
+    if (initialFeeType === 'DRESS') {
+      return summary.installments.filter(
+        (i) =>
+          i.headName.toLowerCase().includes('dress') ||
+          i.headName.toLowerCase().includes('uniform') ||
+          i.headName.toLowerCase().includes('cloth')
+      );
+    }
+    return summary.installments;
+  }, [summary.installments, initialFeeType]);
+
   const initialAmount = useMemo(() => {
-    return summary.dueTillDate > 0 ? summary.dueTillDate : summary.totalDue;
-  }, [summary.dueTillDate, summary.totalDue]);
+    const list = filteredInstallments.length > 0 && initialFeeType !== 'ALL' ? filteredInstallments : summary.installments;
+    const dueList = list.filter((i) => i.balanceAmount > 0);
+    const sumDue = dueList.reduce((acc, i) => acc + i.balanceAmount, 0);
+    return sumDue > 0 ? sumDue : (summary.dueTillDate > 0 ? summary.dueTillDate : summary.totalDue);
+  }, [filteredInstallments, summary.installments, summary.totalDue, summary.dueTillDate, initialFeeType]);
 
   const [paymentAmount, setPaymentAmount] = useState<number>(initialAmount);
   const [paymentMode, setPaymentMode] = useState<PaymentMode>('Cash');
   const [referenceNo, setReferenceNo] = useState('');
   const [remarks, setRemarks] = useState('');
   const [paymentDate, setPaymentDate] = useState<string>(
-    new Date().toISOString().split('T')[0]
+    currentDate || getKolkataToday()
   );
   const [allocations, setAllocations] = useState<PaymentAllocation[]>([]);
   const [isManualOverride, setIsManualOverride] = useState(false);
@@ -73,10 +98,11 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   // Automatically recalculate FIFO allocations whenever paymentAmount changes
   useEffect(() => {
     if (!isManualOverride) {
-      const computed = calculateFifoAllocations(summary.installments, paymentAmount);
+      const sourceInsts = filteredInstallments.length > 0 && initialFeeType !== 'ALL' ? filteredInstallments : summary.installments;
+      const computed = calculateFifoAllocations(sourceInsts, paymentAmount);
       setAllocations(computed);
     }
-  }, [paymentAmount, summary.installments, isManualOverride]);
+  }, [paymentAmount, summary.installments, filteredInstallments, initialFeeType, isManualOverride]);
 
   const handleAllocationChange = (installmentId: string, amount: number) => {
     setIsManualOverride(true);

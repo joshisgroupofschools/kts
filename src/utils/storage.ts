@@ -130,16 +130,14 @@ export function getStoredStudents(): Student[] {
       localStorage.setItem(DATA_VERSION_KEY, CURRENT_DATA_VERSION);
       return seed.students;
     }
-    return parsed
-      .filter((s: Student) => s.isActive !== false)
-      .map((s: Student) => ({
-        ...s,
-        isActive: true,
-        parentName:
-          s.parentName && (s.parentName.toLowerCase().startsWith('parent of') || s.parentName.trim().toLowerCase() === 'parent')
-            ? ''
-            : (s.parentName || ''),
-      }));
+    return parsed.map((s: Student) => ({
+      ...s,
+      isActive: s.isActive !== false,
+      parentName:
+        s.parentName && (s.parentName.toLowerCase().startsWith('parent of') || s.parentName.trim().toLowerCase() === 'parent')
+          ? ''
+          : (s.parentName || ''),
+    }));
   } catch {
     return [];
   }

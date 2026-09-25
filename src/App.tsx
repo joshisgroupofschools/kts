@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useRef } from 'react';
 import {
   AppView,
   ClassFeeConfig,
@@ -57,7 +57,7 @@ import {
   saveTransactions,
 } from './utils/storage';
 import { db, COLLECTION_ID, DOC_ID } from './firebase/firebaseClient';
-import { doc, onSnapshot, setDoc } from 'firebase/firestore';
+import { doc, onSnapshot, setDoc, runTransaction } from 'firebase/firestore';
 import { Navbar } from './components/Navbar';
 import { FinancialDashboard } from './components/FinancialDashboard';
 import { MasterStudentTable } from './components/MasterStudentTable';
@@ -126,9 +126,9 @@ export default function App() {
     localStorage.setItem('sfc_theme', theme);
   }, [theme]);
 
-  // Date Simulation (Default: Today is 26/9/2026)
+  // Date Simulation (Default: Today in Asia/Kolkata)
   const [asOfDate, setAsOfDate] = useState<string>(
-    () => '2026-09-26'
+    () => getKolkataToday()
   );
 
   // Filter State
@@ -201,47 +201,67 @@ export default function App() {
     saveSchoolProfile(schoolProfile);
   }, [schoolProfile]);
 
+  const [isLoadingCloud, setIsLoadingCloud] = useState<boolean>(true);
+
   // Firebase Firestore real-time sync across logins & devices
   useEffect(() => {
     const docRef = doc(db, COLLECTION_ID, DOC_ID);
     const unsubscribe = onSnapshot(docRef, (snapshot) => {
       if (snapshot.exists()) {
         const data = snapshot.data();
-        if (data.students && Array.isArray(data.students) && data.students.length > 0) {
+        if (data.students && Array.isArray(data.students)) {
           setStudents(data.students);
         }
-        if (data.transactions && Array.isArray(data.transactions)) {
-          setTransactions(data.transactions);
+        if (data.structures && Array.isArray(data.structures)) {
+          setStructures(data.structures);
         }
         if (data.installments && Array.isArray(data.installments)) {
           setInstallments(data.installments);
         }
+        if (data.transactions && Array.isArray(data.transactions)) {
+          setTransactions(data.transactions);
+        }
+        if (data.classConfigs && Array.isArray(data.classConfigs)) {
+          setClassConfigs(data.classConfigs);
+        }
+        if (data.feeHeads && Array.isArray(data.feeHeads)) {
+          setFeeHeads(data.feeHeads);
+        }
+        if (data.tolerance) {
+          setTolerance(data.tolerance);
+        }
         if (data.schoolProfile) {
           setSchoolProfile(data.schoolProfile);
+        }
+        if (typeof data.dailyTarget === 'number') {
+          setDailyTarget(data.dailyTarget);
+        }
+        if (data.dayCloseRecords) {
+          setDayCloseRecords(data.dayCloseRecords);
         }
       } else {
         setDoc(docRef, {
           students,
-          transactions,
+          structures,
           installments,
+          transactions,
+          classConfigs,
+          feeHeads,
+          tolerance,
           schoolProfile,
+          dailyTarget,
+          dayCloseRecords,
+          nextReceiptSequence: schoolProfile.nextReceiptSequence || 1,
           updatedAt: new Date().toISOString(),
-        }).catch(() => {});
+        }).catch((err) => console.error('Firestore init error:', err));
       }
-    }, () => {});
+      setIsLoadingCloud(false);
+    }, (err) => {
+      console.error('Firestore snapshot error:', err);
+      setIsLoadingCloud(false);
+    });
     return () => unsubscribe();
   }, []);
-
-  useEffect(() => {
-    const docRef = doc(db, COLLECTION_ID, DOC_ID);
-    setDoc(docRef, {
-      students,
-      transactions,
-      installments,
-      schoolProfile,
-      updatedAt: new Date().toISOString(),
-    }, { merge: true }).catch(() => {});
-  }, [students, transactions, installments, schoolProfile]);
 
   // Safe schoolProfile guaranteeing all fields
   const safeSchoolProfile: SchoolProfile = useMemo(() => {
@@ -333,10 +353,10 @@ export default function App() {
   }, [studentSummaries, selectedStudentId]);
 
   // -------------------------------------------------------------
-  // 5. Payment Collection Handler (FIFO Knock-Off Logic)
+  // 5. Payment Collection Handler (Firestore Transactional Safety)
   // -------------------------------------------------------------
-  const handleSavePayment = (
-    transaction: PaymentTransaction,
+  const handleSavePayment = async (
+    transactionData: PaymentTransaction,
     allocations: PaymentAllocation[],
     partialStatusUpdate?: {
       manualCategoryOverride: 'auto' | 'id_card' | 'permission' | 'action';
@@ -344,95 +364,173 @@ export default function App() {
       permissionReason?: string;
     }
   ) => {
-    // If partial payment clearance status was selected, update the student record
-    if (partialStatusUpdate && selectedStudentId) {
-      setStudents((prev) =>
-        prev.map((s) => {
-          if (s.id === selectedStudentId) {
-            return {
-              ...s,
-              manualCategoryOverride: partialStatusUpdate.manualCategoryOverride,
-              permissionExpiresAt: partialStatusUpdate.permissionExpiresAt,
-              permissionReason: partialStatusUpdate.permissionReason,
-              updatedAt: new Date().toISOString(),
-            };
+    try {
+      const docRef = doc(db, COLLECTION_ID, DOC_ID);
+      await runTransaction(db, async (transaction) => {
+        const snap = await transaction.get(docRef);
+        let cloudStudents = snap.exists() ? snap.data().students || students : students;
+        let cloudTransactions = snap.exists() ? snap.data().transactions || transactions : transactions;
+        let cloudInstallments = snap.exists() ? snap.data().installments || installments : installments;
+        let cloudSchoolProfile = snap.exists() ? snap.data().schoolProfile || schoolProfile : schoolProfile;
+        let cloudStructures = snap.exists() ? snap.data().structures || structures : structures;
+        let cloudClassConfigs = snap.exists() ? snap.data().classConfigs || classConfigs : classConfigs;
+        let cloudFeeHeads = snap.exists() ? snap.data().feeHeads || feeHeads : feeHeads;
+        let cloudTolerance = snap.exists() ? snap.data().tolerance || tolerance : tolerance;
+        let cloudDailyTarget = snap.exists() ? snap.data().dailyTarget || dailyTarget : dailyTarget;
+        let cloudDayCloseRecords = snap.exists() ? snap.data().dayCloseRecords || dayCloseRecords : dayCloseRecords;
+
+        const currentYear = new Date().getFullYear();
+        const seq = cloudSchoolProfile.nextReceiptSequence || 1;
+        const sequenceStr = String(seq).padStart(5, '0');
+        const finalReceiptNo = `${cloudSchoolProfile.receiptPrefix || 'KSB'}-${currentYear}-${sequenceStr}`;
+
+        if (cloudTransactions.some((t: PaymentTransaction) => t.receiptNo === finalReceiptNo)) {
+          throw new Error(`Receipt number ${finalReceiptNo} already exists. Please retry.`);
+        }
+
+        for (const alloc of allocations) {
+          if (alloc.allocatedAmount < 0) throw new Error('Allocation amount cannot be negative.');
+          const targetInst = cloudInstallments.find((i: Installment) => i.id === alloc.installmentId);
+          if (!targetInst) {
+            throw new Error(`Referenced installment ID ${alloc.installmentId} no longer exists. Please refresh and correct fee structure.`);
           }
-          return s;
-        })
-      );
+          if (alloc.allocatedAmount > targetInst.balanceAmount + 0.01) {
+            throw new Error(`Allocation for ${targetInst.headName} exceeds its current balance.`);
+          }
+        }
+
+        const totalAllocated = allocations.reduce((sum, a) => sum + a.allocatedAmount, 0);
+        if (Math.abs(totalAllocated - transactionData.amount) > 0.01) {
+          throw new Error('Allocation total must exactly equal payment amount.');
+        }
+
+        const finalTransaction = {
+          ...transactionData,
+          receiptNo: finalReceiptNo,
+        };
+
+        if (partialStatusUpdate && selectedStudentId) {
+          cloudStudents = cloudStudents.map((s: Student) => {
+            if (s.id === selectedStudentId) {
+              return {
+                ...s,
+                manualCategoryOverride: partialStatusUpdate.manualCategoryOverride,
+                permissionExpiresAt: partialStatusUpdate.permissionExpiresAt,
+                permissionReason: partialStatusUpdate.permissionReason,
+                updatedAt: new Date().toISOString(),
+              };
+            }
+            return s;
+          });
+        }
+
+        const updatedCloudInstallments = cloudInstallments.map((inst: Installment) => {
+          const matched = allocations.find((a) => a.installmentId === inst.id);
+          if (!matched) return inst;
+
+          const newPaid = inst.paidAmount + matched.allocatedAmount;
+          const newBal = Math.max(0, inst.amount - newPaid);
+          const newStatus = newBal === 0 ? ('paid' as const) : ('partial' as const);
+
+          return {
+            ...inst,
+            paidAmount: newPaid,
+            balanceAmount: newBal,
+            status: newStatus,
+            lastPaymentDate: asOfDate,
+          };
+        });
+
+        const updatedCloudTransactions = [finalTransaction, ...cloudTransactions];
+        const updatedSchoolProfile = {
+          ...cloudSchoolProfile,
+          nextReceiptSequence: seq + 1,
+        };
+
+        transaction.set(docRef, {
+          students: cloudStudents,
+          structures: cloudStructures,
+          installments: updatedCloudInstallments,
+          transactions: updatedCloudTransactions,
+          classConfigs: cloudClassConfigs,
+          feeHeads: cloudFeeHeads,
+          tolerance: cloudTolerance,
+          schoolProfile: updatedSchoolProfile,
+          dailyTarget: cloudDailyTarget,
+          dayCloseRecords: cloudDayCloseRecords,
+          updatedAt: new Date().toISOString(),
+        }, { merge: true });
+
+        setStudents(cloudStudents);
+        setInstallments(updatedCloudInstallments);
+        setTransactions(updatedCloudTransactions);
+        setSchoolProfile(updatedSchoolProfile);
+
+        setActiveReceiptTransaction(finalTransaction);
+        setActiveModal('RECEIPT');
+      });
+    } catch (err: any) {
+      alert(`Payment Save Failed: ${err.message || err}`);
     }
-
-    // Update Installments balances
-    const updatedInstallments = installments.map((inst) => {
-      const matched = allocations.find((a) => a.installmentId === inst.id);
-      if (!matched) return inst;
-
-      const newPaid = inst.paidAmount + matched.allocatedAmount;
-      const newBal = Math.max(0, inst.amount - newPaid);
-      const newStatus = newBal === 0 ? ('paid' as const) : ('partial' as const);
-
-      return {
-        ...inst,
-        paidAmount: newPaid,
-        balanceAmount: newBal,
-        status: newStatus,
-        lastPaymentDate: asOfDate,
-      };
-    });
-
-    // Update State & increment receipt counter
-    setInstallments(updatedInstallments);
-    setTransactions([transaction, ...transactions]);
-    setSchoolProfile((prev) => ({
-      ...safeSchoolProfile,
-      ...(prev || {}),
-      nextReceiptSequence: (prev?.nextReceiptSequence || safeSchoolProfile.nextReceiptSequence || 1) + 1,
-    }));
-
-    // Auto-open Dual A5 Receipt Modal for immediate print/download
-    setActiveReceiptTransaction(transaction);
-    setActiveModal('RECEIPT');
   };
 
   // -------------------------------------------------------------
-  // 6. Void / Cancel Receipt Handler (Reverses balances)
+  // 6. Void / Cancel Receipt Handler (Firestore Transactional Safety)
   // -------------------------------------------------------------
-  const handleCancelReceipt = (transactionId: string, cancelReason: string) => {
-    const txn = transactions.find((t) => t.id === transactionId);
-    if (!txn || txn.isCancelled) return;
+  const handleCancelReceipt = async (transactionId: string, cancelReason: string) => {
+    try {
+      const docRef = doc(db, COLLECTION_ID, DOC_ID);
+      await runTransaction(db, async (transaction) => {
+        const snap = await transaction.get(docRef);
+        if (!snap.exists()) return;
+        const data = snap.data();
+        const cloudTransactions = data.transactions || transactions;
+        const cloudInstallments = data.installments || installments;
 
-    // Rollback installments
-    const updatedInstallments = installments.map((inst) => {
-      const matched = txn.allocations.find((a) => a.installmentId === inst.id);
-      if (!matched) return inst;
+        const txn = cloudTransactions.find((t: PaymentTransaction) => t.id === transactionId);
+        if (!txn || txn.isCancelled) return;
 
-      const newPaid = Math.max(0, inst.paidAmount - matched.allocatedAmount);
-      const newBal = inst.amount - newPaid;
-      const newStatus = newPaid === 0 ? ('unpaid' as const) : ('partial' as const);
+        const updatedCloudInstallments = cloudInstallments.map((inst: Installment) => {
+          const matched = txn.allocations.find((a: PaymentAllocation) => a.installmentId === inst.id);
+          if (!matched) return inst;
 
-      return {
-        ...inst,
-        paidAmount: newPaid,
-        balanceAmount: newBal,
-        status: newStatus,
-      };
-    });
+          const newPaid = Math.max(0, inst.paidAmount - matched.allocatedAmount);
+          const newBal = inst.amount - newPaid;
+          const newStatus = newPaid === 0 ? ('unpaid' as const) : ('partial' as const);
 
-    // Mark transaction as cancelled
-    const updatedTransactions = transactions.map((t) => {
-      if (t.id === transactionId) {
-        return {
-          ...t,
-          isCancelled: true,
-          cancelledAt: new Date().toISOString(),
-          cancelledReason: cancelReason,
-        };
-      }
-      return t;
-    });
+          return {
+            ...inst,
+            paidAmount: newPaid,
+            balanceAmount: newBal,
+            status: newStatus,
+          };
+        });
 
-    setInstallments(updatedInstallments);
-    setTransactions(updatedTransactions);
+        const updatedCloudTransactions = cloudTransactions.map((t: PaymentTransaction) => {
+          if (t.id === transactionId) {
+            return {
+              ...t,
+              isCancelled: true,
+              cancelledAt: new Date().toISOString(),
+              cancellationReason: cancelReason,
+            };
+          }
+          return t;
+        });
+
+        transaction.set(docRef, {
+          ...data,
+          installments: updatedCloudInstallments,
+          transactions: updatedCloudTransactions,
+          updatedAt: new Date().toISOString(),
+        }, { merge: true });
+
+        setInstallments(updatedCloudInstallments);
+        setTransactions(updatedCloudTransactions);
+      });
+    } catch (err: any) {
+      alert(`Cancellation Failed: ${err.message || err}`);
+    }
   };
 
   // -------------------------------------------------------------
@@ -466,11 +564,12 @@ export default function App() {
     studentId: string,
     newStructures: StudentFeeStructure[],
     isActive: boolean,
-    studentNotes?: string
+    studentNotes?: string,
+    updatedStudent?: Student
   ) => {
-    // 1. Update Student active status and notes
     const updatedStudents = students.map((s) => {
       if (s.id === studentId) {
+        if (updatedStudent) return { ...updatedStudent, updatedAt: new Date().toISOString() };
         return {
           ...s,
           isActive,
@@ -481,28 +580,53 @@ export default function App() {
       return s;
     });
 
-    // 2. Filter out old structures for this student and append new
     const otherStructures = structures.filter((s) => s.studentId !== studentId);
     const updatedStructures = [...otherStructures, ...newStructures];
 
-    // 3. Re-generate and map installments for all heads
+    const existingStudentInstallments = installments.filter((i) => i.studentId === studentId);
     const otherInstallments = installments.filter((i) => i.studentId !== studentId);
     const newInstallmentsList: Installment[] = [];
 
     newStructures.forEach((struct) => {
-      const insts = generateInstallments(
+      const generated = generateInstallments(
         struct.id,
         studentId,
         struct.headName,
         struct.committedFee,
         struct.installmentsCount
       );
-      newInstallmentsList.push(...insts);
+      generated.forEach((genInst) => {
+        const existingPaidMatch = existingStudentInstallments.find(
+          (ei) => ei.headName === genInst.headName && ei.installmentNumber === genInst.installmentNumber
+        );
+        if (existingPaidMatch && existingPaidMatch.paidAmount > 0) {
+          const reconciledPaid = existingPaidMatch.paidAmount;
+          const reconciledBal = Math.max(0, genInst.amount - reconciledPaid);
+          const reconciledStatus = reconciledBal === 0 ? ('paid' as const) : ('partial' as const);
+          newInstallmentsList.push({
+            ...genInst,
+            id: existingPaidMatch.id,
+            paidAmount: reconciledPaid,
+            balanceAmount: reconciledBal,
+            status: reconciledStatus,
+          });
+        } else {
+          newInstallmentsList.push(genInst);
+        }
+      });
     });
 
     setStudents(updatedStudents);
     setStructures(updatedStructures);
     setInstallments([...otherInstallments, ...newInstallmentsList]);
+
+    const docRef = doc(db, COLLECTION_ID, DOC_ID);
+    setDoc(docRef, {
+      students: updatedStudents,
+      structures: updatedStructures,
+      installments: [...otherInstallments, ...newInstallmentsList],
+      updatedAt: new Date().toISOString(),
+    }, { merge: true }).catch((err) => console.error('Firestore fee structure write error:', err));
   };
 
   // -------------------------------------------------------------
@@ -767,6 +891,16 @@ export default function App() {
     }
   };
 
+  if (isLoadingCloud) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen bg-slate-900 text-slate-100">
+        <div className="w-12 h-12 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+        <h2 className="text-lg font-bold">Loading latest data...</h2>
+        <p className="text-sm text-slate-400 mt-1">Synchronizing cloud ledger across devices</p>
+      </div>
+    );
+  }
+
   return (
     <PasscodeGate
       schoolProfile={safeSchoolProfile}
@@ -910,6 +1044,7 @@ export default function App() {
           summary={selectedSummary}
           schoolProfile={safeSchoolProfile}
           initialFeeType={collectInitialFeeType}
+          currentDate={asOfDate}
           onClose={() => setActiveModal('NONE')}
           onSavePayment={handleSavePayment}
         />
