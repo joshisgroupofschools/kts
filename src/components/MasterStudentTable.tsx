@@ -361,7 +361,7 @@ export const MasterStudentTable: React.FC<MasterStudentTableProps> = ({
   const [selectedTier, setSelectedTier] = useState<ActionTier | 'ALL'>('ALL');
   const [selectedStatus, setSelectedStatus] = useState<StatusCategory | 'ALL'>('ALL');
   const [selectedDueMonth, setSelectedDueMonth] = useState<AcademicMonth>('ALL');
-  const [isExclusiveMonthDue, setIsExclusiveMonthDue] = useState<boolean>(false);
+  const [monthSubFilter, setMonthSubFilter] = useState<'ALL' | 'X' | 'Y'>('ALL');
   const [activeStatusDropdownId, setActiveStatusDropdownId] = useState<string | null>(null);
   const [selectedStudentToEdit, setSelectedStudentToEdit] = useState<Student | null>(null);
   const [selectedStatusDate, setSelectedStatusDate] = useState<string>(() =>
@@ -494,15 +494,14 @@ export const MasterStudentTable: React.FC<MasterStudentTableProps> = ({
         const monthDue = getStudentMonthDue(item, selectedDueMonth);
         if (!monthDue.hasDue) return false;
 
-        // When Exclusive toggle is enabled:
-        // Exclude student if they have any outstanding dues in prior academic months!
-        if (isExclusiveMonthDue) {
-          const currentMonthIdx = ACADEMIC_MONTHS.findIndex((m) => m.key === selectedDueMonth);
-          if (currentMonthIdx > 0) {
-            const priorMonths = ACADEMIC_MONTHS.slice(0, currentMonthIdx);
-            const hasPriorDue = priorMonths.some((pm) => getStudentMonthDue(item, pm.key).hasDue);
-            if (hasPriorDue) return false;
-          }
+        const currentMonthIdx = ACADEMIC_MONTHS.findIndex((m) => m.key === selectedDueMonth);
+        const priorMonths = currentMonthIdx > 0 ? ACADEMIC_MONTHS.slice(0, currentMonthIdx) : [];
+        const hasPriorDue = priorMonths.some((pm) => getStudentMonthDue(item, pm.key).hasDue);
+
+        if (monthSubFilter === 'X') {
+          if (hasPriorDue) return false;
+        } else if (monthSubFilter === 'Y') {
+          if (!hasPriorDue) return false;
         }
       }
 
@@ -559,7 +558,7 @@ export const MasterStudentTable: React.FC<MasterStudentTableProps> = ({
 
       return false;
     });
-  }, [summaries, searchQuery, selectedTier, selectedStatus, selectedDueMonth, isExclusiveMonthDue]);
+  }, [summaries, searchQuery, selectedTier, selectedStatus, selectedDueMonth, monthSubFilter]);
 
   // Precomputed counts of students due per month (June to March) with total and exclusive bifurcation
   const monthDueCounts = useMemo(() => {
@@ -867,6 +866,7 @@ export const MasterStudentTable: React.FC<MasterStudentTableProps> = ({
                 value={selectedDueMonth}
                 onChange={(e) => {
                   setSelectedDueMonth(e.target.value as any);
+                  setMonthSubFilter('ALL');
                   setCurrentPage(1);
                 }}
                 className="bg-transparent text-slate-800 dark:text-slate-200 font-bold text-xs focus:outline-none cursor-pointer"
@@ -968,27 +968,69 @@ export const MasterStudentTable: React.FC<MasterStudentTableProps> = ({
         </div>
       </div>
 
-      {/* Active Filter Notification: Showing ONLY those names */}
-      {selectedDueMonth !== 'ALL' && (
-        <div className="bg-rose-50/90 dark:bg-rose-950/50 border-b border-rose-200 dark:border-rose-900/60 p-2.5 px-4 flex items-center justify-between gap-3 text-xs">
-          <div className="flex items-center gap-2">
-            <span className="p-1 px-2 rounded bg-rose-600 text-white font-black text-[10px] uppercase">
-              {selectedDueMonth} DUE
-            </span>
-            <span className="font-bold text-rose-900 dark:text-rose-200">
-              Showing <strong>ONLY {filteredSummaries.length} student names</strong> with pending dues in <strong>{selectedDueMonth}</strong> (Total {selectedDueMonth} Dues: <strong>{formatCurrency(totalMonthDueAmount)}</strong>)
-            </span>
+      {/* Active Filter Notification: Detailed Monthly Bifurcation X and Y */}
+      {selectedDueMonth !== 'ALL' && monthBreakdownXY && (
+        <div className="bg-amber-50/90 dark:bg-amber-950/60 border-b border-amber-200 dark:border-amber-900/60 p-3 px-4 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-3 text-xs">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+            <div className="flex items-center gap-2">
+              <span className="p-1 px-2.5 rounded bg-amber-600 text-white font-black text-[10px] uppercase tracking-wider shrink-0">
+                {selectedDueMonth} BIFURCATION
+              </span>
+              <span className="font-bold text-slate-900 dark:text-slate-100">
+                Showing <strong>{filteredSummaries.length} of {monthBreakdownXY.totalCount} student names</strong> in <strong>{monthBreakdownXY.monthLabel}</strong> (Total Dues: <strong>{formatCurrency(monthBreakdownXY.totalAmount, currencySymbol)}</strong>)
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2 flex-wrap text-[11px]">
+              <button
+                type="button"
+                onClick={() => setMonthSubFilter(monthSubFilter === 'X' ? 'ALL' : 'X')}
+                className={`px-2.5 py-1 rounded border font-semibold transition-colors cursor-pointer shadow-2xs flex items-center gap-1.5 ${
+                  monthSubFilter === 'X'
+                    ? 'bg-emerald-600 text-white border-emerald-700 shadow-xs'
+                    : 'bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-200 hover:bg-emerald-50'
+                }`}
+              >
+                <span>🌱 <strong>{monthBreakdownXY.countX}</strong> students of only {monthBreakdownXY.monthLabel}:</span>
+                <strong className={monthSubFilter === 'X' ? 'text-white' : 'text-emerald-700 dark:text-emerald-400'}>
+                  {formatCurrency(monthBreakdownXY.amountX, currencySymbol)}
+                </strong>
+                {monthSubFilter === 'X' && <span className="text-[10px] bg-black/20 px-1 rounded">Active ✓</span>}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setMonthSubFilter(monthSubFilter === 'Y' ? 'ALL' : 'Y')}
+                className={`px-2.5 py-1 rounded border font-semibold transition-colors cursor-pointer shadow-2xs flex items-center gap-1.5 ${
+                  monthSubFilter === 'Y'
+                    ? 'bg-amber-600 text-white border-amber-700 shadow-xs'
+                    : 'bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-200 hover:bg-amber-50'
+                }`}
+              >
+                <span>🔄 <strong>{monthBreakdownXY.countY}</strong> from previous instalment + {monthBreakdownXY.monthLabel}:</span>
+                <strong className={monthSubFilter === 'Y' ? 'text-white' : 'text-amber-700 dark:text-amber-400'}>
+                  {formatCurrency(monthBreakdownXY.amountY, currencySymbol)}
+                </strong>
+                {monthSubFilter === 'Y' && <span className="text-[10px] bg-black/20 px-1 rounded">Active ✓</span>}
+              </button>
+            </div>
           </div>
-          <button
-            type="button"
-            onClick={() => {
-              setSelectedDueMonth('ALL');
-              setCurrentPage(1);
-            }}
-            className="px-2.5 py-1 bg-white dark:bg-slate-800 text-rose-700 dark:text-rose-300 rounded font-bold border border-rose-300 dark:border-rose-800 hover:bg-rose-100 text-[11px] cursor-pointer shadow-2xs"
-          >
-            Show All Students ({summaries.length})
-          </button>
+
+          <div className="flex items-center gap-2 shrink-0 self-end lg:self-auto">
+            {(selectedDueMonth !== 'ALL' || monthSubFilter !== 'ALL') && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedDueMonth('ALL');
+                  setMonthSubFilter('ALL');
+                  setCurrentPage(1);
+                }}
+                className="px-3 py-1.5 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-lg font-bold border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 text-xs cursor-pointer shadow-2xs"
+              >
+                Show All Students ({summaries.length})
+              </button>
+            )}
+          </div>
         </div>
       )}
 

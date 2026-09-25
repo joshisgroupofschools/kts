@@ -250,7 +250,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                   )}
                 </div>
                 <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                  Simulate installments due, overdue balances, and target run-rates as of any specific calendar date:
+                  Simulate installments due, overdue balances, and collection targets as of any specific calendar date:
                 </p>
                 <input
                   type="date"
@@ -445,7 +445,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                         )}
                       </div>
                       <div className="text-[11px] text-slate-500 dark:text-slate-400">
-                        Revenue realization, headwise breakdown & daily run-rate
+                        Revenue realization, headwise breakdown & daily targets
                       </div>
                     </div>
                   </div>
@@ -644,7 +644,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                     </div>
                     <div>
                       <div className="font-bold text-teal-900 dark:text-teal-100 text-xs">
-                        Accountant Manual & Run-Rate Guide
+                        Accountant Manual & Collection Guide
                       </div>
                       <div className="text-[11px] text-teal-700/80 dark:text-teal-300/80">
                         FIFO knock-off logic, color rules & FAQs

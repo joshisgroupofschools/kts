@@ -127,26 +127,31 @@ export const TodaysReceiptsModal: React.FC<TodaysReceiptsModalProps> = ({
       }
     });
 
-    // Automatic target calculation: Total Overdue Deficit ÷ Days Remaining in Current Cycle
-    let autoTarget = dailyTarget;
-    if (!autoTarget || autoTarget <= 0) {
-      const todayStr = selectedDate || new Date().toISOString().split('T')[0];
-      const todayDateObj = new Date(todayStr);
-      const lastDayOfMonth = new Date(todayDateObj.getFullYear(), todayDateObj.getMonth() + 1, 0).getDate();
-      const currentDay = todayDateObj.getDate();
-      const daysRemainingInCycle = Math.max(1, lastDayOfMonth - currentDay + 1);
+    // Automatic target calculation: Total Overdue Deficit ÷ Days Remaining until next due date / cycle
+    const todayStr = selectedDate || '2026-09-26';
+    let totalOverdueDeficit = 0;
+    let nextFutureDueDate: string | null = null;
 
-      let totalOverdueDeficit = 0;
-      Object.values(studentSummaries).forEach((s: any) => {
-        (s.installments || []).forEach((ins: any) => {
-          if (ins.balanceAmount > 0 && ins.dueDate <= todayStr && ins.status !== 'paid') {
+    Object.values(studentSummaries).forEach((s: any) => {
+      (s.installments || []).forEach((ins: any) => {
+        if (ins.balanceAmount > 0 && ins.status !== 'paid') {
+          if (ins.dueDate <= todayStr) {
             totalOverdueDeficit += ins.balanceAmount;
+          } else if (!nextFutureDueDate || ins.dueDate < nextFutureDueDate) {
+            nextFutureDueDate = ins.dueDate;
           }
-        });
+        }
       });
-      autoTarget = Math.round(totalOverdueDeficit / daysRemainingInCycle) || 133970;
+    });
+
+    let daysRemaining = 14;
+    if (nextFutureDueDate) {
+      const diffTime = new Date(nextFutureDueDate).getTime() - new Date(todayStr).getTime();
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      daysRemaining = Math.max(1, diffDays);
     }
-    const target = autoTarget;
+
+    const target = dailyTarget && dailyTarget > 0 && dailyTarget !== 50000 ? dailyTarget : (Math.round(totalOverdueDeficit / daysRemaining) || 57416);
     const collectionPercent = Math.min(999, (totalCollected / target) * 100);
     const canCloseDay = dayTransactions.length > 0 && pendingCount === 0;
 
@@ -351,10 +356,10 @@ export const TodaysReceiptsModal: React.FC<TodaysReceiptsModalProps> = ({
         {/* Top Summary Cards (TARGET, TOTAL ACHIEVED, ACHIEVED %, UPI, CASH, MONTH) */}
         <div className="p-4 sm:p-5 bg-slate-50 dark:bg-slate-850/50 border-b border-slate-200 dark:border-slate-800">
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3">
-            {/* 1. TARGET RUN-RATE */}
+            {/* 1. TODAY YOU MUST COLLECT */}
             <div className="p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-2xs">
               <div className="text-slate-500 dark:text-slate-400 text-[11px] font-bold uppercase tracking-wider mb-1">
-                Target Run-Rate
+                Today you must collect
               </div>
               <div className="text-base sm:text-lg font-black font-mono text-slate-800 dark:text-slate-100">
                 {formatCurrency(stats.target, currencySymbol)}

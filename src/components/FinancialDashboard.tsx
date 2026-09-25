@@ -220,7 +220,7 @@ export const FinancialDashboard: React.FC<FinancialDashboardProps> = ({
                 </span>
               </div>
               <p className="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400 truncate">
-                Comprehensive fee realization, headwise bifurcation, deficit tracking & target run-rates
+                Comprehensive fee realization, headwise bifurcation, deficit tracking & daily collection targets
               </p>
             </div>
           </div>
@@ -570,7 +570,7 @@ export const FinancialDashboard: React.FC<FinancialDashboardProps> = ({
                 <div className="flex items-center justify-between text-[11px] font-bold text-amber-300 mb-1">
                   <span className="flex items-center gap-1">
                     <Flame className="w-3.5 h-3.5 text-amber-400" />
-                    2. Today's Target (Run-Rate)
+                    2. Today you must collect
                   </span>
                   <span className="text-[10px] text-slate-400">
                     {dailyTargetRunRate.daysRemainingInCycle}d left

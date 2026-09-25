@@ -21,6 +21,7 @@ import {
   generateInstallments,
 } from './utils/feeCalculator';
 import { computeSystemAnalytics } from './utils/analyticsEngine';
+import { getKolkataToday } from './utils/dateUtils';
 import { sortClassList, STANDARD_CLASS_ORDER } from './utils/classOrder';
 import { formatCurrency, formatDate } from './utils/numberToWords';
 import {
@@ -781,7 +782,7 @@ export default function App() {
         onUpdateTolerance={(newTol) => setTolerance(newTol)}
         currentDate={asOfDate}
         onChangeDate={(newDate) => setAsOfDate(newDate)}
-        onResetDate={() => setAsOfDate(new Date().toISOString().split('T')[0])}
+        onResetDate={() => setAsOfDate(getKolkataToday())}
         isSheetsConnected={isSheetsConnected}
         onOpenSheetsSync={() => setActiveModal('SHEETS_SYNC')}
         onOpenSettings={() => setActiveModal('SCHOOL_SETTINGS')}
@@ -821,42 +822,7 @@ export default function App() {
           </div>
         )}
 
-        {/* Top Trial Alert Banner on Dashboard (only if not dismissed) */}
-        {currentView !== 'TRIAL_VERIFICATION' && !dismissedCrossCheckBanner && (
-          <div className="bg-gradient-to-r from-indigo-50 to-blue-50 dark:from-indigo-950/60 dark:to-blue-950/60 p-3.5 rounded-xl border border-indigo-200 dark:border-indigo-800 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
-            <div className="flex items-center gap-2.5">
-              <div className="p-2 rounded-lg bg-indigo-600 text-white shrink-0">
-                <FileSpreadsheet className="w-4 h-4" />
-              </div>
-              <div>
-                <span className="font-bold text-indigo-900 dark:text-indigo-200 block">
-                  September Master Data Cross-Check Room Available
-                </span>
-                <span className="text-slate-600 dark:text-slate-400 text-[11px]">
-                  229 student records, School (₹56.49L), Transport (₹4.05L), Old Due (₹3.83L), Books (₹10.2K).
-                </span>
-              </div>
-            </div>
 
-            <div className="flex items-center gap-2 shrink-0">
-              <button
-                type="button"
-                onClick={() => handleSetCurrentView('TRIAL_VERIFICATION')}
-                className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg transition-colors cursor-pointer shadow-xs"
-              >
-                Open Cross-Check Room
-              </button>
-              <button
-                type="button"
-                onClick={handleDismissCrossCheckBanner}
-                className="px-2 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 dark:bg-slate-800 dark:text-slate-300 rounded-lg text-xs font-semibold transition-colors cursor-pointer"
-                title="Dismiss banner"
-              >
-                Dismiss
-              </button>
-            </div>
-          </div>
-        )}
 
         {/* View Switch: Cross-Check Room, Dedicated Financial Analytics Page, or Master Student Ledger */}
         {currentView === 'TRIAL_VERIFICATION' ? (

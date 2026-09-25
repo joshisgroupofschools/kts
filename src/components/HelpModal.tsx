@@ -95,7 +95,7 @@ export const HelpModal: React.FC<HelpModalProps> = ({ onClose, currencySymbol = 
             }`}
           >
             <Target className="w-3.5 h-3.5 text-amber-500" />
-            <span>Target Run-Rate</span>
+            <span>Today you must collect</span>
           </button>
           <button
             type="button"
@@ -187,7 +187,7 @@ export const HelpModal: React.FC<HelpModalProps> = ({ onClose, currencySymbol = 
                     <Target className="w-4 h-4" />
                   </div>
                   <span className="text-sm font-extrabold">
-                    Why is Target Run-Rate shown as {currencySymbol}4,910/day? How is it calculated?
+                    Why is "Today you must collect" shown as {currencySymbol}4,910/day? How is it calculated?
                   </span>
                 </div>
                 {expandedFaq === 'run-rate' ? <ChevronUp className="w-4 h-4 text-slate-500" /> : <ChevronDown className="w-4 h-4 text-slate-500" />}
@@ -196,7 +196,7 @@ export const HelpModal: React.FC<HelpModalProps> = ({ onClose, currencySymbol = 
               {expandedFaq === 'run-rate' && (
                 <div className="px-4 pb-4 pt-1 space-y-3 text-slate-700 dark:text-slate-300 leading-relaxed border-t border-amber-200/70 dark:border-amber-900/50">
                   <p>
-                    The <strong>Target Run-Rate</strong> is your school's daily cash collection goal to ensure 100% of past-due fee installments are recovered on time before the month closes.
+                    The <strong>Today you must collect</strong> target is your school's daily cash collection goal to ensure 100% of past-due fee installments are recovered on time before the cycle/month closes.
                   </p>
                   
                   <div className="p-3 bg-white dark:bg-slate-900 rounded-lg border border-amber-300 dark:border-amber-800 font-mono text-xs space-y-1.5">
