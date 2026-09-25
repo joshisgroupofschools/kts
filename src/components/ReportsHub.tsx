@@ -6,6 +6,7 @@ import {
   SchoolProfile,
   AnalyticsSummary,
 } from '../types';
+import { formatWhatsAppReminderMessage, normalizePhoneNumber } from '../utils/installmentFormatter';
 import {
   AlertTriangle,
   ArrowDownLeft,
@@ -1093,19 +1094,22 @@ export const ReportsHub: React.FC<ReportsHubProps> = ({
                                 </button>
                               )}
 
-                              {s.student.phone && (
-                                <a
-                                  href={`https://wa.me/91${s.student.phone}?text=${encodeURIComponent(
-                                    `Dear Parent, This is a gentle fee reminder from ${schoolProfile.schoolName || 'Kakatiya School'}. Pending fee for ${s.student.name} (${s.student.className}) is ${formatCurrency(s.totalDue)}. Kindly clear the dues at your earliest convenience.`
-                                  )}`}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="p-1 bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 text-emerald-600 dark:text-emerald-400 rounded-lg transition-colors"
-                                  title="Send WhatsApp Reminder"
-                                >
-                                  <MessageCircle className="w-3.5 h-3.5" />
-                                </a>
-                              )}
+                              {s.student.phone && (() => {
+                                const { message, hasDue } = formatWhatsAppReminderMessage(s.student, s, schoolProfile);
+                                const phoneNum = normalizePhoneNumber(s.student.phone);
+                                if (!hasDue || !phoneNum) return null;
+                                return (
+                                  <a
+                                    href={`https://wa.me/${phoneNum}?text=${encodeURIComponent(message)}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="p-1 bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 text-emerald-600 dark:text-emerald-400 rounded-lg transition-colors"
+                                    title="Send WhatsApp Reminder"
+                                  >
+                                    <MessageCircle className="w-3.5 h-3.5" />
+                                  </a>
+                                );
+                              })()}
                             </div>
                           </td>
                         </tr>

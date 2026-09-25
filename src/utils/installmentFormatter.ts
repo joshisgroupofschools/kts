@@ -67,3 +67,78 @@ function getMonthFromDate(dateStr?: string): string | null {
   }
   return null;
 }
+
+export function formatWhatsAppReminderMessage(
+  student: { name: string; className: string },
+  summary: { installments?: any[]; dueTillDate?: number },
+  schoolProfile: { schoolName?: string },
+  asOfDate?: string
+): { message: string; totalSum: number; hasDue: boolean } {
+  const schoolName = schoolProfile?.schoolName || 'Kakatiya School, Boduppal';
+  const studentClass = student.className.startsWith('Class') ? student.className : `Class ${student.className}`;
+  const cutoffDate = asOfDate || new Date().toISOString().split('T')[0];
+  const [y, m, d] = cutoffDate.split('-');
+  const formattedCutoffDate = `${d}/${m}/${y}`;
+
+  // Filter installments: balanceAmount > 0 and dueDate <= cutoffDate
+  const overdueInstallments = (summary.installments || []).filter(
+    (ins) => ins.balanceAmount > 0 && ins.dueDate <= cutoffDate && ins.status !== 'paid'
+  );
+
+  if (overdueInstallments.length === 0) {
+    return { message: '', totalSum: 0, hasDue: false };
+  }
+
+  // Sort by due date ascending, then head priority:
+  // 1. School Fees (school, tuition, academic)
+  // 2. Transport (transport, bus, van)
+  // 3. Old Fees (old, previous, arrear)
+  // 4. Other heads
+  const getHeadRank = (headName: string) => {
+    const norm = (headName || '').toLowerCase();
+    if (norm.includes('school') || norm.includes('tuition') || norm.includes('academic')) return 1;
+    if (norm.includes('transport') || norm.includes('bus') || norm.includes('van')) return 2;
+    if (norm.includes('old') || norm.includes('carryover') || norm.includes('previous')) return 3;
+    return 4;
+  };
+
+  const sortedInstallments = [...overdueInstallments].sort((a, b) => {
+    if (a.dueDate !== b.dueDate) {
+      return a.dueDate.localeCompare(b.dueDate);
+    }
+    return getHeadRank(a.headName) - getHeadRank(b.headName);
+  });
+
+  let totalSum = 0;
+  const lineItems: string[] = [];
+
+  sortedInstallments.forEach((ins) => {
+    totalSum += ins.balanceAmount;
+    const displayName = getInstallmentDisplayName(ins.headName, ins.installmentNumber, ins.totalInstallments, ins.dueDate);
+    lineItems.push(`- *${displayName}:* ₹${ins.balanceAmount.toLocaleString('en-IN')}`);
+  });
+
+  const formattedTotal = totalSum.toLocaleString('en-IN');
+
+  const message = `Dear Parent, reminder from *${schoolName}* regarding fee payment for *${student.name.toUpperCase()} (${studentClass})*.
+
+Your *total due till ${formattedCutoffDate} is ₹${formattedTotal}*, towards:
+
+${lineItems.join('\n')}
+
+Kindly clear the pending fees. *Thank you.*`;
+
+  return { message, totalSum, hasDue: true };
+}
+
+export function normalizePhoneNumber(phone?: string): string {
+  if (!phone) return '';
+  const cleaned = phone.replace(/\D/g, '');
+  if (cleaned.length === 10) {
+    return `91${cleaned}`;
+  }
+  if (cleaned.startsWith('91') && cleaned.length === 12) {
+    return cleaned;
+  }
+  return cleaned;
+}

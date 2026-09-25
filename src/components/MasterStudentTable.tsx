@@ -9,7 +9,7 @@ import {
   ToleranceConfig,
 } from '../types';
 import { formatCurrency, formatDate, getNextMultipleOfFiveDate } from '../utils/numberToWords';
-import { getInstallmentDisplayName } from '../utils/installmentFormatter';
+import { getInstallmentDisplayName, formatWhatsAppReminderMessage, normalizePhoneNumber } from '../utils/installmentFormatter';
 import { getStatusCategoryMeta } from '../utils/statusResolver';
 import { getClassSortIndex } from '../utils/classOrder';
 import { lookupStandardClassFee } from '../data/trialSpreadsheetData';
@@ -1705,48 +1705,35 @@ export const MasterStudentTable: React.FC<MasterStudentTableProps> = ({
                           </button>
 
                           {/* 4. WhatsApp Message */}
-                          {student.phone ? (
-                            <a
-                              id={`btn-whatsapp-${student.id}`}
-                              href={`https://wa.me/91${student.phone.replace(/\D/g, '')}?text=${encodeURIComponent(
-                                (() => {
-                                  const schoolName = 'Kakatiya School Boduppal';
-                                  const studentClassDisplay = student.className.startsWith('Class')
-                                    ? student.className
-                                    : `Class ${student.className}`;
-                                  const cutoffDate = asOfDate || new Date().toISOString().split('T')[0];
-                                  const [y, m, d] = cutoffDate.split('-');
-                                  const todayDateStr = `${d}/${m}/${y}`;
-
-                                  // Overdue installments with balance strictly due till date
-                                  const overdueInstallments = (item.installments || []).filter(
-                                    (ins) => ins.balanceAmount > 0 && ins.dueDate <= cutoffDate && ins.status !== 'paid'
-                                  );
-
-                                  // Group remaining balance by fee head
-                                  const headBalances: Record<string, number> = {};
-                                  overdueInstallments.forEach((ins) => {
-                                    headBalances[ins.headName] = (headBalances[ins.headName] || 0) + ins.balanceAmount;
-                                  });
-
-                                  const headEntries = Object.entries(headBalances);
-                                  const installmentClause =
-                                    headEntries.length > 0
-                                      ? ` (THIS IS TOWARD ${headEntries.map(([head, amt]) => `${head.toUpperCase()}: ₹${amt.toLocaleString('en-IN')}`).join(', ')})`
-                                      : '';
-
-                                  return `Dear Parent, reminder from ${schoolName} regarding fee payment for ${student.name} (${studentClassDisplay}). Your total due till date ${todayDateStr} amount is ₹${item.dueTillDate.toLocaleString('en-IN')}${installmentClause}. Thank you.`;
-                                })()
-                              )}`}
-                              target="_blank"
-                              rel="noreferrer"
-                              onClick={(e) => e.stopPropagation()}
-                              className="p-1.5 rounded-md bg-emerald-50 hover:bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 transition-colors cursor-pointer"
-                              title="Send WhatsApp Fee Reminder"
-                            >
-                              <MessageCircle className="w-3.5 h-3.5" />
-                            </a>
-                          ) : (
+                          {student.phone ? (() => {
+                            const { message, hasDue } = formatWhatsAppReminderMessage(student, item, schoolProfile, asOfDate);
+                            const phoneNum = normalizePhoneNumber(student.phone);
+                            if (!hasDue || !phoneNum) {
+                              return (
+                                <button
+                                  type="button"
+                                  disabled
+                                  className="p-1.5 rounded-md bg-slate-100 text-slate-300 dark:bg-slate-800 dark:text-slate-600 border border-slate-200 dark:border-slate-700 opacity-40 cursor-not-allowed"
+                                  title="No overdue fees or invalid phone number"
+                                >
+                                  <MessageCircle className="w-3.5 h-3.5" />
+                                </button>
+                              );
+                            }
+                            return (
+                              <a
+                                id={`btn-whatsapp-${student.id}`}
+                                href={`https://wa.me/${phoneNum}?text=${encodeURIComponent(message)}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                onClick={(e) => e.stopPropagation()}
+                                className="p-1.5 rounded-md bg-emerald-50 hover:bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 transition-colors cursor-pointer"
+                                title="Send WhatsApp Fee Reminder"
+                              >
+                                <MessageCircle className="w-3.5 h-3.5" />
+                              </a>
+                            );
+                          })() : (
                             <button
                               type="button"
                               disabled
