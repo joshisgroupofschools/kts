@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import confetti from 'canvas-confetti';
 import {
-  Installment,
   PaymentAllocation,
   PaymentMode,
   PaymentTransaction,
@@ -11,43 +10,36 @@ import {
 } from '../types';
 import { calculateFifoAllocations } from '../utils/feeCalculator';
 import { formatCurrency, formatDate, getNextMultipleOfFiveDate } from '../utils/numberToWords';
+import { getInstallmentDisplayName } from '../utils/installmentFormatter';
 import {
   AlertCircle,
+  ArrowLeft,
   Award,
   Banknote,
-  BookOpen,
   Calendar,
   CalendarClock,
   Check,
-  CheckCircle,
+  CheckCircle2,
   Clock,
-  CreditCard,
+  Coins,
   Flame,
   Layers,
   Printer,
   QrCode,
-  Shirt,
-  Sparkles,
+  ShieldCheck,
   User,
   X,
 } from 'lucide-react';
-
-export interface PartialPaymentStatusUpdate {
-  manualCategoryOverride: 'auto' | 'id_card' | 'permission' | 'action';
-  permissionExpiresAt?: string;
-  permissionReason?: string;
-}
 
 interface PaymentModalProps {
   student: Student;
   summary: StudentFinancialSummary;
   schoolProfile: SchoolProfile;
-  initialFeeType?: 'ALL' | 'BOOKS' | 'DRESS';
   onClose: () => void;
   onSavePayment: (
     transaction: PaymentTransaction,
     customAllocations: PaymentAllocation[],
-    partialStatusUpdate?: PartialPaymentStatusUpdate
+    partialStatusUpdate?: any
   ) => void;
 }
 
@@ -55,38 +47,17 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   student,
   summary,
   schoolProfile,
-  initialFeeType = 'ALL',
   onClose,
   onSavePayment,
 }) => {
-  const [selectedFeeType, setSelectedFeeType] = useState<'ALL' | 'BOOKS' | 'DRESS'>(initialFeeType);
-
-  // Find book / dress structures if present
-  const bookStruct = summary.structures.find((s) => s.headName.toLowerCase().includes('book'));
-  const dressStruct = summary.structures.find(
-    (s) => s.headName.toLowerCase().includes('dress') || s.headName.toLowerCase().includes('uniform')
-  );
-
   const initialAmount = useMemo(() => {
-    if (initialFeeType === 'BOOKS') {
-      return bookStruct ? bookStruct.committedFee : 3000;
-    }
-    if (initialFeeType === 'DRESS') {
-      return dressStruct ? dressStruct.committedFee : 2500;
-    }
     return summary.dueTillDate > 0 ? summary.dueTillDate : summary.totalDue;
-  }, [initialFeeType, bookStruct, dressStruct, summary.dueTillDate, summary.totalDue]);
+  }, [summary.dueTillDate, summary.totalDue]);
 
   const [paymentAmount, setPaymentAmount] = useState<number>(initialAmount);
   const [paymentMode, setPaymentMode] = useState<PaymentMode>('Cash');
   const [referenceNo, setReferenceNo] = useState('');
-  const [remarks, setRemarks] = useState(
-    initialFeeType === 'BOOKS'
-      ? 'Books & Notebooks Fee'
-      : initialFeeType === 'DRESS'
-      ? 'School Dress & Uniform Fee'
-      : ''
-  );
+  const [remarks, setRemarks] = useState('');
   const [paymentDate, setPaymentDate] = useState<string>(
     new Date().toISOString().split('T')[0]
   );
@@ -94,113 +65,29 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   const [isManualOverride, setIsManualOverride] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // Partial Payment Automated Category Prompt State (Default: Permission Slip)
-  const [partialCategory, setPartialCategory] = useState<'permission' | 'id_card' | 'action'>('permission');
-  const [permissionDate, setPermissionDate] = useState<string>(() =>
-    getNextMultipleOfFiveDate(new Date())
-  );
-  const [permissionReason, setPermissionReason] = useState<string>('');
-
-  // Update permissionDate whenever paymentDate changes
-  useEffect(() => {
-    const d = new Date(paymentDate);
-    if (!isNaN(d.getTime())) {
-      setPermissionDate(getNextMultipleOfFiveDate(d));
-    }
-  }, [paymentDate]);
-
   // Generate Preview Receipt No
   const currentYear = new Date().getFullYear();
   const sequenceStr = String(schoolProfile.nextReceiptSequence || 1).padStart(5, '0');
-  const previewReceiptNo =
-    selectedFeeType === 'BOOKS'
-      ? `B-${sequenceStr}`
-      : selectedFeeType === 'DRESS'
-      ? `D-${sequenceStr}`
-      : `${schoolProfile.receiptPrefix}-${currentYear}-${sequenceStr}`;
+  const previewReceiptNo = `${schoolProfile.receiptPrefix || 'KSB'}-${currentYear}-${sequenceStr}`;
 
-  // Automatically recalculate FIFO allocations whenever paymentAmount changes (unless manual override is enabled)
+  // Automatically recalculate FIFO allocations whenever paymentAmount changes
   useEffect(() => {
     if (!isManualOverride) {
-      if (selectedFeeType === 'BOOKS') {
-        const bookInsts = bookStruct ? summary.installments.filter((i) => i.feeStructureId === bookStruct.id) : [];
-        if (bookInsts.length > 0) {
-          const computed = calculateFifoAllocations(bookInsts, paymentAmount);
-          setAllocations(computed);
-        } else {
-          // Dedicated spot Books allocation outside regular balance
-          setAllocations([
-            {
-              installmentId: `inst_spot_books_${student.id}`,
-              headName: 'Books & Stationery Fee',
-              installmentNumber: 1,
-              dueDate: paymentDate,
-              allocatedAmount: paymentAmount,
-            },
-          ]);
-        }
-        return;
-      }
-      
-      if (selectedFeeType === 'DRESS') {
-        const dressInsts = dressStruct ? summary.installments.filter((i) => i.feeStructureId === dressStruct.id) : [];
-        if (dressInsts.length > 0) {
-          const computed = calculateFifoAllocations(dressInsts, paymentAmount);
-          setAllocations(computed);
-        } else {
-          // Dedicated spot Dress allocation outside regular balance
-          setAllocations([
-            {
-              installmentId: `inst_spot_dress_${student.id}`,
-              headName: 'School Uniform & Dress Fee',
-              installmentNumber: 1,
-              dueDate: paymentDate,
-              allocatedAmount: paymentAmount,
-            },
-          ]);
-        }
-        return;
-      }
-
-      // For regular school/tuition/all fees: allocate FIFO across standard installments
-      const nonSpotInsts = summary.installments.filter(
-        (i) => !i.headName.toLowerCase().includes('book') && !i.headName.toLowerCase().includes('dress')
-      );
-      const computed = calculateFifoAllocations(nonSpotInsts.length > 0 ? nonSpotInsts : summary.installments, paymentAmount);
+      const computed = calculateFifoAllocations(summary.installments, paymentAmount);
       setAllocations(computed);
     }
-  }, [paymentAmount, summary.installments, isManualOverride, selectedFeeType, bookStruct, dressStruct, paymentDate, student.id]);
+  }, [paymentAmount, summary.installments, isManualOverride]);
 
-  // Handle fee type toggle
-  const handleFeeTypeChange = (type: 'ALL' | 'BOOKS' | 'DRESS') => {
-    setSelectedFeeType(type);
-    setIsManualOverride(false);
-    if (type === 'BOOKS') {
-      const amt = bookStruct ? bookStruct.committedFee : 3000;
-      setPaymentAmount(amt);
-      setRemarks('Books & Study Material Fee');
-    } else if (type === 'DRESS') {
-      const amt = dressStruct ? dressStruct.committedFee : 2500;
-      setPaymentAmount(amt);
-      setRemarks('School Dress & Uniform Fee');
-    } else {
-      setPaymentAmount(summary.dueTillDate > 0 ? summary.dueTillDate : summary.totalDue);
-      setRemarks('');
-    }
-  };
-
-  // Handle manual adjustment of a single allocation
-  const handleAllocationChange = (installmentId: string, newAllocAmount: number) => {
+  const handleAllocationChange = (installmentId: string, amount: number) => {
     setIsManualOverride(true);
     const updated = allocations.map((a) => {
       if (a.installmentId === installmentId) {
-        return { ...a, allocatedAmount: Math.max(0, newAllocAmount) };
+        return { ...a, allocatedAmount: Math.max(0, amount) };
       }
       return a;
     });
     setAllocations(updated);
 
-    // Update total amount to match sum of allocations
     const newTotal = updated.reduce((sum, a) => sum + a.allocatedAmount, 0);
     setPaymentAmount(newTotal);
   };
@@ -218,43 +105,44 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
       setErrorMsg('Payment amount must be greater than 0.');
       return;
     }
-    if (paymentAmount > summary.totalDue && selectedFeeType === 'ALL') {
-      setErrorMsg(`Cannot accept payment greater than total outstanding balance of ${formatCurrency(summary.totalDue)}.`);
+    if (paymentAmount > summary.totalDue) {
+      setErrorMsg(`Cannot accept payment greater than total outstanding balance of ${formatCurrency(summary.totalDue, schoolProfile.currencySymbol)}.`);
+      return;
+    }
+
+    if (paymentMode === 'UPI' && !referenceNo.trim()) {
+      setErrorMsg('Please enter the mandatory UPI UTR / Reference Number for UPI payments.');
       return;
     }
 
     const totalAllocated = allocations.reduce((sum, a) => sum + a.allocatedAmount, 0);
     let finalAllocations = allocations;
 
-    // If spot/book/dress without pre-existing installment in list, synthesize allocation
     if (totalAllocated === 0 && paymentAmount > 0) {
-      const headLabel =
-        selectedFeeType === 'BOOKS'
-          ? 'Books & Stationery Fee'
-          : selectedFeeType === 'DRESS'
-          ? 'School Uniform & Dress Fee'
-          : 'School Tuition Fee';
-
       finalAllocations = [
         {
-          installmentId: `inst_spot_${Date.now()}`,
-          headName: headLabel,
+          installmentId: `inst_fee_${Date.now()}`,
+          headName: 'School Tuition Fee',
           installmentNumber: 1,
           dueDate: paymentDate,
           allocatedAmount: paymentAmount,
         },
       ];
-    } else if (totalAllocated !== paymentAmount && selectedFeeType === 'ALL') {
-      setErrorMsg(`Total allocated amount (${formatCurrency(totalAllocated)}) does not match payment amount (${formatCurrency(paymentAmount)}).`);
+    } else if (totalAllocated !== paymentAmount) {
+      setErrorMsg(`Total allocated amount (${formatCurrency(totalAllocated, schoolProfile.currencySymbol)}) does not match payment amount (${formatCurrency(paymentAmount, schoolProfile.currencySymbol)}).`);
       return;
     }
 
     // Trigger celebratory confetti effect
-    confetti({
-      particleCount: 60,
-      spread: 60,
-      origin: { y: 0.7 },
-    });
+    try {
+      confetti({
+        particleCount: 70,
+        spread: 60,
+        origin: { y: 0.6 },
+      });
+    } catch {
+      // ignore
+    }
 
     const now = new Date();
     const timeStr = now.toTimeString().split(' ')[0].substring(0, 5);
@@ -266,7 +154,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
       studentId: student.id,
       studentName: student.name,
       studentRollNo: student.rollNo,
-      studentClass: `${student.className} - ${student.section}`,
+      studentClass: `${student.className}${student.section ? ' - ' + student.section : ''}`,
       date: fullDateTime,
       amount: paymentAmount,
       paymentMode,
@@ -276,256 +164,357 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
       isCancelled: false,
     };
 
-    // Prepare partial payment status update
-    let partialStatusUpdate: PartialPaymentStatusUpdate | undefined;
-    if (isPartialPayment) {
-      if (partialCategory === 'permission') {
-        partialStatusUpdate = {
-          manualCategoryOverride: 'permission',
-          permissionExpiresAt: permissionDate,
-          permissionReason:
-            permissionReason.trim() ||
-            `Partial payment of ${formatCurrency(paymentAmount)} received. Balance granted till ${formatDate(permissionDate)}.`,
-        };
-      } else if (partialCategory === 'id_card') {
-        partialStatusUpdate = {
-          manualCategoryOverride: 'id_card',
-          permissionReason: permissionReason.trim() || 'Approved for ID Card issue.',
-        };
-      } else if (partialCategory === 'action') {
-        partialStatusUpdate = {
-          manualCategoryOverride: 'action',
-          permissionReason: permissionReason.trim() || 'Action required for balance collection.',
-        };
-      }
-    }
-
-    onSavePayment(newTransaction, finalAllocations, partialStatusUpdate);
+    onSavePayment(newTransaction, finalAllocations);
   };
 
   return (
-    <div id="modal-collect-fees" className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs overflow-y-auto">
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl max-w-2xl w-full overflow-hidden my-6 animate-in fade-in zoom-in-95 duration-150">
-        {/* Modal Header */}
-        <div className="bg-slate-900 text-white px-5 py-4 flex items-center justify-between border-b border-slate-800">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-              <Banknote className="w-5 h-5" />
-            </div>
-            <div>
-              <h2 className="text-base font-bold text-slate-100 flex items-center gap-2">
-                Fee Collection & Receipt
-              </h2>
-              <p className="text-xs text-slate-400">
-                Receipt #{previewReceiptNo} • {student.name} (#{student.rollNo}) • {student.className}
-              </p>
-            </div>
-          </div>
+    <div
+      id="modal-collect-fees"
+      className="fixed inset-0 z-50 flex flex-col bg-slate-100 dark:bg-slate-950 overflow-y-auto animate-in fade-in duration-150"
+    >
+      {/* Full-Page Sticky Header */}
+      <header className="sticky top-0 z-30 bg-slate-900 text-white px-4 sm:px-8 py-3.5 border-b border-slate-800 shadow-md flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3 min-w-0">
           <button
             type="button"
             onClick={onClose}
-            className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition-colors cursor-pointer shrink-0"
+            title="Cancel & Back to Ledger"
           >
-            <X className="w-5 h-5" />
+            <ArrowLeft className="w-4 h-4" />
+            <span className="hidden sm:inline">Back to Ledger</span>
           </button>
+
+          <div className="h-6 w-px bg-slate-800 shrink-0" />
+
+          <div className="min-w-0">
+            <h1 className="text-sm sm:text-base font-black text-white flex items-center gap-2 truncate">
+              <span>Fee Collection & Official Receipt</span>
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-mono">
+                #{previewReceiptNo}
+              </span>
+            </h1>
+            <p className="text-xs text-slate-400 truncate">
+              {student.name} • Roll #{student.rollNo} • {student.className}
+              {student.phone ? ` • Phone: ${student.phone}` : ''}
+            </p>
+          </div>
         </div>
 
-        {/* Modal Body */}
-        <div className="p-5 space-y-4 text-xs text-slate-700 dark:text-slate-300 max-h-[75vh] overflow-y-auto">
-          {/* Fee Collection Category Selector (Standard, Books, Dress) */}
-          <div className="flex items-center gap-2 p-1.5 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
-            <span className="text-[11px] font-bold text-slate-600 dark:text-slate-400 px-2">
-              Collection Head:
-            </span>
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold cursor-pointer"
+          >
+            Cancel
+          </button>
+          <button
+            id="btn-confirm-payment"
+            type="button"
+            onClick={handleConfirm}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs sm:text-sm shadow-lg shadow-emerald-900/30 transition-all cursor-pointer active:scale-95"
+          >
+            <Banknote className="w-4 h-4" />
+            <span>Accept & Generate Receipt</span>
+          </button>
+        </div>
+      </header>
+
+      {/* Main Full-Page Workspace Container */}
+      <main className="flex-1 max-w-6xl w-full mx-auto p-4 sm:p-6 space-y-5">
+        {/* Error Alert */}
+        {errorMsg && (
+          <div className="p-3.5 bg-rose-50 dark:bg-rose-950/60 border border-rose-300 dark:border-rose-800 rounded-xl flex items-center justify-between gap-2 text-xs text-rose-800 dark:text-rose-200 animate-fadeIn">
+            <div className="flex items-center gap-2 font-bold">
+              <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
+              <span>{errorMsg}</span>
+            </div>
             <button
               type="button"
-              onClick={() => handleFeeTypeChange('ALL')}
-              className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                selectedFeeType === 'ALL'
-                  ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs border border-slate-200 dark:border-slate-700'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
-              }`}
+              onClick={() => setErrorMsg(null)}
+              className="text-rose-500 hover:text-rose-700 font-bold"
             >
-              🎓 School & Transport
-            </button>
-            <button
-              type="button"
-              onClick={() => handleFeeTypeChange('BOOKS')}
-              className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                selectedFeeType === 'BOOKS'
-                  ? 'bg-emerald-600 text-white shadow-xs'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
-              }`}
-            >
-              📚 Books Fee
-            </button>
-            <button
-              type="button"
-              onClick={() => handleFeeTypeChange('DRESS')}
-              className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                selectedFeeType === 'DRESS'
-                  ? 'bg-indigo-600 text-white shadow-xs'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
-              }`}
-            >
-              👗 Dress / Uniform
+              ✕
             </button>
           </div>
+        )}
 
-          {/* Student Balance Summary Ribbon */}
-          <div className="grid grid-cols-4 gap-2 bg-slate-50 dark:bg-slate-800/50 p-3 rounded-xl border border-slate-200 dark:border-slate-700">
-            <div>
-              <span className="text-[10px] text-slate-500 block uppercase font-medium">Total Payable</span>
-              <span className="text-sm font-bold text-slate-900 dark:text-white font-mono">
+        {/* 1. Student Fee Overview Banner */}
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 sm:p-5 shadow-xs">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-700/60">
+              <span className="text-[10.5px] text-slate-500 uppercase font-bold block">Total Payable</span>
+              <span className="text-base sm:text-lg font-black text-slate-900 dark:text-white font-mono">
                 {formatCurrency(summary.totalPayable, schoolProfile.currencySymbol)}
               </span>
             </div>
-            <div>
-              <span className="text-[10px] text-emerald-600 block uppercase font-medium">Total Paid</span>
-              <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400 font-mono">
+
+            <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-100 dark:border-emerald-900/60">
+              <span className="text-[10.5px] text-emerald-700 dark:text-emerald-400 uppercase font-bold block">Total Paid Till Date</span>
+              <span className="text-base sm:text-lg font-black text-emerald-600 dark:text-emerald-400 font-mono">
                 {formatCurrency(summary.totalPaid, schoolProfile.currencySymbol)}
               </span>
             </div>
-            <div>
-              <span className="text-[10px] text-slate-500 block uppercase font-medium">Total Balance</span>
-              <span className="text-sm font-bold text-slate-800 dark:text-slate-200 font-mono">
-                {formatCurrency(summary.totalDue, schoolProfile.currencySymbol)}
-              </span>
-            </div>
-            <div className="bg-rose-50 dark:bg-rose-950/40 p-1.5 rounded-lg border border-rose-200 dark:border-rose-800">
-              <span className="text-[10px] text-rose-700 dark:text-rose-300 block uppercase font-bold">
-                Due Till Date
-              </span>
-              <span className="text-sm font-extrabold text-rose-600 dark:text-rose-400 font-mono">
+
+            <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-100 dark:border-rose-900/60">
+              <span className="text-[10.5px] text-rose-700 dark:text-rose-400 uppercase font-bold block">Overdue Matured Till Date</span>
+              <span className="text-base sm:text-lg font-black text-rose-600 dark:text-rose-400 font-mono">
                 {formatCurrency(summary.dueTillDate, schoolProfile.currencySymbol)}
               </span>
             </div>
+
+            <div className="p-3 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+              <span className="text-[10.5px] text-slate-700 dark:text-slate-300 uppercase font-bold block">Net Outstanding Balance</span>
+              <span className="text-base sm:text-lg font-black text-slate-950 dark:text-white font-mono">
+                {formatCurrency(summary.totalDue, schoolProfile.currencySymbol)}
+              </span>
+            </div>
           </div>
+        </div>
 
-          {/* Payment Amount Input & Quick Fill Buttons */}
-          <div>
-            <label className="block text-slate-800 dark:text-slate-200 font-bold mb-1.5">
-              Enter Payment Amount ({schoolProfile.currencySymbol}):
-            </label>
-            <div className="flex items-center gap-2">
-              <div className="relative flex-1">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 font-bold text-slate-400 text-sm">
-                  {schoolProfile.currencySymbol}
-                </span>
-                <input
-                  id="input-payment-amount"
-                  type="number"
-                  min="1"
-                  max={summary.totalDue}
-                  value={paymentAmount || ''}
-                  onChange={(e) => {
-                    setIsManualOverride(false);
-                    setPaymentAmount(Math.max(0, parseFloat(e.target.value) || 0));
-                    setErrorMsg(null);
-                  }}
-                  className="w-full pl-8 pr-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-base font-extrabold text-slate-900 dark:text-white font-mono focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                  placeholder="0"
-                />
-              </div>
+        {/* 2-Column Responsive Layout */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          {/* Left Column: Payment Inputs & Details (5 cols) */}
+          <div className="lg:col-span-5 space-y-4">
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 sm:p-5 shadow-xs space-y-4">
+              <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                <Banknote className="w-4 h-4 text-emerald-600" />
+                <span>Payment Amount & Mode</span>
+              </h2>
 
-              {/* Quick Fill Buttons */}
-              <div className="flex items-center gap-1 shrink-0">
-                {summary.dueTillDate > 0 && selectedFeeType === 'ALL' && (
+              {/* Amount Input */}
+              <div>
+                <label className="block text-xs font-bold text-slate-800 dark:text-slate-200 mb-1.5">
+                  Collection Amount ({schoolProfile.currencySymbol}):
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 font-black text-slate-400 text-lg">
+                    {schoolProfile.currencySymbol}
+                  </span>
+                  <input
+                    id="input-payment-amount"
+                    type="number"
+                    min="1"
+                    max={summary.totalDue}
+                    value={paymentAmount || ''}
+                    onChange={(e) => {
+                      setIsManualOverride(false);
+                      setPaymentAmount(Math.max(0, parseFloat(e.target.value) || 0));
+                      setErrorMsg(null);
+                    }}
+                    className="w-full pl-9 pr-3 py-2.5 bg-slate-50 dark:bg-slate-800 border-2 border-slate-300 dark:border-slate-700 rounded-xl text-xl font-black text-slate-900 dark:text-white font-mono focus:border-emerald-500 focus:outline-none"
+                    placeholder="0"
+                  />
+                </div>
+
+                {/* Quick Auto-Fill Buttons */}
+                <div className="grid grid-cols-2 gap-2 mt-2">
                   <button
                     type="button"
                     onClick={() => {
                       setIsManualOverride(false);
                       setPaymentAmount(summary.dueTillDate);
                     }}
-                    className="px-2.5 py-2 bg-rose-100 hover:bg-rose-200 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300 font-semibold rounded-xl text-xs transition-colors border border-rose-200 dark:border-rose-800 cursor-pointer"
+                    className="py-1.5 px-2 bg-rose-50 hover:bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300 border border-rose-200 dark:border-rose-800 rounded-lg text-[11px] font-bold transition-colors cursor-pointer text-center truncate"
                     title="Fill exact amount overdue till date"
                   >
-                    Due Till Date ({formatCurrency(summary.dueTillDate)})
+                    Till Date: {formatCurrency(summary.dueTillDate, schoolProfile.currencySymbol)}
                   </button>
-                )}
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsManualOverride(false);
-                    setPaymentAmount(summary.totalDue);
-                  }}
-                  className="px-2.5 py-2 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 font-semibold rounded-xl text-xs transition-colors border border-emerald-200 dark:border-emerald-800 cursor-pointer"
-                  title="Pay full remaining balance for the whole year"
-                >
-                  Full Balance ({formatCurrency(summary.totalDue)})
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsManualOverride(false);
+                      setPaymentAmount(summary.totalDue);
+                    }}
+                    className="py-1.5 px-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 rounded-lg text-[11px] font-bold transition-colors cursor-pointer text-center truncate"
+                    title="Pay full remaining balance for the academic year"
+                  >
+                    Full Balance: {formatCurrency(summary.totalDue, schoolProfile.currencySymbol)}
+                  </button>
+                </div>
+              </div>
+
+              {/* Payment Mode Selection (Strictly Cash or UPI) */}
+              <div>
+                <label className="block text-xs font-bold text-slate-800 dark:text-slate-200 mb-1.5">
+                  Payment Mode (Cash / UPI Only):
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setPaymentMode('Cash')}
+                    className={`py-2.5 px-3 rounded-xl font-black text-center border transition-all text-xs flex items-center justify-center gap-2 cursor-pointer ${
+                      paymentMode === 'Cash'
+                        ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm ring-2 ring-emerald-500/20'
+                        : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700'
+                    }`}
+                  >
+                    <span>💵 Cash</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setPaymentMode('UPI')}
+                    className={`py-2.5 px-3 rounded-xl font-black text-center border transition-all text-xs flex items-center justify-center gap-2 cursor-pointer ${
+                      paymentMode === 'UPI'
+                        ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm ring-2 ring-indigo-500/20'
+                        : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700'
+                    }`}
+                  >
+                    <span>📱 UPI (PhonePe / GPay / Paytm)</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Mandatory UTR Number when UPI selected */}
+              {paymentMode === 'UPI' && (
+                <div className="p-3 bg-indigo-50/70 dark:bg-indigo-950/40 border-2 border-indigo-300 dark:border-indigo-800 rounded-xl space-y-1 animate-fadeIn">
+                  <label className="block text-xs font-extrabold text-indigo-950 dark:text-indigo-200">
+                    UPI UTR / Reference Number (Mandatory for UPI):
+                  </label>
+                  <input
+                    id="input-payment-ref"
+                    type="text"
+                    value={referenceNo}
+                    onChange={(e) => {
+                      setReferenceNo(e.target.value);
+                      setErrorMsg(null);
+                    }}
+                    placeholder="Enter 12-digit UPI UTR No (e.g. 427819203811)"
+                    className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-indigo-300 dark:border-indigo-700 rounded-lg text-xs font-mono font-bold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                  <span className="text-[10.5px] text-indigo-700 dark:text-indigo-400 block font-medium">
+                    This UTR number will be printed on the official receipt and saved in audit history.
+                  </span>
+                </div>
+              )}
+
+              {/* Collection Date */}
+              <div>
+                <label className="block text-xs font-bold text-slate-800 dark:text-slate-200 mb-1">
+                  Collection Date:
+                </label>
+                <input
+                  id="input-payment-date"
+                  type="date"
+                  value={paymentDate}
+                  onChange={(e) => setPaymentDate(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-semibold text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+              </div>
+
+              {/* Remarks */}
+              <div>
+                <label className="block text-xs font-bold text-slate-800 dark:text-slate-200 mb-1">
+                  Receipt Remarks / Notes (Optional):
+                </label>
+                <input
+                  id="input-payment-remarks"
+                  type="text"
+                  value={remarks}
+                  onChange={(e) => setRemarks(e.target.value)}
+                  placeholder="e.g. Paid by father, term 1 cleared"
+                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                />
               </div>
             </div>
           </div>
 
-          {/* Live Chronological Knock-off Allocations Preview */}
-          <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">
-            <div className="bg-slate-100 dark:bg-slate-800 px-3 py-2 flex items-center justify-between">
-              <span className="font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
-                <Layers className="w-3.5 h-3.5 text-emerald-600" />
-                Chronological FIFO Knock-Off Breakdown
-              </span>
-              <div className="flex items-center gap-2">
-                {isManualOverride && (
-                  <span className="text-[10px] bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded font-semibold">
-                    Manual Customization
-                  </span>
-                )}
-                <button
-                  type="button"
-                  onClick={handleResetToAutoFifo}
-                  className="text-[11px] text-indigo-600 dark:text-indigo-400 hover:underline font-semibold cursor-pointer"
-                >
-                  Auto-Reset FIFO
-                </button>
-              </div>
-            </div>
+          {/* Right Column: Live Chronological FIFO Knock-Off Schedule (7 cols) */}
+          <div className="lg:col-span-7 space-y-4">
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 sm:p-5 shadow-xs space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                    <Layers className="w-4 h-4 text-emerald-600" />
+                    <span>Chronological Installments Allocation</span>
+                  </h2>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                    Auto-allocated to earliest pending installments in strict FIFO order
+                  </p>
+                </div>
 
-            {allocations.length === 0 ? (
-              <div className="p-4 text-center text-slate-400 italic">
-                Enter an amount above to preview chronological installment allocation.
+                <div className="flex items-center gap-2">
+                  {isManualOverride && (
+                    <span className="text-[10px] bg-amber-100 text-amber-800 px-2 py-0.5 rounded font-bold">
+                      Manual Customization
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    onClick={handleResetToAutoFifo}
+                    className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline font-bold cursor-pointer"
+                  >
+                    Reset Auto-FIFO
+                  </button>
+                </div>
               </div>
-            ) : (
-              <div className="divide-y divide-slate-100 dark:divide-slate-800 max-h-40 overflow-y-auto">
+
+              {/* Installments Knock-off Table */}
+              <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">
                 <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-50 dark:bg-slate-800/50 text-slate-500 font-semibold">
+                  <thead className="bg-slate-50 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 font-bold border-b border-slate-200 dark:border-slate-700">
                     <tr>
-                      <th className="py-1.5 px-3">Fee Head & Installment</th>
-                      <th className="py-1.5 px-2">Due Date</th>
-                      <th className="py-1.5 px-2 text-right">Remaining Balance</th>
-                      <th className="py-1.5 px-3 text-right">Knock-off Amount</th>
+                      <th className="py-2.5 px-3">Standardized Installment Name</th>
+                      <th className="py-2.5 px-2 text-center">Due Date</th>
+                      <th className="py-2.5 px-2 text-right">Remaining Due</th>
+                      <th className="py-2.5 px-3 text-right">Allocated ({schoolProfile.currencySymbol})</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                    {allocations.map((alloc) => {
-                      const matchedInst = summary.installments.find((i) => i.id === alloc.installmentId);
+                    {summary.installments.map((inst) => {
+                      const alloc = allocations.find((a) => a.installmentId === inst.id);
+                      const allocatedAmt = alloc ? alloc.allocatedAmount : 0;
+                      const displayName = getInstallmentDisplayName(
+                        inst.headName,
+                        inst.installmentNumber,
+                        inst.totalInstallments,
+                        inst.dueDate
+                      );
+
+                      if (inst.balanceAmount <= 0 && allocatedAmt <= 0) {
+                        return null; // Skip fully cleared in this view to keep it clean
+                      }
+
                       return (
-                        <tr key={alloc.installmentId} className="hover:bg-slate-50 dark:hover:bg-slate-800/30">
-                          <td className="py-1.5 px-3 font-medium text-slate-800 dark:text-slate-200">
-                            {alloc.headName} #{alloc.installmentNumber}
+                        <tr
+                          key={inst.id}
+                          className={`transition-colors ${
+                            allocatedAmt > 0
+                              ? 'bg-emerald-50/40 dark:bg-emerald-950/20'
+                              : 'hover:bg-slate-50 dark:hover:bg-slate-800/30'
+                          }`}
+                        >
+                          <td className="py-2 px-3 font-semibold text-slate-800 dark:text-slate-200">
+                            <div>{displayName}</div>
                           </td>
-                          <td className="py-1.5 px-2 text-slate-500 font-mono">
-                            {formatDate(alloc.dueDate)}
+                          <td className="py-2 px-2 text-center text-slate-500 font-mono text-[11px]">
+                            {formatDate(inst.dueDate)}
                           </td>
-                          <td className="py-1.5 px-2 text-right font-mono text-slate-500">
-                            {matchedInst ? formatCurrency(matchedInst.balanceAmount) : '—'}
+                          <td className="py-2 px-2 text-right font-mono text-slate-600 dark:text-slate-400 font-bold">
+                            {formatCurrency(inst.balanceAmount, schoolProfile.currencySymbol)}
                           </td>
-                          <td className="py-1.5 px-3 text-right">
+                          <td className="py-2 px-3 text-right">
                             <div className="inline-flex items-center justify-end gap-1">
-                              <span className="text-slate-400">{schoolProfile.currencySymbol}</span>
+                              <span className="text-slate-400 text-xs">{schoolProfile.currencySymbol}</span>
                               <input
                                 type="number"
                                 min="0"
-                                max={matchedInst ? matchedInst.balanceAmount : undefined}
-                                value={alloc.allocatedAmount}
+                                max={inst.balanceAmount}
+                                value={allocatedAmt}
                                 onChange={(e) =>
                                   handleAllocationChange(
-                                    alloc.installmentId,
+                                    inst.id,
                                     parseFloat(e.target.value) || 0
                                   )
                                 }
-                                className="w-20 text-right py-0.5 px-1 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-700 rounded font-bold font-mono text-emerald-800 dark:text-emerald-300 focus:outline-none"
+                                className={`w-24 text-right py-1 px-2 rounded-lg font-bold font-mono text-xs focus:outline-none ${
+                                  allocatedAmt > 0
+                                    ? 'bg-emerald-100 text-emerald-900 border border-emerald-300 dark:bg-emerald-900/60 dark:text-emerald-200 dark:border-emerald-700'
+                                    : 'bg-slate-100 text-slate-500 border border-slate-200 dark:bg-slate-800 dark:text-slate-400'
+                                }`}
                               />
                             </div>
                           </td>
@@ -533,109 +522,40 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                       );
                     })}
                   </tbody>
+                  <tfoot className="bg-slate-50 dark:bg-slate-800/90 font-bold border-t border-slate-200 dark:border-slate-700 text-xs">
+                    <tr>
+                      <td colSpan={3} className="py-2.5 px-3 text-right uppercase tracking-wider text-slate-700 dark:text-slate-300 font-black">
+                        Total Allocated:
+                      </td>
+                      <td className="py-2.5 px-3 text-right font-mono font-black text-emerald-600 dark:text-emerald-400 text-sm">
+                        {formatCurrency(
+                          allocations.reduce((sum, a) => sum + a.allocatedAmount, 0),
+                          schoolProfile.currencySymbol
+                        )}
+                      </td>
+                    </tr>
+                  </tfoot>
                 </table>
               </div>
-            )}
-          </div>
 
-          {/* Payment Method, Date & Metadata */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-            <div>
-              <label className="block text-slate-700 dark:text-slate-300 font-bold mb-1">
-                Payment Mode (Cash / UPI Only):
-              </label>
-              <div className="grid grid-cols-2 gap-2">
-                {(['Cash', 'UPI'] as PaymentMode[]).map((mode) => (
-                  <button
-                    key={mode}
-                    type="button"
-                    onClick={() => setPaymentMode(mode)}
-                    className={`py-2 px-3 rounded-xl font-bold text-center border transition-all text-xs flex items-center justify-center gap-1.5 cursor-pointer ${
-                      paymentMode === mode
-                        ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm ring-2 ring-emerald-500/20'
-                        : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700'
-                    }`}
-                  >
-                    <span>{mode === 'Cash' ? '💵 Cash' : '📱 UPI'}</span>
-                  </button>
-                ))}
+              {/* Receipt Preview Info Footer */}
+              <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-700/60 flex items-center justify-between text-xs text-slate-600 dark:text-slate-400">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                  <span>Dual A5 Laser Receipt will be instantly generated upon confirmation.</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleConfirm}
+                  className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg text-xs cursor-pointer shadow-xs"
+                >
+                  Save & Print
+                </button>
               </div>
             </div>
-
-            <div>
-              <label className="block text-slate-700 dark:text-slate-300 font-bold mb-1">
-                Collection Date:
-              </label>
-              <input
-                id="input-payment-date"
-                type="date"
-                value={paymentDate}
-                onChange={(e) => setPaymentDate(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-semibold text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-              />
-            </div>
-
-            {paymentMode === 'UPI' && (
-              <div className="sm:col-span-2">
-                <label className="block text-slate-700 dark:text-slate-300 font-bold mb-1">
-                  UPI Txn / UTR Reference ID (Optional):
-                </label>
-                <input
-                  id="input-payment-ref"
-                  type="text"
-                  value={referenceNo}
-                  onChange={(e) => setReferenceNo(e.target.value)}
-                  placeholder="e.g. UPI/4938201948 or GooglePay / PhonePe Txn Ref"
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                />
-              </div>
-            )}
-
-            <div className="sm:col-span-2">
-              <label className="block text-slate-700 dark:text-slate-300 font-bold mb-1">
-                Remarks / Notes (Optional):
-              </label>
-              <input
-                id="input-payment-remarks"
-                type="text"
-                value={remarks}
-                onChange={(e) => setRemarks(e.target.value)}
-                placeholder="e.g. Cleared till current month installment"
-                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-              />
-            </div>
           </div>
-
-          {/* Error Message if any */}
-          {errorMsg && (
-            <div className="p-2.5 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 shrink-0" />
-              <span>{errorMsg}</span>
-            </div>
-          )}
         </div>
-
-        {/* Modal Footer */}
-        <div className="bg-slate-50 dark:bg-slate-800/80 px-5 py-3.5 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 dark:bg-slate-700 dark:text-slate-200 rounded-xl font-semibold text-xs transition-colors cursor-pointer"
-          >
-            Cancel
-          </button>
-
-          <button
-            id="btn-confirm-payment"
-            type="button"
-            onClick={handleConfirm}
-            className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold text-xs shadow-md transition-all flex items-center gap-2 active:scale-95 cursor-pointer"
-          >
-            <CheckCircle className="w-4 h-4" />
-            <span>Save & Generate Dual A5 Receipt</span>
-          </button>
-        </div>
-      </div>
+      </main>
     </div>
   );
 };

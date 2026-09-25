@@ -1,7 +1,8 @@
 import React, { useRef } from 'react';
 import { PaymentTransaction, SchoolProfile, Student } from '../types';
 import { formatCurrency, formatDate, numberToWords } from '../utils/numberToWords';
-import { Building2, CheckCircle2, ExternalLink, Printer, Scissors, X } from 'lucide-react';
+import { getInstallmentDisplayName } from '../utils/installmentFormatter';
+import { CheckCircle2, ExternalLink, Printer, X } from 'lucide-react';
 
 interface DualA5ReceiptModalProps {
   transaction: PaymentTransaction;
@@ -9,6 +10,9 @@ interface DualA5ReceiptModalProps {
   schoolProfile: SchoolProfile;
   remainingDueBalance?: number;
   nextDueDate?: string | null;
+  totalBalance?: number;
+  nextInstallmentBalance?: number;
+  nextInstallmentDueDate?: string | null;
   onClose: () => void;
 }
 
@@ -18,489 +22,135 @@ export const DualA5ReceiptModal: React.FC<DualA5ReceiptModalProps> = ({
   schoolProfile,
   remainingDueBalance = 0,
   nextDueDate = null,
+  totalBalance,
+  nextInstallmentBalance,
+  nextInstallmentDueDate,
   onClose,
 }) => {
   const receiptPrintRef = useRef<HTMLDivElement>(null);
   const currencySymbol = schoolProfile?.currencySymbol || '₹';
   const amountInWords = numberToWords(transaction.amount);
 
-  const isBooksTransaction =
-    transaction.allocations.some((a) => {
-      const l = a.headName.toLowerCase();
-      return l.includes('book') || l.includes('stationery') || l.includes('kit');
-    }) ||
-    (transaction.remarks &&
-      (transaction.remarks.toLowerCase().includes('book') ||
-        transaction.remarks.toLowerCase().includes('stationery')));
+  const displayTotalBalance = totalBalance !== undefined ? totalBalance : remainingDueBalance;
+  const displayNextInstDue = nextInstallmentDueDate !== undefined ? nextInstallmentDueDate : nextDueDate;
+  const displayNextInstBalance =
+    nextInstallmentBalance !== undefined && nextInstallmentBalance > 0
+      ? nextInstallmentBalance
+      : displayTotalBalance > 0
+      ? displayTotalBalance
+      : 0;
 
-  const isDressTransaction =
-    transaction.allocations.some((a) => {
-      const l = a.headName.toLowerCase();
-      return l.includes('dress') || l.includes('uniform');
-    }) ||
-    (transaction.remarks &&
-      (transaction.remarks.toLowerCase().includes('dress') ||
-        transaction.remarks.toLowerCase().includes('uniform')));
+  const schoolName = schoolProfile.schoolName || 'KAKATIYA SCHOOL BODUPPAL';
 
-  const isBooksOrDressTransaction = isBooksTransaction || isDressTransaction;
-
-  // Derive standardized display receipt number (B-00001, D-00001, or School Prefix)
-  const displayReceiptNo = (() => {
-    if (isBooksTransaction) {
-      if (transaction.receiptNo.startsWith('B-')) return transaction.receiptNo;
-      const num = transaction.receiptNo.replace(/\D/g, '').slice(-5) || '00001';
-      return `B-${num.padStart(5, '0')}`;
-    }
-    if (isDressTransaction) {
-      if (transaction.receiptNo.startsWith('D-')) return transaction.receiptNo;
-      const num = transaction.receiptNo.replace(/\D/g, '').slice(-5) || '00001';
-      return `D-${num.padStart(5, '0')}`;
-    }
-    return transaction.receiptNo;
-  })();
-
-  const receiptTitle = isBooksTransaction
-    ? 'BOOKS & STATIONERY RECEIPT'
-    : isDressTransaction
-    ? 'SCHOOL UNIFORM & DRESS RECEIPT'
-    : schoolProfile.schoolName || 'Kakatiya School Boduppal';
-
-  /**
-   * Universal Print Handler:
-   * Works reliably in sandboxed iframes by injecting an isolated printing iframe,
-   * with fallback to window.print()
-   */
-  const handleDirectPrint = () => {
-    const printContent = receiptPrintRef.current;
-    if (!printContent) {
-      window.print();
-      return;
-    }
-
-    try {
-      // Create hidden iframe for bulletproof printing in sandbox
-      const iframe = document.createElement('iframe');
-      iframe.style.position = 'fixed';
-      iframe.style.right = '0';
-      iframe.style.bottom = '0';
-      iframe.style.width = '0';
-      iframe.style.height = '0';
-      iframe.style.border = '0';
-      iframe.style.visibility = 'hidden';
-      document.body.appendChild(iframe);
-
-      const doc = iframe.contentWindow?.document;
-      if (doc) {
-        doc.open();
-        doc.write(`
-          <!DOCTYPE html>
-          <html>
-            <head>
-              <title>Receipt - ${displayReceiptNo} - ${transaction.studentName}</title>
-              <meta charset="utf-8" />
-              <style>
-                @page {
-                  size: A4 landscape;
-                  margin: 6mm;
-                }
-                * {
-                  box-sizing: border-box;
-                  margin: 0;
-                  padding: 0;
-                  -webkit-print-color-adjust: exact !important;
-                  print-color-adjust: exact !important;
-                  color-adjust: exact !important;
-                }
-                body {
-                  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-                  color: #000000;
-                  background: #ffffff;
-                  padding: 8px;
-                }
-                .receipt-grid {
-                  display: grid;
-                  grid-template-columns: 1fr 1fr;
-                  gap: 16px;
-                  width: 100%;
-                }
-                .receipt-card {
-                  border: 2px solid #000000 !important;
-                  padding: 12px 14px;
-                  border-radius: 6px;
-                  display: flex;
-                  flex-direction: column;
-                  justify-content: space-between;
-                  background: #ffffff !important;
-                  font-size: 11px;
-                  line-height: 1.35;
-                }
-                .receipt-header {
-                  border-bottom: 2px solid #000000 !important;
-                  padding-bottom: 6px;
-                  margin-bottom: 6px;
-                  display: flex;
-                  justify-content: space-between;
-                  align-items: flex-start;
-                }
-                .school-title {
-                  font-size: 15px;
-                  font-weight: 900;
-                  text-transform: uppercase;
-                  letter-spacing: 0.5px;
-                  color: #000000;
-                }
-                .copy-badge {
-                  border: 1.5px solid #000000 !important;
-                  padding: 2px 6px;
-                  font-size: 10px;
-                  font-weight: 800;
-                  text-transform: uppercase;
-                  background: #f0f0f0 !important;
-                  border-radius: 3px;
-                }
-                table {
-                  width: 100%;
-                  border-collapse: collapse;
-                  margin-bottom: 6px;
-                  border: 1.5px solid #000000 !important;
-                }
-                th {
-                  border: 1px solid #000000 !important;
-                  padding: 4px 6px;
-                  background: #f2f2f2 !important;
-                  font-size: 10px;
-                  font-weight: 800;
-                  text-align: left;
-                  text-transform: uppercase;
-                }
-                td {
-                  border: 1px solid #000000 !important;
-                  padding: 3.5px 6px;
-                  font-size: 11px;
-                }
-                .words-box {
-                  border: 1px dashed #000000 !important;
-                  padding: 4px 6px;
-                  font-size: 10.5px;
-                  margin-bottom: 6px;
-                  background: #fafafa !important;
-                }
-                .balance-box {
-                  display: flex;
-                  justify-content: space-between;
-                  border: 1px solid #000000 !important;
-                  padding: 4px 8px;
-                  font-size: 10.5px;
-                  margin-bottom: 6px;
-                  background: #f5f5f5 !important;
-                }
-                .sign-container {
-                  display: flex;
-                  justify-content: flex-end;
-                  margin-top: 14px;
-                  padding-right: 8px;
-                }
-                .sign-line {
-                  border-top: 1.5px solid #000000 !important;
-                  width: 160px;
-                  text-align: center;
-                  font-size: 10px;
-                  font-weight: 800;
-                  padding-top: 3px;
-                  text-transform: uppercase;
-                }
-              </style>
-            </head>
-            <body>
-              <div class="receipt-grid">
-                ${printContent.innerHTML}
-              </div>
-            </body>
-          </html>
-        `);
-        doc.close();
-
-        setTimeout(() => {
-          try {
-            iframe.contentWindow?.focus();
-            iframe.contentWindow?.print();
-          } catch (e) {
-            window.print();
-          } finally {
-            setTimeout(() => {
-              if (document.body.contains(iframe)) {
-                document.body.removeChild(iframe);
-              }
-            }, 3000);
-          }
-        }, 350);
-      } else {
-        window.print();
-      }
-    } catch (err) {
-      window.print();
-    }
+  const handlePrint = () => {
+    window.print();
   };
 
-  const handlePrintInCleanWindow = () => {
-    const printableContent = receiptPrintRef.current?.innerHTML;
-    if (!printableContent) {
-      window.print();
-      return;
-    }
-
-    const printWindow = window.open('', '_blank', 'width=950,height=700');
-    if (!printWindow) {
-      handleDirectPrint();
-      return;
-    }
-
-    printWindow.document.write(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>Fee Receipt - ${displayReceiptNo} - ${transaction.studentName}</title>
-          <meta charset="utf-8" />
-          <style>
-            @page {
-              size: A4 landscape;
-              margin: 6mm 8mm;
-            }
-            * {
-              box-sizing: border-box;
-              margin: 0;
-              padding: 0;
-              -webkit-print-color-adjust: exact !important;
-              print-color-adjust: exact !important;
-            }
-            body {
-              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-              color: #000000;
-              background: #ffffff;
-              padding: 10px;
-            }
-            .receipt-grid {
-              display: grid;
-              grid-template-columns: 1fr 1fr;
-              gap: 16px;
-              width: 100%;
-            }
-            .receipt-card {
-              border: 2px solid #000000 !important;
-              padding: 14px;
-              border-radius: 6px;
-              display: flex;
-              flex-direction: column;
-              justify-content: space-between;
-              background: #ffffff !important;
-              font-size: 11px;
-              line-height: 1.35;
-            }
-            .receipt-header {
-              border-bottom: 2px solid #000000 !important;
-              padding-bottom: 6px;
-              margin-bottom: 6px;
-              display: flex;
-              justify-content: space-between;
-              align-items: flex-start;
-            }
-            .school-title {
-              font-size: 15px;
-              font-weight: 900;
-              text-transform: uppercase;
-              letter-spacing: 0.5px;
-              color: #000000;
-            }
-            .copy-badge {
-              border: 1.5px solid #000000 !important;
-              padding: 2px 6px;
-              font-size: 10px;
-              font-weight: 800;
-              text-transform: uppercase;
-              background: #f0f0f0 !important;
-            }
-            table {
-              width: 100%;
-              border-collapse: collapse;
-              margin-bottom: 8px;
-              border: 1.5px solid #000000 !important;
-            }
-            th {
-              border: 1px solid #000000 !important;
-              padding: 4px 6px;
-              background: #f4f4f4 !important;
-              font-size: 10px;
-              font-weight: 800;
-              text-align: left;
-            }
-            td {
-              border: 1px solid #000000 !important;
-              padding: 4px 6px;
-              font-size: 11px;
-            }
-            tr.total-row td {
-              font-weight: 900;
-              font-size: 12px;
-              background: #f9f9f9 !important;
-            }
-            .words-box {
-              border: 1px dashed #000000 !important;
-              padding: 4px 6px;
-              font-size: 10.5px;
-              margin-bottom: 6px;
-              background: #fafafa !important;
-            }
-            .balance-box {
-              display: flex;
-              justify-content: space-between;
-              border: 1px solid #000000 !important;
-              padding: 4px 8px;
-              font-size: 10.5px;
-              margin-bottom: 6px;
-              background: #f5f5f5 !important;
-            }
-            .sign-container {
-              display: flex;
-              justify-content: flex-end;
-              margin-top: 16px;
-              padding-right: 8px;
-            }
-            .sign-line {
-              border-top: 1.5px solid #000000 !important;
-              width: 160px;
-              text-align: center;
-              font-size: 10px;
-              font-weight: 800;
-              padding-top: 3px;
-            }
-          </style>
-        </head>
-        <body>
-          <div class="receipt-grid">
-            ${printableContent}
-          </div>
-          <script>
-            window.onload = function() {
-              window.print();
-            };
-          </script>
-        </body>
-      </html>
-    `);
-    printWindow.document.close();
-  };
-
-  // High-contrast, Black & White Professional Laser Receipt Copy
-  const SingleReceiptView = ({ copyType }: { copyType: 'PARENT COPY' | 'OFFICE COPY' }) => (
-    <div className="receipt-card border-2 border-slate-900 bg-white p-3.5 sm:p-4 rounded-lg flex flex-col justify-between text-slate-900 text-xs shadow-none">
+  const SingleReceiptCard = ({ copyType }: { copyType: 'PARENT COPY' | 'OFFICE COPY' }) => (
+    <div className="receipt-single-box border-2 border-black bg-white p-3.5 rounded flex flex-col justify-between text-black text-[11px] leading-tight select-none shadow-none font-sans">
       <div>
-        {/* Header Bar */}
-        <div className="border-b-2 border-slate-900 pb-2 mb-2 flex items-start justify-between">
+        {/* School Header */}
+        <div className="border-b-2 border-black pb-2 mb-2 flex items-start justify-between">
           <div>
-            <h2 className="text-sm sm:text-base font-black text-slate-950 uppercase tracking-tight leading-tight">
-              {receiptTitle}
+            <h2 className="text-base font-black text-black uppercase tracking-tight leading-tight">
+              {schoolName}
             </h2>
-            {schoolProfile.phone && !isBooksOrDressTransaction && (
-              <p className="text-[9.5px] text-slate-600 mt-0.5">
-                Contact: {schoolProfile.phone}
-              </p>
-            )}
-            {isBooksOrDressTransaction && schoolProfile.schoolName && (
-              <p className="text-[9.5px] text-slate-600 mt-0.5">
-                {schoolProfile.schoolName}
-              </p>
-            )}
+            <p className="text-[10px] text-gray-700 font-medium">
+              Boduppal, Hyderabad • Phone: {schoolProfile.phone || '98480xxxxx'}
+            </p>
           </div>
           <div className="text-right shrink-0">
-            <span className="inline-block px-2.5 py-0.5 border border-slate-900 bg-slate-100 font-extrabold text-[10px] uppercase tracking-wider text-slate-950 rounded-xs">
+            <span className="inline-block px-2 py-0.5 border border-black bg-gray-100 font-black text-[10px] uppercase tracking-wider text-black rounded-xs">
               {copyType}
             </span>
           </div>
         </div>
 
-        {/* Student & Receipt Meta Grid */}
-        <div className="border border-slate-900 mb-2 divide-y divide-slate-800 text-[11px]">
-          <div className="grid grid-cols-2 divide-x divide-slate-800 bg-slate-50/80">
-            <div className="p-1.5 px-2">
-              <span className="text-slate-600 font-medium">Receipt No: </span>
-              <strong className="font-mono font-extrabold text-slate-950">
-                {displayReceiptNo}
+        {/* Student & Receipt Metadata */}
+        <div className="border border-black mb-2 divide-y divide-black text-[11px]">
+          <div className="grid grid-cols-2 divide-x divide-black bg-gray-50">
+            <div className="p-1 px-2">
+              <span className="text-gray-600 font-semibold">Receipt No: </span>
+              <strong className="font-mono font-black text-black">
+                {transaction.receiptNo}
               </strong>
             </div>
-            <div className="p-1.5 px-2">
-              <span className="text-slate-600 font-medium">Payment Date: </span>
-              <strong className="font-semibold text-slate-950">{formatDate(transaction.date)}</strong>
+            <div className="p-1 px-2">
+              <span className="text-gray-600 font-semibold">Payment Date: </span>
+              <strong className="font-bold text-black">{formatDate(transaction.date)}</strong>
             </div>
           </div>
-          <div className="grid grid-cols-2 divide-x divide-slate-800">
-            <div className="p-1.5 px-2">
-              <span className="text-slate-600 font-medium">Student Name: </span>
-              <strong className="font-bold text-slate-950">{transaction.studentName}</strong>
+
+          <div className="grid grid-cols-2 divide-x divide-black">
+            <div className="p-1 px-2">
+              <span className="text-gray-600 font-semibold">Student Name: </span>
+              <strong className="font-black text-black">{transaction.studentName}</strong>
             </div>
-            <div className="p-1.5 px-2">
-              <span className="text-slate-600 font-medium">Class & Section: </span>
-              <strong className="font-bold text-slate-950">{transaction.studentClass}</strong>
+            <div className="p-1 px-2">
+              <span className="text-gray-600 font-semibold">Class: </span>
+              <strong className="font-black text-black">{transaction.studentClass}</strong>
             </div>
           </div>
-          <div className="grid grid-cols-2 divide-x divide-slate-800 bg-slate-50/80">
-            <div className="p-1.5 px-2">
-              <span className="text-slate-600 font-medium">Payment Mode: </span>
-              <strong className="font-mono font-bold text-slate-950">
+
+          <div className="grid grid-cols-2 divide-x divide-black bg-gray-50">
+            <div className="p-1 px-2">
+              <span className="text-gray-600 font-semibold">Roll No: </span>
+              <strong className="font-mono font-black text-black">#{transaction.studentRollNo}</strong>
+            </div>
+            <div className="p-1 px-2">
+              <span className="text-gray-600 font-semibold">Payment Mode: </span>
+              <strong className="font-mono font-black text-black">
                 {transaction.paymentMode.toUpperCase()}
-                {transaction.referenceNo ? ` [Ref: ${transaction.referenceNo}]` : ''}
+                {transaction.referenceNo ? ` [UTR: ${transaction.referenceNo}]` : ''}
               </strong>
-            </div>
-            <div className="p-1.5 px-2">
-              <span className="text-slate-600 font-medium">Roll No / Reg: </span>
-              <strong className="font-mono font-bold text-slate-950">#{transaction.studentRollNo}</strong>
             </div>
           </div>
         </div>
 
-        {/* Chronological Breakdown Table */}
-        <div className="border border-slate-900 mb-2 overflow-hidden">
+        {/* Allocations Table with Standardized Installment Names */}
+        <div className="border border-black mb-2 overflow-hidden">
           <table className="w-full text-left text-[11px] border-collapse">
-            <thead className="bg-slate-100 border-b border-slate-900 text-slate-900 font-extrabold text-[10px] uppercase">
+            <thead className="bg-gray-100 border-b border-black text-black font-black text-[10px] uppercase">
               <tr>
-                <th className="py-1 px-2 border-r border-slate-900 w-8 text-center">#</th>
-                <th className="py-1 px-2 border-r border-slate-900">
-                  {isBooksOrDressTransaction ? 'Particulars (Item / Kit Description)' : 'Particulars (Fee Head & Installment)'}
-                </th>
-                <th className="py-1 px-2 border-r border-slate-900 text-center">
-                  {isBooksOrDressTransaction ? 'Date' : 'Due Date'}
-                </th>
-                <th className="py-1 px-2 text-right">Amount ({currencySymbol})</th>
+                <th className="py-1 px-2 border-r border-black w-7 text-center">#</th>
+                <th className="py-1 px-2 border-r border-black">Fee Particulars</th>
+                <th className="py-1 px-2 border-r border-black text-center w-24">Due Date</th>
+                <th className="py-1 px-2 text-right w-24">Amount ({currencySymbol})</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800 font-mono text-[10.5px]">
+            <tbody className="divide-y divide-black font-mono text-[10.5px]">
               {transaction.allocations.map((alloc, idx) => {
-                const displayName = isBooksOrDressTransaction
-                  ? alloc.headName.replace(/\(Installment #\d+\)/gi, '').trim()
-                  : `${alloc.headName} (Installment #${alloc.installmentNumber})`;
+                const displayName = getInstallmentDisplayName(
+                  alloc.headName,
+                  alloc.installmentNumber,
+                  undefined,
+                  alloc.dueDate
+                );
 
                 return (
-                  <tr key={idx} className="hover:bg-slate-50">
-                    <td className="py-1 px-2 border-r border-slate-800 text-center text-slate-500 font-medium">
+                  <tr key={idx} className="hover:bg-gray-50">
+                    <td className="py-1 px-2 border-r border-black text-center text-gray-600 font-medium">
                       {idx + 1}
                     </td>
-                    <td className="py-1 px-2 border-r border-slate-800 font-sans font-medium text-slate-950">
+                    <td className="py-1 px-2 border-r border-black font-sans font-bold text-black">
                       {displayName}
                     </td>
-                    <td className="py-1 px-2 border-r border-slate-800 text-center text-slate-700">
+                    <td className="py-1 px-2 border-r border-black text-center text-gray-700">
                       {formatDate(alloc.dueDate || transaction.date)}
                     </td>
-                    <td className="py-1 px-2 text-right font-bold text-slate-950">
+                    <td className="py-1 px-2 text-right font-black text-black">
                       {formatCurrency(alloc.allocatedAmount, currencySymbol)}
                     </td>
                   </tr>
                 );
               })}
-              {/* Grand Total Row */}
-              <tr className="bg-slate-100 border-t-2 border-slate-900 font-bold text-slate-950 text-xs">
+
+              {/* Total Row */}
+              <tr className="bg-gray-100 border-t-2 border-black font-black text-black text-xs">
                 <td colSpan={3} className="py-1.5 px-2 font-sans text-right uppercase tracking-wider">
                   Total Amount Received:
                 </td>
-                <td className="py-1.5 px-2 text-right font-mono font-black text-slate-950">
+                <td className="py-1.5 px-2 text-right font-mono font-black text-black">
                   {formatCurrency(transaction.amount, currencySymbol)}
                 </td>
               </tr>
@@ -509,44 +159,62 @@ export const DualA5ReceiptModal: React.FC<DualA5ReceiptModalProps> = ({
         </div>
 
         {/* Amount in Words */}
-        <div className="border border-dashed border-slate-800 p-1.5 px-2 bg-slate-50 text-[10.5px] text-slate-900 mb-2">
-          <span className="font-bold text-slate-950">Amount in Words: </span>
-          <span className="italic font-medium">{amountInWords}</span>
+        <div className="border border-dashed border-black p-1.5 px-2 bg-gray-50 text-[10px] text-black mb-2">
+          <span className="font-bold">Amount in Words: </span>
+          <span className="italic font-semibold">{amountInWords}</span>
         </div>
 
-        {/* Remaining Balance & Next Due Summary - STRICTLY EXCLUDED FOR BOOKS & DRESS RECEIPTS */}
-        {!isBooksOrDressTransaction && (
-          <div className="flex items-center justify-between border border-slate-900 p-1.5 px-2 bg-slate-50 text-[10.5px] text-slate-900 mb-2">
-            <div>
-              <span className="font-semibold text-slate-700">Remaining Balance: </span>
-              <strong className="font-mono font-bold text-slate-950">
-                {formatCurrency(remainingDueBalance, currencySymbol)}
+        {/* REQUIRED 3 SUMMARY ITEMS: NEXT INSTALMENT BALANCE, NEXT INSTALMENT DUE DATE, TOTAL BALANCE */}
+        <div className="border-2 border-black p-2 bg-gray-50 mb-2">
+          <div className="grid grid-cols-3 gap-2 text-center divide-x divide-black">
+            <div className="pr-1 text-left">
+              <span className="text-[9px] font-black uppercase text-gray-600 block">
+                NEXT INSTALMENT BALANCE
+              </span>
+              <strong className="font-mono font-black text-black text-[11.5px]">
+                {displayNextInstBalance > 0
+                  ? formatCurrency(displayNextInstBalance, currencySymbol)
+                  : '₹0'}
               </strong>
             </div>
-            {nextDueDate && (
-              <div>
-                <span className="font-semibold text-slate-700">Next Due Date: </span>
-                <strong className="font-semibold text-slate-950">{formatDate(nextDueDate)}</strong>
-              </div>
-            )}
+
+            <div className="px-1 text-center">
+              <span className="text-[9px] font-black uppercase text-gray-600 block">
+                NEXT INSTALMENT DUE DATE
+              </span>
+              <strong className="font-bold text-black text-[11px]">
+                {displayNextInstDue ? formatDate(displayNextInstDue) : 'N/A (Cleared)'}
+              </strong>
+            </div>
+
+            <div className="pl-1 text-right">
+              <span className="text-[9px] font-black uppercase text-gray-600 block">
+                TOTAL BALANCE
+              </span>
+              <strong className="font-mono font-black text-black text-[12px]">
+                {formatCurrency(displayTotalBalance, currencySymbol)}
+              </strong>
+            </div>
           </div>
-        )}
+        </div>
       </div>
 
-      {/* Footer Disclaimer & Signatures */}
-      <div className="pt-2 border-t border-slate-400 mt-2">
-        <p className="text-[8.5px] text-slate-600 leading-tight mb-3">
+      {/* Footer & Signatures */}
+      <div className="pt-2 border-t border-black mt-2">
+        <p className="text-[8.5px] text-gray-600 leading-tight mb-3">
           {schoolProfile.receiptDisclaimer ||
-            'Note: Fees once paid are non-refundable & non-transferable. Computer-generated official receipt.'}
+            'Note: Fees once paid are non-refundable & non-transferable. Official computer-generated receipt.'}
         </p>
 
-        {/* Authorized Signatory Only */}
-        <div className="flex items-center justify-end text-[10px] pt-4 px-2">
+        <div className="flex items-center justify-between text-[10px] pt-4 px-2">
+          <div className="text-[9px] text-gray-500 font-mono">
+            {transaction.remarks ? `Note: ${transaction.remarks}` : ''}
+          </div>
           <div className="text-center">
-            <div className="border-t-2 border-slate-900 w-36 pt-1 font-bold text-slate-950 uppercase tracking-tight">
+            <div className="border-t-2 border-black w-36 pt-1 font-black text-black uppercase tracking-tight text-[10px]">
               Authorised Signatory
             </div>
-            <span className="text-[8.5px] text-slate-500 font-medium">(Cashier / Accounts Officer)</span>
+            <span className="text-[8.5px] text-gray-500 font-medium">(Accounts Officer)</span>
           </div>
         </div>
       </div>
@@ -558,7 +226,7 @@ export const DualA5ReceiptModal: React.FC<DualA5ReceiptModalProps> = ({
       id="modal-dual-a5-receipt"
       className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-xs overflow-y-auto"
     >
-      <div className="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-2xl shadow-2xl max-w-5xl w-full overflow-hidden my-4">
+      <div className="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-800 rounded-2xl shadow-2xl max-w-5xl w-full overflow-hidden my-4 print:border-none print:shadow-none print:m-0 print:p-0 print:max-w-none">
         {/* Modal Controls Bar (Hidden during print) */}
         <div className="bg-slate-900 text-white px-4 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 print:hidden">
           <div className="flex items-center gap-2">
@@ -566,8 +234,9 @@ export const DualA5ReceiptModal: React.FC<DualA5ReceiptModalProps> = ({
               <CheckCircle2 className="w-4 h-4" />
             </div>
             <div>
-              <h2 className="text-sm font-bold text-slate-100">
-                Official Fee Receipt: #{displayReceiptNo}
+              <h2 className="text-sm font-bold text-slate-100 flex items-center gap-2">
+                <span>Official Fee Receipt</span>
+                <span className="font-mono text-emerald-400 font-bold">#{transaction.receiptNo}</span>
               </h2>
               <p className="text-[11px] text-slate-400">
                 {transaction.studentName} (#{transaction.studentRollNo}) • {transaction.studentClass}
@@ -580,53 +249,43 @@ export const DualA5ReceiptModal: React.FC<DualA5ReceiptModalProps> = ({
             <button
               id="btn-print-dual-receipt"
               type="button"
-              onClick={handleDirectPrint}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold shadow-sm transition-all cursor-pointer active:scale-95"
-              title="Print directly or save as PDF"
+              onClick={handlePrint}
+              className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black shadow-md transition-all cursor-pointer active:scale-95"
+              title="Print directly (A4 landscape with dual A5 copies)"
             >
-              <Printer className="w-3.5 h-3.5" />
-              <span>Print Receipt (A4 / A5)</span>
-            </button>
-
-            {/* Fallback Clean Window Print */}
-            <button
-              type="button"
-              onClick={handlePrintInCleanWindow}
-              className="flex items-center gap-1 px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-lg text-xs font-semibold transition-all cursor-pointer"
-              title="Open standalone clean print window"
-            >
-              <ExternalLink className="w-3.5 h-3.5 text-slate-400" />
-              <span className="hidden sm:inline">Print in New Tab</span>
+              <Printer className="w-4 h-4" />
+              <span>Print Official Receipt</span>
             </button>
 
             <button
               type="button"
               onClick={onClose}
-              className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+              className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>
           </div>
         </div>
 
-        {/* Printable Dual A5 Area */}
-        <div className="p-3 sm:p-6 bg-slate-100 dark:bg-slate-950 overflow-x-auto print:p-0 print:bg-white print:overflow-visible">
+        {/* Printable Dual A5 Area - exact 2-column landscape layout preserved in preview and print */}
+        <div className="p-4 sm:p-6 bg-slate-100 dark:bg-slate-950 overflow-x-auto print:p-0 print:bg-white print:overflow-visible">
           <div
             ref={receiptPrintRef}
             id="printable-receipt-area"
-            className="grid grid-cols-1 lg:grid-cols-2 gap-4 max-w-4xl mx-auto print:grid-cols-2 print:gap-4 print:max-w-none print:w-full"
+            className="receipt-grid-container grid grid-cols-1 md:grid-cols-2 gap-4 max-w-4xl mx-auto print:grid-cols-2 print:gap-4 print:max-w-none print:w-full"
           >
-            <SingleReceiptView copyType="PARENT COPY" />
-            <SingleReceiptView copyType="OFFICE COPY" />
+            <SingleReceiptCard copyType="PARENT COPY" />
+            <SingleReceiptCard copyType="OFFICE COPY" />
           </div>
         </div>
 
-        {/* Print Stylesheet for High Contrast Monochrome Laser Output */}
+        {/* Print Stylesheet guaranteeing 1:1 identical appearance */}
         <style>{`
           @media print {
             body {
               background: #ffffff !important;
               color: #000000 !important;
+              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif !important;
             }
             body * {
               visibility: hidden;
@@ -639,23 +298,26 @@ export const DualA5ReceiptModal: React.FC<DualA5ReceiptModalProps> = ({
               left: 0 !important;
               top: 0 !important;
               width: 100% !important;
-              padding: 4mm !important;
               margin: 0 !important;
+              padding: 6mm !important;
               background: #ffffff !important;
               display: grid !important;
               grid-template-columns: 1fr 1fr !important;
               gap: 16px !important;
+              box-sizing: border-box !important;
             }
-            .receipt-card {
-              border: 1.5px solid #000000 !important;
+            .receipt-single-box {
+              border: 2px solid #000000 !important;
               background: #ffffff !important;
               color: #000000 !important;
-              padding: 10px !important;
+              padding: 12px !important;
+              border-radius: 4px !important;
               box-shadow: none !important;
+              page-break-inside: avoid !important;
             }
             @page {
               size: A4 landscape;
-              margin: 6mm;
+              margin: 4mm;
             }
           }
         `}</style>

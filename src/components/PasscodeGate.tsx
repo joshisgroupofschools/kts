@@ -1,16 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { Lock, KeyRound, ArrowRight, ShieldCheck, AlertCircle } from 'lucide-react';
+import { Lock, KeyRound, ArrowRight, ShieldCheck, AlertCircle, ArrowLeft } from 'lucide-react';
 import { SchoolProfile } from '../types';
 
 interface PasscodeGateProps {
   schoolProfile: SchoolProfile;
+  onBackToLedger?: () => void;
   children: React.ReactNode;
 }
 
-const REQUIRED_PASSCODE = '5840';
-const PASSCODE_STORAGE_KEY = 'sfc_app_passcode_authenticated_v1';
+const REQUIRED_PASSCODE = '2026';
+const PASSCODE_STORAGE_KEY = 'sfc_analytics_passcode_authenticated_2026';
 
-export const PasscodeGate: React.FC<PasscodeGateProps> = ({ schoolProfile, children }) => {
+export const PasscodeGate: React.FC<PasscodeGateProps> = ({ schoolProfile, onBackToLedger, children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
     try {
       return sessionStorage.getItem(PASSCODE_STORAGE_KEY) === 'true';
@@ -86,7 +87,7 @@ export const PasscodeGate: React.FC<PasscodeGateProps> = ({ schoolProfile, child
       setIsAuthenticated(true);
     } else {
       setIsShaking(true);
-      setError('Incorrect Passcode. Please enter the 4-digit code (5840).');
+      setError('Incorrect Passcode. Please try again.');
       setTimeout(() => {
         setIsShaking(false);
         setDigits(['', '', '', '']);
@@ -129,31 +130,31 @@ export const PasscodeGate: React.FC<PasscodeGateProps> = ({ schoolProfile, child
   }
 
   return (
-    <div className="min-h-screen bg-slate-900 text-white flex items-center justify-center p-4">
-      <div className="w-full max-w-md bg-slate-800 border border-slate-700/80 rounded-2xl shadow-2xl p-6 sm:p-8 text-center relative overflow-hidden">
+    <div className="min-h-[70vh] flex items-center justify-center p-4">
+      <div className="w-full max-w-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl p-6 sm:p-8 text-center relative overflow-hidden">
         {/* Decorative background glow */}
-        <div className="absolute -top-24 -left-24 w-48 h-48 bg-indigo-500/20 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute -bottom-24 -right-24 w-48 h-48 bg-emerald-500/20 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute -top-24 -left-24 w-48 h-48 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute -bottom-24 -right-24 w-48 h-48 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
 
         {/* Lock Icon and Header */}
         <div className="relative z-10 space-y-4">
-          <div className="w-16 h-16 bg-gradient-to-tr from-indigo-600 to-emerald-500 rounded-2xl mx-auto flex items-center justify-center shadow-lg shadow-indigo-500/30">
+          <div className="w-16 h-16 bg-gradient-to-tr from-indigo-600 to-emerald-600 rounded-2xl mx-auto flex items-center justify-center shadow-lg shadow-indigo-500/20">
             <Lock className="w-8 h-8 text-white" />
           </div>
 
           <div>
-            <h1 className="text-xl sm:text-2xl font-black tracking-tight text-white">
-              {schoolProfile.schoolName || 'Kakatiya School'}
+            <h1 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900 dark:text-white">
+              Financial Analytics & Fee Health
             </h1>
-            <p className="text-xs text-slate-400 mt-1 font-medium">
-              School Fee Collection System & Financial Ledger
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 font-medium">
+              Protected Area • Enter 4-digit PIN to access executive analytics
             </p>
           </div>
 
-          <div className="bg-slate-900/60 border border-slate-700/60 rounded-xl p-4 my-4">
-            <div className="flex items-center justify-center gap-1.5 text-xs text-slate-300 font-semibold mb-3">
-              <KeyRound className="w-4 h-4 text-emerald-400" />
-              <span>Enter Security Passcode to Access</span>
+          <div className="bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 rounded-xl p-4 my-4">
+            <div className="flex items-center justify-center gap-1.5 text-xs text-slate-600 dark:text-slate-300 font-semibold mb-3">
+              <KeyRound className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+              <span>Enter Security Passcode</span>
             </div>
 
             {/* 4-digit PIN Inputs */}
@@ -173,14 +174,14 @@ export const PasscodeGate: React.FC<PasscodeGateProps> = ({ schoolProfile, child
                   onChange={(e) => handleDigitChange(idx, e.target.value)}
                   onKeyDown={(e) => handleKeyDown(idx, e)}
                   onPaste={idx === 0 ? handlePaste : undefined}
-                  className="w-12 h-14 text-center text-2xl font-black bg-slate-800 border-2 border-slate-600 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 rounded-xl text-white outline-none transition-all"
+                  className="w-12 h-14 text-center text-2xl font-black bg-white dark:bg-slate-800 border-2 border-slate-300 dark:border-slate-600 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 rounded-xl text-slate-900 dark:text-white outline-none transition-all shadow-inner"
                   autoComplete="off"
                 />
               ))}
             </div>
 
             {error && (
-              <div className="flex items-center justify-center gap-1.5 text-xs text-rose-400 mt-3 font-semibold">
+              <div className="flex items-center justify-center gap-1.5 text-xs text-rose-600 dark:text-rose-400 mt-3 font-semibold">
                 <AlertCircle className="w-3.5 h-3.5 shrink-0" />
                 <span>{error}</span>
               </div>
@@ -194,7 +195,7 @@ export const PasscodeGate: React.FC<PasscodeGateProps> = ({ schoolProfile, child
                 key={num}
                 type="button"
                 onClick={() => handleNumpadClick(num)}
-                className="h-11 bg-slate-700/60 hover:bg-slate-700 active:bg-slate-600 border border-slate-600/50 rounded-xl text-lg font-bold text-white transition-all cursor-pointer shadow-xs"
+                className="h-11 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 dark:active:bg-slate-600 border border-slate-200 dark:border-slate-700 rounded-xl text-lg font-bold text-slate-800 dark:text-white transition-all cursor-pointer shadow-xs"
               >
                 {num}
               </button>
@@ -202,36 +203,49 @@ export const PasscodeGate: React.FC<PasscodeGateProps> = ({ schoolProfile, child
             <button
               type="button"
               onClick={() => setDigits(['', '', '', ''])}
-              className="h-11 bg-slate-700/30 hover:bg-slate-700/50 border border-slate-600/40 rounded-xl text-xs font-bold text-slate-400 transition-all cursor-pointer"
+              className="h-11 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800/40 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700/60 rounded-xl text-xs font-bold text-slate-500 dark:text-slate-400 transition-all cursor-pointer"
             >
               Clear
             </button>
             <button
               type="button"
               onClick={() => handleNumpadClick('0')}
-              className="h-11 bg-slate-700/60 hover:bg-slate-700 active:bg-slate-600 border border-slate-600/50 rounded-xl text-lg font-bold text-white transition-all cursor-pointer shadow-xs"
+              className="h-11 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 dark:active:bg-slate-600 border border-slate-200 dark:border-slate-700 rounded-xl text-lg font-bold text-slate-800 dark:text-white transition-all cursor-pointer shadow-xs"
             >
               0
             </button>
             <button
               type="button"
               onClick={handleNumpadBackspace}
-              className="h-11 bg-slate-700/30 hover:bg-slate-700/50 border border-slate-600/40 rounded-xl text-xs font-bold text-slate-300 transition-all cursor-pointer"
+              className="h-11 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800/40 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700/60 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300 transition-all cursor-pointer"
             >
               ⌫
             </button>
           </div>
 
-          {/* Unlock button */}
-          <button
-            type="button"
-            onClick={() => verifyPasscode(digits.join(''))}
-            className="w-full py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-emerald-900/30 transition-all cursor-pointer"
-          >
-            <ShieldCheck className="w-5 h-5" />
-            <span>Unlock Dashboard</span>
-            <ArrowRight className="w-4 h-4 ml-1" />
-          </button>
+          {/* Action buttons */}
+          <div className="space-y-2 pt-2">
+            <button
+              type="button"
+              onClick={() => verifyPasscode(digits.join(''))}
+              className="w-full py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-emerald-900/20 transition-all cursor-pointer"
+            >
+              <ShieldCheck className="w-5 h-5" />
+              <span>Unlock Financial Analytics</span>
+              <ArrowRight className="w-4 h-4 ml-1" />
+            </button>
+
+            {onBackToLedger && (
+              <button
+                type="button"
+                onClick={onBackToLedger}
+                className="w-full py-2.5 text-xs font-bold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                <span>Return to Student Ledger</span>
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </div>

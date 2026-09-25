@@ -3,10 +3,13 @@ import {
   ActionTier,
   PaymentTransaction,
   SchoolProfile,
+  StatusCategory,
   Student,
   StudentFinancialSummary,
+  ToleranceConfig,
 } from '../types';
 import { formatCurrency, formatDate, getNextMultipleOfFiveDate } from '../utils/numberToWords';
+import { getInstallmentDisplayName } from '../utils/installmentFormatter';
 import { getStatusCategoryMeta } from '../utils/statusResolver';
 import { getClassSortIndex } from '../utils/classOrder';
 import { lookupStandardClassFee } from '../data/trialSpreadsheetData';
@@ -25,6 +28,7 @@ import {
   EyeOff,
   FileSpreadsheet,
   Flame,
+  Info,
   MessageCircle,
   MoreHorizontal,
   Printer,
@@ -49,12 +53,13 @@ export interface ColumnVisibilityState {
   netPayable: boolean;
   totalPaid: boolean;
   totalDue: boolean;
+  payableTillDate: boolean;
   dueTillDate: boolean;
   feeHealth: boolean;
   actions: boolean;
 }
 
-const STORAGE_KEY = 'school_fee_column_prefs_v6';
+const STORAGE_KEY = 'school_fee_column_prefs_v7';
 
 const DEFAULT_COLUMNS: ColumnVisibilityState = {
   sno: true,
@@ -68,6 +73,7 @@ const DEFAULT_COLUMNS: ColumnVisibilityState = {
   netPayable: true,
   totalPaid: true,
   totalDue: true,
+  payableTillDate: true,
   dueTillDate: true,
   feeHealth: true,
   actions: true,
@@ -85,6 +91,7 @@ const COLUMN_LABELS: Record<keyof ColumnVisibilityState, string> = {
   netPayable: 'Net Payable',
   totalPaid: 'Total Paid',
   totalDue: 'Total Due',
+  payableTillDate: 'Payable till date',
   dueTillDate: 'Due till date',
   feeHealth: 'Fee Health & Action',
   actions: 'Actions',
@@ -102,6 +109,7 @@ export type SortField =
   | 'netPayable'
   | 'totalPaid'
   | 'totalDue'
+  | 'payableTillDate'
   | 'dueTillDate'
   | 'feeHealth';
 
@@ -109,6 +117,8 @@ interface MasterStudentTableProps {
   summaries: StudentFinancialSummary[];
   schoolProfile: SchoolProfile;
   classList?: string[];
+  tolerance?: ToleranceConfig;
+  asOfDate?: string;
   onOpenCollectModal: (student: Student, initialFeeType?: 'ALL' | 'BOOKS' | 'DRESS') => void;
   onOpenPermissionModal: (student: Student) => void;
   onOpenLedgerModal: (student: Student) => void;
@@ -258,10 +268,84 @@ export function getStudentFeeBreakdown(item: StudentFinancialSummary) {
   };
 }
 
+export type AcademicMonth =
+  | 'ALL'
+  | 'JUNE'
+  | 'JULY'
+  | 'AUGUST'
+  | 'SEPTEMBER'
+  | 'OCTOBER'
+  | 'NOVEMBER'
+  | 'DECEMBER'
+  | 'JANUARY'
+  | 'FEBRUARY'
+  | 'MARCH';
+
+export interface AcademicMonthInfo {
+  key: AcademicMonth;
+  label: string;
+  shortLabel: string;
+  monthIndex: number;
+}
+
+export const ACADEMIC_MONTHS: AcademicMonthInfo[] = [
+  { key: 'JUNE', label: 'June 2026', shortLabel: 'June', monthIndex: 6 },
+  { key: 'JULY', label: 'July 2026', shortLabel: 'July', monthIndex: 7 },
+  { key: 'AUGUST', label: 'August 2026', shortLabel: 'August', monthIndex: 8 },
+  { key: 'SEPTEMBER', label: 'September 2026', shortLabel: 'September', monthIndex: 9 },
+  { key: 'OCTOBER', label: 'October 2026', shortLabel: 'October', monthIndex: 10 },
+  { key: 'NOVEMBER', label: 'November 2026', shortLabel: 'November', monthIndex: 11 },
+  { key: 'DECEMBER', label: 'December 2026', shortLabel: 'December', monthIndex: 12 },
+  { key: 'JANUARY', label: 'January 2027', shortLabel: 'January', monthIndex: 1 },
+  { key: 'FEBRUARY', label: 'February 2027', shortLabel: 'February', monthIndex: 2 },
+  { key: 'MARCH', label: 'March 2027', shortLabel: 'March', monthIndex: 3 },
+];
+
+export function getStudentMonthDue(item: StudentFinancialSummary, monthKey: AcademicMonth): {
+  hasDue: boolean;
+  dueAmount: number;
+  monthName: string;
+} {
+  if (monthKey === 'ALL') {
+    return {
+      hasDue: item.totalDue > 0,
+      dueAmount: Math.max(0, item.totalDue),
+      monthName: 'All Months',
+    };
+  }
+
+  const monthInfo = ACADEMIC_MONTHS.find((m) => m.key === monthKey);
+  if (!monthInfo) {
+    return { hasDue: false, dueAmount: 0, monthName: '' };
+  }
+
+  // Check installments scheduled in this specific calendar month
+  const matchingInstallments = (item.installments || []).filter((inst) => {
+    if (!inst.dueDate) return false;
+    const parts = inst.dueDate.split('-');
+    if (parts.length < 2) return false;
+    const m = parseInt(parts[1], 10);
+    return m === monthInfo.monthIndex;
+  });
+
+  const installmentDue = matchingInstallments.reduce(
+    (sum, inst) => sum + (inst.balanceAmount > 0 ? inst.balanceAmount : 0),
+    0
+  );
+
+  return {
+    hasDue: installmentDue > 0,
+    dueAmount: installmentDue,
+    monthName: monthInfo.label,
+  };
+}
+
 export const MasterStudentTable: React.FC<MasterStudentTableProps> = ({
   summaries,
   schoolProfile,
   classList = [],
+  tolerance,
+  asOfDate,
   onOpenCollectModal,
   onOpenPermissionModal,
   onOpenLedgerModal,
@@ -272,8 +356,12 @@ export const MasterStudentTable: React.FC<MasterStudentTableProps> = ({
   onUpdateActionStatus,
 }) => {
   const currencySymbol = schoolProfile?.currencySymbol || '₹';
+  const todayDateStr = asOfDate || new Date().toISOString().split('T')[0];
   const [searchQuery, setSearchQuery] = useState('');
-  const [category1Filter, setCategory1Filter] = useState<'ALL' | 'BOOKS' | 'DRESS' | 'BOTH' | 'NONE'>('ALL');
+  const [selectedTier, setSelectedTier] = useState<ActionTier | 'ALL'>('ALL');
+  const [selectedStatus, setSelectedStatus] = useState<StatusCategory | 'ALL'>('ALL');
+  const [selectedDueMonth, setSelectedDueMonth] = useState<AcademicMonth>('ALL');
+  const [isExclusiveMonthDue, setIsExclusiveMonthDue] = useState<boolean>(false);
   const [activeStatusDropdownId, setActiveStatusDropdownId] = useState<string | null>(null);
   const [selectedStudentToEdit, setSelectedStudentToEdit] = useState<Student | null>(null);
   const [selectedStatusDate, setSelectedStatusDate] = useState<string>(() =>
@@ -281,10 +369,31 @@ export const MasterStudentTable: React.FC<MasterStudentTableProps> = ({
   );
   const [sortBy, setSortBy] = useState<SortField>('dueTillDate');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
-  const [pageSize, setPageSize] = useState<number>(0); // 0 = All rows
+  const pageSize = 0; // Continuous full view without clumsy rows dropdown
   const [currentPage, setCurrentPage] = useState<number>(1);
-  const [isHeadwiseMode, setIsHeadwiseMode] = useState<boolean>(false);
   const [showColumnMenu, setShowColumnMenu] = useState<boolean>(false);
+
+  // Precomputed Workflow Tier counts
+  const tierCounts = useMemo(() => {
+    return {
+      all: summaries.length,
+      idCard: summaries.filter((s) => s.actionTier === 'ID_CARD').length,
+      permission: summaries.filter((s) => s.actionTier === 'PERMISSION_SLIP').length,
+      action: summaries.filter((s) => s.actionTier === 'ACTION_REQUIRED').length,
+    };
+  }, [summaries]);
+
+  // Precomputed Status counts
+  const statusCounts = useMemo(() => {
+    return {
+      all: summaries.length,
+      strongGreen: summaries.filter((s) => s.statusCategory === 'STRONG_GREEN').length,
+      lightGreen: summaries.filter((s) => s.statusCategory === 'LIGHT_GREEN').length,
+      lightYellow: summaries.filter((s) => s.statusCategory === 'LIGHT_YELLOW').length,
+      lightRed: summaries.filter((s) => s.statusCategory === 'LIGHT_RED').length,
+      strongRed: summaries.filter((s) => s.statusCategory === 'STRONG_RED').length,
+    };
+  }, [summaries]);
 
   // Persistent column visibility
   const [columns, setColumns] = useState<ColumnVisibilityState>(() => {
@@ -350,6 +459,7 @@ export const MasterStudentTable: React.FC<MasterStudentTableProps> = ({
       netPayable: true,
       totalPaid: true,
       totalDue: true,
+      payableTillDate: true,
       dueTillDate: true,
       feeHealth: true,
       actions: true,
@@ -362,20 +472,38 @@ export const MasterStudentTable: React.FC<MasterStudentTableProps> = ({
     }
   };
 
-  // Filter students based on search query and category1 filter
+  // Filter students based on search query, status, workflow tier, and monthwise due (with exclusive toggle)
   const filteredSummaries = useMemo(() => {
     const q = searchQuery.toLowerCase().trim();
 
     return summaries.filter((item) => {
       const student = item.student;
 
-      // Category 1 filter
-      if (category1Filter !== 'ALL') {
-        const cat = getCategory1Status(item);
-        if (category1Filter === 'BOOKS' && cat !== 'BOOKS') return false;
-        if (category1Filter === 'DRESS' && cat !== 'DRESS') return false;
-        if (category1Filter === 'BOTH' && cat !== 'BOTH') return false;
-        if (category1Filter === 'NONE' && cat !== 'NONE') return false;
+      // Workflow Tier filter (ID Card / Permission Slip / Action Required)
+      if (selectedTier !== 'ALL' && item.actionTier !== selectedTier) {
+        return false;
+      }
+
+      // Status Category filter (Cleared / Within Tolerance / Deficit / Unpaid)
+      if (selectedStatus !== 'ALL' && item.statusCategory !== selectedStatus) {
+        return false;
+      }
+
+      // Monthwise Due filter (June to March)
+      if (selectedDueMonth !== 'ALL') {
+        const monthDue = getStudentMonthDue(item, selectedDueMonth);
+        if (!monthDue.hasDue) return false;
+
+        // When Exclusive toggle is enabled:
+        // Exclude student if they have any outstanding dues in prior academic months!
+        if (isExclusiveMonthDue) {
+          const currentMonthIdx = ACADEMIC_MONTHS.findIndex((m) => m.key === selectedDueMonth);
+          if (currentMonthIdx > 0) {
+            const priorMonths = ACADEMIC_MONTHS.slice(0, currentMonthIdx);
+            const hasPriorDue = priorMonths.some((pm) => getStudentMonthDue(item, pm.key).hasDue);
+            if (hasPriorDue) return false;
+          }
+        }
       }
 
       if (!q) return true;
@@ -431,7 +559,59 @@ export const MasterStudentTable: React.FC<MasterStudentTableProps> = ({
 
       return false;
     });
-  }, [summaries, searchQuery, category1Filter]);
+  }, [summaries, searchQuery, selectedTier, selectedStatus, selectedDueMonth, isExclusiveMonthDue]);
+
+  // Precomputed counts of students due per month (June to March) with total and exclusive bifurcation
+  const monthDueCounts = useMemo(() => {
+    const counts: Record<AcademicMonth, { total: number; exclusive: number }> = {
+      ALL: {
+        total: summaries.filter((s) => s.totalDue > 0).length,
+        exclusive: summaries.filter((s) => s.totalDue > 0).length,
+      },
+      JUNE: { total: 0, exclusive: 0 },
+      JULY: { total: 0, exclusive: 0 },
+      AUGUST: { total: 0, exclusive: 0 },
+      SEPTEMBER: { total: 0, exclusive: 0 },
+      OCTOBER: { total: 0, exclusive: 0 },
+      NOVEMBER: { total: 0, exclusive: 0 },
+      DECEMBER: { total: 0, exclusive: 0 },
+      JANUARY: { total: 0, exclusive: 0 },
+      FEBRUARY: { total: 0, exclusive: 0 },
+      MARCH: { total: 0, exclusive: 0 },
+    };
+
+    ACADEMIC_MONTHS.forEach((m, idx) => {
+      const priorMonths = ACADEMIC_MONTHS.slice(0, idx);
+      let total = 0;
+      let exclusive = 0;
+
+      summaries.forEach((s) => {
+        const res = getStudentMonthDue(s, m.key);
+        if (res.hasDue) {
+          total++;
+          const hasPrior = priorMonths.some((pm) => getStudentMonthDue(s, pm.key).hasDue);
+          if (!hasPrior) {
+            exclusive++;
+          }
+        }
+      });
+
+      counts[m.key] = { total, exclusive };
+    });
+
+    return counts;
+  }, [summaries]);
+
+  // Total amount due in the selected month across filtered students
+  const totalMonthDueAmount = useMemo(() => {
+    if (selectedDueMonth === 'ALL') {
+      return filteredSummaries.reduce((sum, s) => sum + (s.totalDue > 0 ? s.totalDue : 0), 0);
+    }
+    return filteredSummaries.reduce((sum, s) => {
+      const res = getStudentMonthDue(s, selectedDueMonth);
+      return sum + res.dueAmount;
+    }, 0);
+  }, [filteredSummaries, selectedDueMonth]);
 
   // Sort summaries on any column
   const sortedSummaries = useMemo(() => {
@@ -479,6 +659,9 @@ export const MasterStudentTable: React.FC<MasterStudentTableProps> = ({
         case 'totalDue':
           diff = a.totalDue - b.totalDue;
           break;
+        case 'payableTillDate':
+          diff = (a.expectedTillDate || 0) - (b.expectedTillDate || 0);
+          break;
         case 'dueTillDate':
           diff = a.dueTillDate - b.dueTillDate;
           break;
@@ -523,6 +706,7 @@ export const MasterStudentTable: React.FC<MasterStudentTableProps> = ({
         acc.netPayable += curr.totalPayable || bk.netPayable || 0;
         acc.totalPaid += curr.totalPaid || 0;
         acc.totalDue += curr.totalDue || 0;
+        acc.payableTillDate += curr.expectedTillDate || 0;
         acc.dueTillDate += curr.dueTillDate || 0;
         return acc;
       },
@@ -535,69 +719,10 @@ export const MasterStudentTable: React.FC<MasterStudentTableProps> = ({
         netPayable: 0,
         totalPaid: 0,
         totalDue: 0,
+        payableTillDate: 0,
         dueTillDate: 0,
       }
     );
-  }, [filteredSummaries]);
-
-  // Headwise breakdown stats across filtered students
-  const headwiseStats = useMemo(() => {
-    const map = new Map<
-      string,
-      {
-        headName: string;
-        studentsCount: number;
-        totalCommitted: number;
-        totalConcession: number;
-        totalPaid: number;
-        totalDue: number;
-      }
-    >();
-
-    filteredSummaries.forEach((item) => {
-      if (item.structures && item.structures.length > 0) {
-        item.structures.forEach((st) => {
-          const head = st.headName || 'School Tuition Fee';
-          const entry = map.get(head) || {
-            headName: head,
-            studentsCount: 0,
-            totalCommitted: 0,
-            totalConcession: 0,
-            totalPaid: 0,
-            totalDue: 0,
-          };
-          entry.studentsCount += 1;
-          entry.totalCommitted += st.committedFee || 0;
-          entry.totalConcession += st.concession || 0;
-
-          const headIns = (item.installments || []).filter((ins) => ins.headName === head);
-          const headPaid = headIns.reduce((sum, ins) => sum + (ins.paidAmount || 0), 0);
-          const headDue = Math.max(0, (st.committedFee || 0) - headPaid);
-
-          entry.totalPaid += headPaid;
-          entry.totalDue += headDue;
-          map.set(head, entry);
-        });
-      } else {
-        const head = 'School Tuition Fee';
-        const entry = map.get(head) || {
-          headName: head,
-          studentsCount: 0,
-          totalCommitted: 0,
-          totalConcession: 0,
-          totalPaid: 0,
-          totalDue: 0,
-        };
-        entry.studentsCount += 1;
-        entry.totalCommitted += item.committedFees || 0;
-        entry.totalConcession += item.concession || 0;
-        entry.totalPaid += item.totalPaid || 0;
-        entry.totalDue += item.totalDue || 0;
-        map.set(head, entry);
-      }
-    });
-
-    return Array.from(map.values()).sort((a, b) => b.totalCommitted - a.totalCommitted);
   }, [filteredSummaries]);
 
   const handleSort = (field: SortField) => {
@@ -639,10 +764,11 @@ export const MasterStudentTable: React.FC<MasterStudentTableProps> = ({
       className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xs overflow-hidden flex flex-col transition-colors"
     >
       {/* Table Top Toolbar */}
-      <div className="p-3 border-b border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-2.5 bg-slate-50/90 dark:bg-slate-900/90">
-        {/* Left: Search Box + Clean student count indicators */}
-        <div className="flex items-center gap-3 flex-1 min-w-[280px] max-w-xl">
-          <div className="relative w-full max-w-sm">
+      <div className="p-3 border-b border-slate-200 dark:border-slate-800 space-y-2.5 bg-slate-50/90 dark:bg-slate-900/90">
+        {/* Row 1: Search Box + Workflow Tiers + Column Visibility */}
+        <div className="flex flex-wrap items-center justify-between gap-2.5">
+          {/* Left: Search Box */}
+          <div className="relative w-full sm:w-72">
             <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               id="input-search-students"
@@ -663,274 +789,372 @@ export const MasterStudentTable: React.FC<MasterStudentTableProps> = ({
             )}
           </div>
 
-          {/* Student Status Counts Pill */}
-          <div className="flex items-center gap-1.5 text-xs text-slate-600 dark:text-slate-400 font-medium whitespace-nowrap">
-            <span className="px-2 py-0.5 rounded-md bg-slate-200/80 dark:bg-slate-800 text-slate-800 dark:text-slate-200 font-semibold">
-              Total: <strong>{filteredSummaries.length}</strong>
+          {/* Center: Workflow Tiers (ID Card / Permission Slip / Action Required) */}
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-[11px] font-black uppercase text-slate-500 tracking-wider mr-1">
+              Workflow Tiers:
             </span>
-            <span className="px-2 py-0.5 rounded-md bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 font-semibold">
-              Active: <strong>{totalActiveInFiltered}</strong>
-            </span>
-            {totalInactiveInFiltered > 0 && (
-              <span className="px-2 py-0.5 rounded-md bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-400 font-semibold">
-                Inactive: <strong>{totalInactiveInFiltered}</strong>
-              </span>
-            )}
+
+            <button
+              type="button"
+              onClick={() => setSelectedTier('ALL')}
+              className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                selectedTier === 'ALL'
+                  ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 shadow-xs'
+                  : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-100'
+              }`}
+            >
+              All ({tierCounts.all})
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setSelectedTier(selectedTier === 'ID_CARD' ? 'ALL' : 'ID_CARD')}
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                selectedTier === 'ID_CARD'
+                  ? 'bg-emerald-600 text-white shadow-xs'
+                  : 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100'
+              }`}
+            >
+              <Award className="w-3.5 h-3.5" />
+              <span>ID Card ({tierCounts.idCard})</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setSelectedTier(selectedTier === 'PERMISSION_SLIP' ? 'ALL' : 'PERMISSION_SLIP')}
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                selectedTier === 'PERMISSION_SLIP'
+                  ? 'bg-indigo-600 text-white shadow-xs'
+                  : 'bg-indigo-50 dark:bg-indigo-950/40 text-indigo-800 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100'
+              }`}
+            >
+              <CalendarClock className="w-3.5 h-3.5" />
+              <span>Permission Slip ({tierCounts.permission})</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setSelectedTier(selectedTier === 'ACTION_REQUIRED' ? 'ALL' : 'ACTION_REQUIRED')}
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                selectedTier === 'ACTION_REQUIRED'
+                  ? 'bg-rose-600 text-white shadow-xs'
+                  : 'bg-rose-50 dark:bg-rose-950/40 text-rose-800 dark:text-rose-300 border border-rose-200 dark:border-rose-800 hover:bg-rose-100'
+              }`}
+            >
+              <Flame className="w-3.5 h-3.5" />
+              <span>Action ({tierCounts.action})</span>
+            </button>
+          </div>
+
+          {/* Right: Column Visibility */}
+          <div className="flex items-center gap-2 shrink-0">
+            {/* Column Visibility Dropdown */}
+            <div className="relative" ref={columnMenuRef}>
+              <button
+                id="btn-toggle-columns-menu"
+                type="button"
+                onClick={() => setShowColumnMenu(!showColumnMenu)}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors cursor-pointer shadow-2xs"
+                title="Customize columns visibility"
+              >
+                <Eye className="w-3.5 h-3.5 text-slate-500" />
+                <span>Columns</span>
+                <span className="px-1.5 py-0.2 bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 rounded text-[9.5px] font-bold">
+                  {totalVisibleCols}/14
+                </span>
+                <ChevronDown className="w-3 h-3 text-slate-400" />
+              </button>
+
+              {showColumnMenu && (
+                <div className="absolute right-0 top-full mt-1.5 w-72 bg-white dark:bg-slate-850 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl z-40 p-3 text-xs text-slate-800 dark:text-slate-200 animate-fadeIn">
+                  <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-100 dark:border-slate-700">
+                    <div className="flex items-center gap-1.5">
+                      <Eye className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                      <span className="font-bold text-slate-900 dark:text-white">Column Visibility</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={handleSelectAllColumns}
+                        className="text-[10.5px] text-emerald-600 dark:text-emerald-400 hover:underline font-bold cursor-pointer"
+                      >
+                        All
+                      </button>
+                      <span className="text-slate-300">|</span>
+                      <button
+                        type="button"
+                        onClick={handleResetColumns}
+                        className="text-[10.5px] text-slate-500 hover:underline font-medium cursor-pointer"
+                      >
+                        Reset
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1 max-h-64 overflow-y-auto pr-1">
+                    {(Object.keys(COLUMN_LABELS) as (keyof ColumnVisibilityState)[]).map((colKey) => (
+                      <label
+                        key={colKey}
+                        className={`flex items-center justify-between px-2 py-1 rounded cursor-pointer select-none transition-colors ${
+                          columns[colKey]
+                            ? 'bg-slate-50 dark:bg-slate-800/60 font-medium'
+                            : 'hover:bg-slate-50 dark:hover:bg-slate-800/40 text-slate-400 dark:text-slate-500'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          {columns[colKey] ? (
+                            <Eye className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                          ) : (
+                            <EyeOff className="w-3.5 h-3.5 text-slate-400" />
+                          )}
+                          <span>{COLUMN_LABELS[colKey]}</span>
+                        </div>
+                        <input
+                          type="checkbox"
+                          checked={columns[colKey]}
+                          onChange={() => handleToggleColumn(colKey)}
+                          className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                        />
+                      </label>
+                    ))}
+                  </div>
+
+                  <div className="pt-2 mt-2 border-t border-slate-100 dark:border-slate-700 text-[10px] text-slate-400 dark:text-slate-500 flex items-center justify-between">
+                    <div className="flex items-center gap-1">
+                      <Check className="w-3 h-3 text-emerald-500" />
+                      <span>Saved automatically</span>
+                    </div>
+                    <span>{totalVisibleCols} visible</span>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
-        {/* Right: Column Visibility, Headwise Toggle & Page Size */}
-        <div className="flex items-center gap-2 shrink-0 flex-wrap">
-          {/* Column Visibility Dropdown */}
-          <div className="relative" ref={columnMenuRef}>
-            <button
-              id="btn-toggle-columns-menu"
-              type="button"
-              onClick={() => setShowColumnMenu(!showColumnMenu)}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors cursor-pointer shadow-2xs"
-              title="Customize columns visibility"
-            >
-              <Eye className="w-3.5 h-3.5 text-slate-500" />
-              <span>Columns</span>
-              <span className="px-1.5 py-0.2 bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 rounded text-[9.5px] font-bold">
-                {totalVisibleCols}/14
-              </span>
-              <ChevronDown className="w-3 h-3 text-slate-400" />
-            </button>
+        {/* Row 2: Status Breakdown Badges Filter */}
+        <div className="flex flex-wrap items-center gap-1.5 pt-1 border-t border-slate-200/60 dark:border-slate-800/60 text-xs">
+          <span className="text-[11px] font-black uppercase text-slate-500 tracking-wider mr-1">
+            Status Breakdown:
+          </span>
 
-            {showColumnMenu && (
-              <div className="absolute right-0 top-full mt-1.5 w-72 bg-white dark:bg-slate-850 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl z-40 p-3 text-xs text-slate-800 dark:text-slate-200 animate-fadeIn">
-                <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-100 dark:border-slate-700">
-                  <div className="flex items-center gap-1.5">
-                    <Eye className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                    <span className="font-bold text-slate-900 dark:text-white">Column Visibility</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={handleSelectAllColumns}
-                      className="text-[10.5px] text-emerald-600 dark:text-emerald-400 hover:underline font-bold cursor-pointer"
-                    >
-                      All
-                    </button>
-                    <span className="text-slate-300">|</span>
-                    <button
-                      type="button"
-                      onClick={handleResetColumns}
-                      className="text-[10.5px] text-slate-500 hover:underline font-medium cursor-pointer"
-                    >
-                      Reset
-                    </button>
-                  </div>
-                </div>
-
-                <div className="space-y-1 max-h-64 overflow-y-auto pr-1">
-                  {(Object.keys(COLUMN_LABELS) as (keyof ColumnVisibilityState)[]).map((colKey) => (
-                    <label
-                      key={colKey}
-                      className={`flex items-center justify-between px-2 py-1 rounded cursor-pointer select-none transition-colors ${
-                        columns[colKey]
-                          ? 'bg-slate-50 dark:bg-slate-800/60 font-medium'
-                          : 'hover:bg-slate-50 dark:hover:bg-slate-800/40 text-slate-400 dark:text-slate-500'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2">
-                        {columns[colKey] ? (
-                          <Eye className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                        ) : (
-                          <EyeOff className="w-3.5 h-3.5 text-slate-400" />
-                        )}
-                        <span>{COLUMN_LABELS[colKey]}</span>
-                      </div>
-                      <input
-                        type="checkbox"
-                        checked={columns[colKey]}
-                        onChange={() => handleToggleColumn(colKey)}
-                        className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
-                      />
-                    </label>
-                  ))}
-                </div>
-
-                <div className="pt-2 mt-2 border-t border-slate-100 dark:border-slate-700 text-[10px] text-slate-400 dark:text-slate-500 flex items-center justify-between">
-                  <div className="flex items-center gap-1">
-                    <Check className="w-3 h-3 text-emerald-500" />
-                    <span>Saved automatically</span>
-                  </div>
-                  <span>{totalVisibleCols} visible</span>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Books / Uniforms Purchase Filter */}
-          <div className="flex items-center gap-1 text-xs text-slate-600 dark:text-slate-400">
-            <span className="hidden sm:inline font-semibold">Filter Purchases:</span>
-            <select
-              id="select-category1-filter"
-              value={category1Filter}
-              onChange={(e) => {
-                setCategory1Filter(e.target.value as any);
-                setCurrentPage(1);
-              }}
-              className="bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-2 py-1 text-xs font-semibold text-slate-800 dark:text-slate-200 focus:outline-none cursor-pointer"
-              title="Filter students by Books / Dress purchase status"
-            >
-              <option value="ALL">All Students</option>
-              <option value="BOOKS">📚 Only Books Purchased</option>
-              <option value="DRESS">👗 Only Dress Purchased</option>
-              <option value="BOTH">📚👗 Both Books & Dress Purchased</option>
-              <option value="NONE">❌ Didn't Purchase Anything</option>
-            </select>
-          </div>
-
-          {/* Headwise Toggle Button */}
           <button
-            id="btn-toggle-headwise"
             type="button"
-            onClick={() => setIsHeadwiseMode(!isHeadwiseMode)}
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-bold transition-all cursor-pointer shadow-2xs ${
-              isHeadwiseMode
-                ? 'bg-indigo-600 text-white border-indigo-700 ring-2 ring-indigo-300 dark:ring-indigo-800'
-                : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700'
+            onClick={() => setSelectedStatus('ALL')}
+            className={`px-2 py-0.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+              selectedStatus === 'ALL'
+                ? 'bg-slate-800 text-white dark:bg-slate-200 dark:text-slate-900'
+                : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700 hover:bg-slate-100'
             }`}
-            title="Toggle Headwise fee breakdown statistics"
           >
-            <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-            <span>Headwise</span>
-            {isHeadwiseMode && (
-              <span className="w-1.5 h-1.5 rounded-full bg-amber-300 animate-ping" />
-            )}
+            All
           </button>
 
-          {/* Rows Per Page */}
-          <div className="flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400">
-            <span className="hidden sm:inline">Rows:</span>
-            <select
-              value={pageSize}
-              onChange={(e) => {
-                setPageSize(Number(e.target.value));
-                setCurrentPage(1);
-              }}
-              className="bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-2 py-1 text-xs font-semibold text-slate-800 dark:text-slate-200 focus:outline-none cursor-pointer"
-            >
-              <option value={15}>15</option>
-              <option value={25}>25</option>
-              <option value={50}>50</option>
-              <option value={100}>100</option>
-              <option value={0}>All ({filteredSummaries.length})</option>
-            </select>
-          </div>
+          {/* Cleared */}
+          <button
+            type="button"
+            onClick={() => setSelectedStatus(selectedStatus === 'STRONG_GREEN' ? 'ALL' : 'STRONG_GREEN')}
+            className={`px-2 py-0.5 rounded-lg text-[11px] font-semibold border flex items-center gap-1 transition-all cursor-pointer ${
+              selectedStatus === 'STRONG_GREEN'
+                ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
+                : 'bg-emerald-50 text-emerald-800 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800 hover:bg-emerald-100'
+            }`}
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            <span>Cleared (0 Due): <strong>{statusCounts.strongGreen}</strong></span>
+          </button>
+
+          {/* Within Tolerance / Due till {tolStr} */}
+          <button
+            type="button"
+            onClick={() => setSelectedStatus(selectedStatus === 'LIGHT_GREEN' ? 'ALL' : 'LIGHT_GREEN')}
+            className={`px-2 py-0.5 rounded-lg text-[11px] font-semibold border flex items-center gap-1 transition-all cursor-pointer ${
+              selectedStatus === 'LIGHT_GREEN'
+                ? 'bg-green-600 text-white border-green-600 shadow-xs'
+                : 'bg-green-50 text-green-800 border-green-200 dark:bg-green-950/40 dark:text-green-300 dark:border-green-800 hover:bg-green-100'
+            }`}
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
+            <span>
+              {getStatusCategoryMeta('LIGHT_GREEN', tolerance, currencySymbol).label}:{' '}
+              <strong>{statusCounts.lightGreen}</strong>
+            </span>
+          </button>
+
+          {/* Partial Deficit / Due more than {tolStr} */}
+          <button
+            type="button"
+            onClick={() => setSelectedStatus(selectedStatus === 'LIGHT_YELLOW' ? 'ALL' : 'LIGHT_YELLOW')}
+            className={`px-2 py-0.5 rounded-lg text-[11px] font-semibold border flex items-center gap-1 transition-all cursor-pointer ${
+              selectedStatus === 'LIGHT_YELLOW'
+                ? 'bg-amber-600 text-white border-amber-600 shadow-xs'
+                : 'bg-amber-50 text-amber-900 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800 hover:bg-amber-100'
+            }`}
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+            <span>
+              {getStatusCategoryMeta('LIGHT_YELLOW', tolerance, currencySymbol).label}:{' '}
+              <strong>{statusCounts.lightYellow}</strong>
+            </span>
+          </button>
+
+          {/* Zero Paid */}
+          <button
+            type="button"
+            onClick={() => setSelectedStatus(selectedStatus === 'LIGHT_RED' ? 'ALL' : 'LIGHT_RED')}
+            className={`px-2 py-0.5 rounded-lg text-[11px] font-semibold border flex items-center gap-1 transition-all cursor-pointer ${
+              selectedStatus === 'LIGHT_RED'
+                ? 'bg-rose-600 text-white border-rose-600 shadow-xs'
+                : 'bg-rose-50 text-rose-900 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800 hover:bg-rose-100'
+            }`}
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
+            <span>Zero Paid: <strong>{statusCounts.lightRed}</strong></span>
+          </button>
+
+          {/* Uncommitted Fee */}
+          <button
+            type="button"
+            onClick={() => setSelectedStatus(selectedStatus === 'STRONG_RED' ? 'ALL' : 'STRONG_RED')}
+            className={`px-2 py-0.5 rounded-lg text-[11px] font-semibold border flex items-center gap-1 transition-all cursor-pointer ${
+              selectedStatus === 'STRONG_RED'
+                ? 'bg-red-700 text-white border-red-700 shadow-xs'
+                : 'bg-red-50 text-red-900 border-red-200 dark:bg-red-950/40 dark:text-red-300 dark:border-red-800 hover:bg-red-100'
+            }`}
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-red-600"></span>
+            <span>Uncommitted Fee: <strong>{statusCounts.strongRed}</strong></span>
+          </button>
         </div>
       </div>
 
-      {/* Headwise Stats Breakdown Section */}
-      {isHeadwiseMode && (
-        <div className="p-3.5 bg-indigo-50/70 dark:bg-indigo-950/30 border-b border-indigo-200 dark:border-indigo-800/80 animate-in fade-in duration-200">
-          <div className="flex items-center justify-between mb-2.5">
-            <div className="flex items-center gap-2">
-              <div className="p-1.5 rounded-lg bg-indigo-600 text-white shadow-2xs">
-                <Sparkles className="w-4 h-4" />
-              </div>
-              <div>
-                <h3 className="text-xs font-bold text-indigo-950 dark:text-indigo-100 flex items-center gap-2">
-                  Headwise Fee Financial Breakdown
-                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-200/80 dark:bg-indigo-900 text-indigo-800 dark:text-indigo-200 font-bold">
-                    {headwiseStats.length} Fee Heads
-                  </span>
-                </h3>
-                <p className="text-[11px] text-indigo-700/80 dark:text-indigo-300/80">
-                  Head-by-head financial analysis across {filteredSummaries.length} filtered students
-                </p>
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={() => setIsHeadwiseMode(false)}
-              className="text-xs font-bold text-indigo-700 dark:text-indigo-300 hover:text-indigo-900 bg-white/80 dark:bg-slate-800 px-2.5 py-1 rounded-lg border border-indigo-200 dark:border-indigo-800 shadow-2xs cursor-pointer"
-            >
-              ✕ Close
-            </button>
-          </div>
+      {/* Dedicated Option Bar: June to March Quick Click with Exclusive Toggle */}
+      <div className="px-3 py-2 bg-slate-50 dark:bg-slate-850/80 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between gap-2 overflow-x-auto no-scrollbar">
+        <div className="flex items-center gap-1 sm:gap-1.5 shrink-0 flex-nowrap">
+          <span className="text-[11px] font-black uppercase tracking-wider text-slate-600 dark:text-slate-400 flex items-center gap-1 mr-1 shrink-0">
+            <CalendarClock className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400" />
+            <span>Monthwise Due:</span>
+          </span>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2.5">
-            {headwiseStats.map((head) => {
-              const collectionPct =
-                head.totalCommitted > 0
-                  ? Math.round((head.totalPaid / head.totalCommitted) * 100)
-                  : 100;
-              const isTuition =
-                head.headName.toLowerCase().includes('tuition') ||
-                head.headName.toLowerCase().includes('school');
-              const isTransport =
-                head.headName.toLowerCase().includes('transport') ||
-                head.headName.toLowerCase().includes('bus');
-              const isOldDue =
-                head.headName.toLowerCase().includes('old') ||
-                head.headName.toLowerCase().includes('due');
+          {/* Exclusive Toggle Switch */}
+          <button
+            type="button"
+            onClick={() => {
+              setIsExclusiveMonthDue(!isExclusiveMonthDue);
+              setCurrentPage(1);
+            }}
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap shrink-0 border ${
+              isExclusiveMonthDue
+                ? 'bg-purple-600 text-white border-purple-600 shadow-xs ring-2 ring-purple-300 dark:ring-purple-900'
+                : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-100'
+            }`}
+            title="Exclusive Toggle: When ON, shows students whose earliest pending dues are in that month (e.g. August shows 56/82: 56 exclusive to August without lingering prior July/June dues out of 82 total)"
+          >
+            <span>Exclusive</span>
+            <span
+              className={`w-2 h-2 rounded-full ${
+                isExclusiveMonthDue ? 'bg-amber-300 animate-pulse' : 'bg-slate-300 dark:bg-slate-600'
+              }`}
+            />
+          </button>
 
-              const icon = isTuition ? '🏫' : isTransport ? '🚌' : isOldDue ? '⏳' : '📚';
+          <button
+            type="button"
+            onClick={() => {
+              setSelectedDueMonth('ALL');
+              setCurrentPage(1);
+            }}
+            className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap shrink-0 ${
+              selectedDueMonth === 'ALL'
+                ? 'bg-emerald-600 text-white shadow-xs'
+                : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700'
+            }`}
+          >
+            All ({summaries.length})
+          </button>
 
-              return (
-                <div
-                  key={head.headName}
-                  className="bg-white dark:bg-slate-800/90 border border-indigo-100 dark:border-indigo-900/60 rounded-xl p-3 shadow-xs flex flex-col justify-between"
+          {ACADEMIC_MONTHS.map((m) => {
+            const counts = monthDueCounts[m.key];
+            const isSelected = selectedDueMonth === m.key;
+            const displayCount = isExclusiveMonthDue
+              ? `${counts.exclusive}/${counts.total}`
+              : `${counts.total}`;
+            const hasDues = counts.total > 0;
+
+            return (
+              <button
+                key={m.key}
+                type="button"
+                onClick={() => {
+                  setSelectedDueMonth(m.key);
+                  setCurrentPage(1);
+                }}
+                className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap shrink-0 ${
+                  isSelected
+                    ? 'bg-rose-600 text-white shadow-sm ring-2 ring-rose-300 dark:ring-rose-800'
+                    : hasDues
+                    ? 'bg-white dark:bg-slate-800 text-rose-700 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 border border-rose-200 dark:border-rose-900/40'
+                    : 'bg-white dark:bg-slate-800 text-slate-400 dark:text-slate-500 border border-slate-200 dark:border-slate-700 hover:bg-slate-50'
+                }`}
+                title={
+                  isExclusiveMonthDue
+                    ? `${m.label}: ${counts.exclusive} exclusive (${counts.exclusive}/${counts.total} total)`
+                    : `Click to show students with dues in ${m.label}`
+                }
+              >
+                <span>{m.shortLabel}</span>
+                <span
+                  className={`text-[9.5px] px-1 py-0.2 rounded-full font-mono font-bold ${
+                    isSelected
+                      ? 'bg-white/25 text-white'
+                      : hasDues
+                      ? 'bg-rose-100 dark:bg-rose-950 text-rose-800 dark:text-rose-300'
+                      : 'bg-slate-100 dark:bg-slate-700 text-slate-400'
+                  }`}
                 >
-                  <div>
-                    <div className="flex items-center justify-between gap-1 mb-1.5">
-                      <span className="font-bold text-xs text-slate-900 dark:text-white flex items-center gap-1.5 truncate">
-                        <span>{icon}</span>
-                        <span className="truncate">{head.headName}</span>
-                      </span>
-                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 shrink-0">
-                        {head.studentsCount} stds
-                      </span>
-                    </div>
+                  {displayCount}
+                </span>
+              </button>
+            );
+          })}
+        </div>
 
-                    <div className="grid grid-cols-3 gap-1 text-[11px] py-1 border-y border-slate-100 dark:border-slate-700/60 my-1 font-mono">
-                      <div>
-                        <span className="text-[9.5px] text-slate-400 block font-sans">Committed</span>
-                        <span className="font-bold text-slate-800 dark:text-slate-200">
-                          {formatCurrency(head.totalCommitted, currencySymbol)}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-[9.5px] text-emerald-600 dark:text-emerald-400 block font-sans">Collected</span>
-                        <span className="font-bold text-emerald-600 dark:text-emerald-400">
-                          {formatCurrency(head.totalPaid, currencySymbol)}
-                        </span>
-                      </div>
-                      <div className="text-right">
-                        <span className="text-[9.5px] text-rose-600 dark:text-rose-400 block font-sans">Due</span>
-                        <span className="font-bold text-rose-600 dark:text-rose-400">
-                          {formatCurrency(head.totalDue, currencySymbol)}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
+        {selectedDueMonth !== 'ALL' && (
+          <button
+            type="button"
+            onClick={() => {
+              setSelectedDueMonth('ALL');
+              setCurrentPage(1);
+            }}
+            className="text-xs text-rose-600 dark:text-rose-400 hover:underline font-bold shrink-0 flex items-center gap-1 cursor-pointer"
+          >
+            <span>✕ Clear Filter</span>
+          </button>
+        )}
+      </div>
 
-                  <div className="mt-2">
-                    <div className="flex items-center justify-between text-[10px] mb-1">
-                      <span className="text-slate-500 dark:text-slate-400">Collection Rate</span>
-                      <span className="font-bold text-slate-800 dark:text-slate-200">{collectionPct}%</span>
-                    </div>
-                    <div className="w-full bg-slate-100 dark:bg-slate-700 h-1.5 rounded-full overflow-hidden">
-                      <div
-                        className={`h-full rounded-full transition-all duration-300 ${
-                          collectionPct >= 80
-                            ? 'bg-emerald-500'
-                            : collectionPct >= 50
-                            ? 'bg-amber-500'
-                            : 'bg-rose-500'
-                        }`}
-                        style={{ width: `${Math.min(100, Math.max(0, collectionPct))}%` }}
-                      />
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
+      {/* Active Filter Notification: Showing ONLY those names */}
+      {selectedDueMonth !== 'ALL' && (
+        <div className="bg-rose-50/90 dark:bg-rose-950/50 border-b border-rose-200 dark:border-rose-900/60 p-2.5 px-4 flex items-center justify-between gap-3 text-xs">
+          <div className="flex items-center gap-2">
+            <span className="p-1 px-2 rounded bg-rose-600 text-white font-black text-[10px] uppercase">
+              {selectedDueMonth} DUE
+            </span>
+            <span className="font-bold text-rose-900 dark:text-rose-200">
+              Showing <strong>ONLY {filteredSummaries.length} student names</strong> with pending dues in <strong>{selectedDueMonth}</strong> (Total {selectedDueMonth} Dues: <strong>{formatCurrency(totalMonthDueAmount)}</strong>)
+            </span>
           </div>
+          <button
+            type="button"
+            onClick={() => {
+              setSelectedDueMonth('ALL');
+              setCurrentPage(1);
+            }}
+            className="px-2.5 py-1 bg-white dark:bg-slate-800 text-rose-700 dark:text-rose-300 rounded font-bold border border-rose-300 dark:border-rose-800 hover:bg-rose-100 text-[11px] cursor-pointer shadow-2xs"
+          >
+            Show All Students ({summaries.length})
+          </button>
         </div>
       )}
 
@@ -1093,6 +1317,20 @@ export const MasterStudentTable: React.FC<MasterStudentTableProps> = ({
                 </th>
               )}
 
+              {/* Payable till date */}
+              {columns.payableTillDate && (
+                <th
+                  className="py-2.5 px-3 text-right font-black cursor-pointer bg-sky-50/80 dark:bg-sky-950/40 text-sky-800 dark:text-sky-300 hover:bg-sky-100 dark:hover:bg-sky-950/60 transition-colors whitespace-nowrap"
+                  onClick={() => handleSort('payableTillDate')}
+                  title="Total scheduled installments payable till date (hover to see bifurcation)"
+                >
+                  <div className="flex items-center justify-end gap-1">
+                    <span>Payable till date</span>
+                    {renderSortIndicator('payableTillDate')}
+                  </div>
+                </th>
+              )}
+
               {/* 12. Due till date */}
               {columns.dueTillDate && (
                 <th
@@ -1131,16 +1369,30 @@ export const MasterStudentTable: React.FC<MasterStudentTableProps> = ({
               <tr>
                 <td colSpan={totalVisibleCols} className="py-12 text-center text-slate-400">
                   <div className="flex flex-col items-center justify-center gap-2">
-                    <Search className="w-8 h-8 text-slate-300 dark:text-slate-600" />
+                    {selectedDueMonth !== 'ALL' ? (
+                      <CalendarClock className="w-8 h-8 text-rose-400" />
+                    ) : (
+                      <Search className="w-8 h-8 text-slate-300 dark:text-slate-600" />
+                    )}
                     <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">
-                      No students match your filter criteria.
+                      {selectedDueMonth !== 'ALL'
+                        ? `No students have pending dues in ${selectedDueMonth}!`
+                        : 'No students match your filter criteria.'}
+                    </p>
+                    <p className="text-xs text-slate-500">
+                      {selectedDueMonth !== 'ALL'
+                        ? `All student installments for ${selectedDueMonth} are clear.`
+                        : 'Try adjusting your search query or filters.'}
                     </p>
                     <button
                       type="button"
-                      onClick={() => setSearchQuery('')}
+                      onClick={() => {
+                        setSelectedDueMonth('ALL');
+                        setSearchQuery('');
+                      }}
                       className="text-xs text-emerald-600 dark:text-emerald-400 hover:underline font-bold cursor-pointer"
                     >
-                      Clear search filter
+                      {selectedDueMonth !== 'ALL' ? 'Show All Students' : 'Clear search filter'}
                     </button>
                   </div>
                 </td>
@@ -1148,7 +1400,7 @@ export const MasterStudentTable: React.FC<MasterStudentTableProps> = ({
             ) : (
               paginatedSummaries.map((item, index) => {
                 const { student, statusCategory, actionTier } = item;
-                const statusMeta = getStatusCategoryMeta(statusCategory);
+                const statusMeta = getStatusCategoryMeta(statusCategory, tolerance, currencySymbol);
                 const latestTransaction = item.transactions[item.transactions.length - 1];
                 const serialNumber =
                   pageSize === 0 ? index + 1 : (currentPage - 1) * pageSize + index + 1;
@@ -1189,6 +1441,12 @@ export const MasterStudentTable: React.FC<MasterStudentTableProps> = ({
                             <span className="font-bold text-slate-900 dark:text-white text-xs group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
                               {student.name}
                             </span>
+                            {selectedDueMonth !== 'ALL' && (
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded bg-rose-100 dark:bg-rose-950/70 text-rose-800 dark:text-rose-300 font-black text-[10px] border border-rose-300/80">
+                                <CalendarClock className="w-2.5 h-2.5" />
+                                {selectedDueMonth} Due: {formatCurrency(getStudentMonthDue(item, selectedDueMonth).dueAmount, currencySymbol)}
+                              </span>
+                            )}
                             {bk.hasTransport && (
                               <span
                                 className="inline-flex items-center text-xs select-none"
@@ -1393,35 +1651,7 @@ export const MasterStudentTable: React.FC<MasterStudentTableProps> = ({
                             <FileSpreadsheet className="w-3.5 h-3.5" />
                           </button>
 
-                          {/* 2. Books Button */}
-                          <button
-                            id={`btn-collect-books-${student.id}`}
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onOpenCollectModal(student, 'BOOKS');
-                            }}
-                            className="p-1.5 rounded-md bg-amber-50 hover:bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300 border border-amber-200 dark:border-amber-800 transition-colors cursor-pointer"
-                            title="Collect Books Fee (📚)"
-                          >
-                            <BookOpen className="w-3.5 h-3.5" />
-                          </button>
-
-                          {/* 3. Dress / Uniform Button */}
-                          <button
-                            id={`btn-collect-dress-${student.id}`}
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onOpenCollectModal(student, 'DRESS');
-                            }}
-                            className="p-1.5 rounded-md bg-pink-50 hover:bg-pink-100 text-pink-800 dark:bg-pink-950/50 dark:text-pink-300 border border-pink-200 dark:border-pink-800 transition-colors cursor-pointer"
-                            title="Collect Uniform / Dress Fee (👗)"
-                          >
-                            <Shirt className="w-3.5 h-3.5" />
-                          </button>
-
-                          {/* 4. Action Status Button */}
+                          {/* 2. Action Status Button */}
                           {onUpdateActionStatus && (
                             <div className="relative status-dropdown-container">
                               <button
@@ -1598,12 +1828,39 @@ export const MasterStudentTable: React.FC<MasterStudentTableProps> = ({
                             <Printer className="w-3.5 h-3.5" />
                           </button>
 
-                          {/* 6. WhatsApp Message */}
+                          {/* 4. WhatsApp Message */}
                           {student.phone ? (
                             <a
                               id={`btn-whatsapp-${student.id}`}
                               href={`https://wa.me/91${student.phone.replace(/\D/g, '')}?text=${encodeURIComponent(
-                                `Dear Parent, reminder from ${schoolProfile.schoolName || schoolProfile.name || 'Kakatiya School'} regarding fee payment for ${student.name} of (Class ${student.className}). You total due till date ${new Date().toLocaleDateString('en-GB')} amount is ₹${item.dueTillDate.toLocaleString('en-IN')}. Thank you.`
+                                (() => {
+                                  const schoolName = 'Kakatiya School Boduppal';
+                                  const studentClassDisplay = student.className.startsWith('Class')
+                                    ? student.className
+                                    : `Class ${student.className}`;
+                                  const cutoffDate = asOfDate || new Date().toISOString().split('T')[0];
+                                  const [y, m, d] = cutoffDate.split('-');
+                                  const todayDateStr = `${d}/${m}/${y}`;
+
+                                  // Overdue installments with balance strictly due till date
+                                  const overdueInstallments = (item.installments || []).filter(
+                                    (ins) => ins.balanceAmount > 0 && ins.dueDate <= cutoffDate && ins.status !== 'paid'
+                                  );
+
+                                  // Group remaining balance by fee head
+                                  const headBalances: Record<string, number> = {};
+                                  overdueInstallments.forEach((ins) => {
+                                    headBalances[ins.headName] = (headBalances[ins.headName] || 0) + ins.balanceAmount;
+                                  });
+
+                                  const headEntries = Object.entries(headBalances);
+                                  const installmentClause =
+                                    headEntries.length > 0
+                                      ? ` (THIS IS TOWARD ${headEntries.map(([head, amt]) => `${head.toUpperCase()}: ₹${amt.toLocaleString('en-IN')}`).join(', ')})`
+                                      : '';
+
+                                  return `Dear Parent, reminder from ${schoolName} regarding fee payment for ${student.name} (${studentClassDisplay}). Your total due till date ${todayDateStr} amount is ₹${item.dueTillDate.toLocaleString('en-IN')}${installmentClause}. Thank you.`;
+                                })()
                               )}`}
                               target="_blank"
                               rel="noreferrer"

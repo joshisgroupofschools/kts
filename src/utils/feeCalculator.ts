@@ -219,8 +219,8 @@ export function computeStudentFinancials(
       concession: 0,
       otherFees: 0,
       totalPayable: 0,
-      totalPaid: 0,
-      totalDue: 0,
+      totalPaid: totalPaid,
+      totalDue: -totalPaid,
       dueTillDate: 0,
       expectedTillDate: 0,
       nextDueDate: null,
@@ -243,21 +243,11 @@ export function computeStudentFinancials(
   const concession = schoolFeeStructures.reduce((sum, s) => sum + s.concession, 0);
   const otherFees = otherFeeStructures.reduce((sum, s) => sum + s.committedFee, 0);
 
-  const totalPayable = committedFees + otherFees;
-
-  // Regular school ledger transactions (excluding dedicated spot Books and Dress purchases)
-  const regularTransactions = studentTransactions.filter((t) => {
-    const isBookOrDress = t.allocations.some((a) => {
-      const h = (a.headName || '').toLowerCase();
-      return h.includes('book') || h.includes('dress') || h.includes('uniform') || h.includes('stationery') || h.includes('kit');
-    }) || (t.remarks && (t.remarks.toLowerCase().includes('book') || t.remarks.toLowerCase().includes('dress') || t.remarks.toLowerCase().includes('uniform')));
-    return !isBookOrDress;
-  });
-
-  const regularPaid = regularTransactions.reduce((sum, t) => sum + t.amount, 0);
+  const totalPayable = studentStructures.reduce((sum, s) => sum + s.committedFee, 0);
+  const regularPaid = totalPaid;
 
   // If student is inactive: whatever paid shows, unpaid future dues disappear
-  let totalDue = Math.max(0, totalPayable - regularPaid);
+  let totalDue = totalPayable - regularPaid;
   if (!isActive) {
     totalDue = 0;
   }
@@ -281,12 +271,56 @@ export function computeStudentFinancials(
     dueTillDate = 0;
   }
 
-  // Find next upcoming due date (first installment with balance > 0 and dueDate >= asOfDate)
-  const upcomingInst = regularInstallments
-    .filter((inst) => inst.balanceAmount > 0 && inst.dueDate >= asOfDate)
-    .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime())[0];
+  // Find next upcoming due date and how much is due on that date
+  const unpaidRegularInstallments = regularInstallments.filter((inst) => inst.balanceAmount > 0);
+  let nextDueDate: string | null = null;
+  let nextInstallmentBalance = 0;
 
-  const nextDueDate = upcomingInst ? upcomingInst.dueDate : null;
+  if (unpaidRegularInstallments.length > 0) {
+    const upcoming = unpaidRegularInstallments
+      .filter((inst) => inst.dueDate >= asOfDate)
+      .sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+
+    if (upcoming.length > 0) {
+      nextDueDate = upcoming[0].dueDate;
+    } else {
+      const overdue = [...unpaidRegularInstallments].sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+      nextDueDate = overdue[0].dueDate;
+    }
+
+    if (nextDueDate) {
+      nextInstallmentBalance = unpaidRegularInstallments
+        .filter((inst) => inst.dueDate === nextDueDate)
+        .reduce((sum, inst) => sum + inst.balanceAmount, 0);
+    }
+  } else if (studentInstallments.some((inst) => inst.balanceAmount > 0)) {
+    const otherUnpaid = studentInstallments.filter((inst) => inst.balanceAmount > 0);
+    const upcoming = otherUnpaid
+      .filter((inst) => inst.dueDate >= asOfDate)
+      .sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+
+    if (upcoming.length > 0) {
+      nextDueDate = upcoming[0].dueDate;
+    } else {
+      const overdue = [...otherUnpaid].sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+      nextDueDate = overdue[0].dueDate;
+    }
+
+    if (nextDueDate) {
+      nextInstallmentBalance = otherUnpaid
+        .filter((inst) => inst.dueDate === nextDueDate)
+        .reduce((sum, inst) => sum + inst.balanceAmount, 0);
+    }
+  }
+
+  // If student has an outstanding total due > 0 but nextInstallmentBalance is still 0,
+  // ensure the next payment requirement reflects the pending balance
+  if (totalDue > 0 && nextInstallmentBalance === 0) {
+    nextInstallmentBalance = totalDue;
+    if (!nextDueDate) {
+      nextDueDate = asOfDate;
+    }
+  }
 
   return {
     actualFees,
@@ -299,6 +333,7 @@ export function computeStudentFinancials(
     dueTillDate,
     expectedTillDate,
     nextDueDate,
+    nextInstallmentBalance,
     hasUncommittedFee: false,
   };
 }
@@ -350,6 +385,7 @@ export function computeStudentFinancialSummary(
     statusCategory: statusResult.statusCategory,
     actionTier: statusResult.actionTier,
     nextDueDate: fin.nextDueDate,
+    nextInstallmentBalance: fin.nextInstallmentBalance,
     daysRemainingOnPermission: statusResult.daysRemainingOnPermission,
     isPermissionExpired: statusResult.isPermissionExpired,
     hasUncommittedFee: fin.hasUncommittedFee,

@@ -102,7 +102,23 @@ export function computeStudentStatus(
   };
 }
 
-export function getStatusCategoryMeta(category: StatusCategory) {
+export function getToleranceDisplayString(
+  tolerance?: ToleranceConfig,
+  currencySymbol: string = '₹'
+): string {
+  const symbol = currencySymbol || '₹';
+  if (!tolerance) return `${symbol}500`;
+  const val = tolerance.value !== undefined ? tolerance.value : 500;
+  return `${symbol}${val.toLocaleString('en-IN')}`;
+}
+
+export function getStatusCategoryMeta(
+  category: StatusCategory,
+  tolerance?: ToleranceConfig,
+  currencySymbol: string = '₹'
+) {
+  const tolStr = getToleranceDisplayString(tolerance, currencySymbol);
+
   switch (category) {
     case 'STRONG_GREEN':
       return {
@@ -114,7 +130,7 @@ export function getStatusCategoryMeta(category: StatusCategory) {
       };
     case 'LIGHT_GREEN':
       return {
-        label: 'Within Tolerance',
+        label: `Due till ${tolStr}`,
         bgClass: 'bg-green-50 text-green-700 border-green-200 dark:bg-green-950/30 dark:text-green-300 dark:border-green-800',
         badgeClass: 'bg-green-500 text-white',
         dotClass: 'bg-green-400',
@@ -122,7 +138,7 @@ export function getStatusCategoryMeta(category: StatusCategory) {
       };
     case 'LIGHT_YELLOW':
       return {
-        label: 'Partial Paid (Deficit)',
+        label: `Due more than ${tolStr}`,
         bgClass: 'bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-950/30 dark:text-amber-300 dark:border-amber-800',
         badgeClass: 'bg-amber-500 text-white',
         dotClass: 'bg-amber-400',
@@ -130,7 +146,7 @@ export function getStatusCategoryMeta(category: StatusCategory) {
       };
     case 'LIGHT_RED':
       return {
-        label: 'Committed (₹0 Paid)',
+        label: 'Zero Paid',
         bgClass: 'bg-rose-50 text-rose-800 border-rose-200 dark:bg-rose-950/30 dark:text-rose-300 dark:border-rose-800',
         badgeClass: 'bg-rose-500 text-white',
         dotClass: 'bg-rose-400',

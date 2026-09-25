@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
+  AppView,
   ClassFeeConfig,
+  DayCloseRecord,
   FeeHeadDefinition,
   Installment,
   PaymentAllocation,
@@ -20,11 +22,14 @@ import {
 } from './utils/feeCalculator';
 import { computeSystemAnalytics } from './utils/analyticsEngine';
 import { sortClassList, STANDARD_CLASS_ORDER } from './utils/classOrder';
+import { formatCurrency, formatDate } from './utils/numberToWords';
 import {
   DEFAULT_SCHOOL_PROFILE,
   DEFAULT_TOLERANCE,
   clearAllLocalData,
   exportDataAsJson,
+  getDailyCollectionTarget,
+  getDayCloseRecords,
   getGoogleScriptUrl,
   getSpreadsheetUrl,
   getStoredClassConfigs,
@@ -39,6 +44,8 @@ import {
   pushToGoogleSheets,
   restoreDataFromJson,
   saveClassConfigs,
+  saveDailyCollectionTarget,
+  saveDayCloseRecords,
   saveGoogleScriptUrl,
   saveInstallments,
   saveSchoolProfile,
@@ -63,9 +70,10 @@ import { SchoolSettingsModal } from './components/SchoolSettingsModal';
 import { HelpModal } from './components/HelpModal';
 import { BulkUploadModal } from './components/BulkUploadModal';
 import { TrialVerificationView } from './components/TrialVerificationView';
+import { TodaysReceiptsModal } from './components/TodaysReceiptsModal';
 import { PasscodeGate } from './components/PasscodeGate';
 import { generateStructuredRealData } from './data/trialSpreadsheetData';
-import { FileSpreadsheet, Sparkles, CheckCircle2 } from 'lucide-react';
+import { ArrowRight, CheckCircle2, Coins, FileSpreadsheet, Sparkles, Users } from 'lucide-react';
 
 export default function App() {
   // -------------------------------------------------------------
@@ -79,18 +87,22 @@ export default function App() {
   const [feeHeads, setFeeHeads] = useState<FeeHeadDefinition[]>(() => getStoredFeeHeads());
   const [tolerance, setTolerance] = useState<ToleranceConfig>(() => getStoredToleranceConfig());
   const [schoolProfile, setSchoolProfile] = useState<SchoolProfile>(() => getStoredSchoolProfile());
+  const [dailyTarget, setDailyTarget] = useState<number>(() => getDailyCollectionTarget());
+  const [dayCloseRecords, setDayCloseRecords] = useState<Record<string, DayCloseRecord>>(() => getDayCloseRecords());
 
-  // View state: default to DASHBOARD
-  const [currentView, setCurrentView] = useState<'DASHBOARD' | 'TRIAL_VERIFICATION'>(() => {
+  // View state: LEDGER, ANALYTICS, or TRIAL_VERIFICATION
+  const [currentView, setCurrentView] = useState<AppView>(() => {
     const saved = localStorage.getItem('sfc_current_view');
-    return saved === 'TRIAL_VERIFICATION' ? 'TRIAL_VERIFICATION' : 'DASHBOARD';
+    if (saved === 'ANALYTICS') return 'ANALYTICS';
+    if (saved === 'TRIAL_VERIFICATION') return 'TRIAL_VERIFICATION';
+    return 'LEDGER';
   });
   const [appliedSuccessToast, setAppliedSuccessToast] = useState(false);
   const [dismissedCrossCheckBanner, setDismissedCrossCheckBanner] = useState(() => {
     return localStorage.getItem('sfc_cross_check_dismissed') === 'true';
   });
 
-  const handleSetCurrentView = (view: 'DASHBOARD' | 'TRIAL_VERIFICATION') => {
+  const handleSetCurrentView = (view: AppView) => {
     setCurrentView(view);
     localStorage.setItem('sfc_current_view', view);
   };
@@ -148,6 +160,7 @@ export default function App() {
     | 'SCHOOL_SETTINGS'
     | 'HELP'
     | 'BULK_UPLOAD'
+    | 'TODAYS_RECEIPTS'
   >('NONE');
 
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
@@ -622,13 +635,91 @@ export default function App() {
     setAppliedSuccessToast(true);
     setDismissedCrossCheckBanner(true);
     localStorage.setItem('sfc_cross_check_dismissed', 'true');
-    handleSetCurrentView('DASHBOARD');
+    handleSetCurrentView('LEDGER');
     setTimeout(() => setAppliedSuccessToast(false), 8000);
   };
 
   const handleDismissCrossCheckBanner = () => {
     setDismissedCrossCheckBanner(true);
     localStorage.setItem('sfc_cross_check_dismissed', 'true');
+  };
+
+  const todaysStats = useMemo(() => {
+    const dayTxns = transactions.filter((tx) => !tx.isCancelled && tx.date.split(' ')[0] === asOfDate);
+    let total = 0;
+    let pendingSlips = 0;
+    dayTxns.forEach((tx) => {
+      total += tx.amount || 0;
+      const summary = studentSummaries[tx.studentId];
+      if (summary && summary.totalDue > 0 && !tx.permissionUpdated) {
+        pendingSlips++;
+      }
+    });
+    return {
+      count: dayTxns.length,
+      total,
+      pendingSlips,
+    };
+  }, [transactions, asOfDate, studentSummaries]);
+
+  const handleUpdateDailyTarget = (target: number) => {
+    setDailyTarget(target);
+    saveDailyCollectionTarget(target);
+  };
+
+  const handleCloseDay = (record: DayCloseRecord) => {
+    const updated = { ...dayCloseRecords, [record.date]: record };
+    setDayCloseRecords(updated);
+    saveDayCloseRecords(updated);
+  };
+
+  const handleReopenDay = (date: string) => {
+    const updated = { ...dayCloseRecords };
+    delete updated[date];
+    setDayCloseRecords(updated);
+    saveDayCloseRecords(updated);
+  };
+
+  const handleUpdateTransactionSlip = (
+    txId: string,
+    slipGiven: boolean,
+    permissionDate?: string
+  ) => {
+    let updatedStudentId: string | null = null;
+    const updatedTransactions = transactions.map((tx) => {
+      if (tx.id === txId) {
+        updatedStudentId = tx.studentId;
+        return {
+          ...tx,
+          slipGiven,
+          permissionDate,
+          permissionUpdated: true,
+        };
+      }
+      return tx;
+    });
+
+    setTransactions(updatedTransactions);
+    saveTransactions(updatedTransactions);
+
+    if (updatedStudentId && permissionDate) {
+      setStudents((prev) =>
+        prev.map((s) => {
+          if (s.id === updatedStudentId) {
+            return {
+              ...s,
+              manualCategoryOverride: slipGiven ? 'permission' : s.manualCategoryOverride,
+              permissionExpiresAt: permissionDate,
+              permissionReason: slipGiven
+                ? `Permission slip issued till ${formatDate(permissionDate)}`
+                : s.permissionReason,
+              updatedAt: new Date().toISOString(),
+            };
+          }
+          return s;
+        })
+      );
+    }
   };
 
   return (
@@ -655,7 +746,9 @@ export default function App() {
         theme={theme}
         onToggleTheme={() => setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'))}
         activeView={currentView}
-        onToggleView={(v) => setCurrentView(v)}
+        onToggleView={(v) => handleSetCurrentView(v)}
+        onOpenTodaysReceipts={() => setActiveModal('TODAYS_RECEIPTS')}
+        todaysStats={todaysStats}
       />
 
       {/* Main Workspace Container */}
@@ -666,7 +759,7 @@ export default function App() {
             <div className="flex items-center gap-2 text-xs sm:text-sm font-bold">
               <CheckCircle2 className="w-5 h-5 text-white shrink-0" />
               <span>
-                Real spreadsheet data successfully activated in live app! (228 Students across 3 structured heads).
+                Version 2.0 September master data successfully activated! (229 Students • ₹64,48,344 Committed • ₹21,98,847 Collections Realized).
               </span>
             </div>
             <button
@@ -680,7 +773,7 @@ export default function App() {
         )}
 
         {/* Top Trial Alert Banner on Dashboard (only if not dismissed) */}
-        {currentView === 'DASHBOARD' && !dismissedCrossCheckBanner && (
+        {currentView !== 'TRIAL_VERIFICATION' && !dismissedCrossCheckBanner && (
           <div className="bg-gradient-to-r from-indigo-50 to-blue-50 dark:from-indigo-950/60 dark:to-blue-950/60 p-3.5 rounded-xl border border-indigo-200 dark:border-indigo-800 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
             <div className="flex items-center gap-2.5">
               <div className="p-2 rounded-lg bg-indigo-600 text-white shrink-0">
@@ -688,10 +781,10 @@ export default function App() {
               </div>
               <div>
                 <span className="font-bold text-indigo-900 dark:text-indigo-200 block">
-                  Spreadsheet Data Cross-Check Room Available
+                  September Master Data Cross-Check Room Available
                 </span>
                 <span className="text-slate-600 dark:text-slate-400 text-[11px]">
-                  228 student records, School (Jul 10-Jan 10), Transport (Jun 10-Mar 10), Old Due (Sep 10-Mar 10).
+                  229 student records, School (₹56.49L), Transport (₹4.05L), Old Due (₹3.83L), Books (₹10.2K).
                 </span>
               </div>
             </div>
@@ -716,34 +809,35 @@ export default function App() {
           </div>
         )}
 
-        {/* View Switch */}
+        {/* View Switch: Cross-Check Room, Dedicated Financial Analytics Page, or Master Student Ledger */}
         {currentView === 'TRIAL_VERIFICATION' ? (
           <TrialVerificationView
             schoolProfile={safeSchoolProfile}
             onApplyRealData={handleApplyRealSpreadsheetData}
-            onBackToApp={() => handleSetCurrentView('DASHBOARD')}
+            onBackToApp={() => handleSetCurrentView('LEDGER')}
+          />
+        ) : currentView === 'ANALYTICS' ? (
+          <FinancialDashboard
+            analytics={analytics}
+            schoolProfile={safeSchoolProfile}
+            tolerance={tolerance}
+            selectedStatusFilter={filters.selectedStatus}
+            onSelectStatusFilter={(status) => setFilters((prev) => ({ ...prev, selectedStatus: status }))}
+            selectedActionFilter={filters.selectedCategory}
+            onSelectActionFilter={(cat) => setFilters((prev) => ({ ...prev, selectedCategory: cat }))}
+            selectedClassFilter={filters.selectedClass}
+            onSelectClassFilter={(cls) => setFilters((prev) => ({ ...prev, selectedClass: cls }))}
+            classList={classList}
+            onNavigateToLedger={() => handleSetCurrentView('LEDGER')}
           />
         ) : (
-          <>
-            {/* 2. Key Metrics & Smart Analytics Dashboard */}
-            <FinancialDashboard
-              analytics={analytics}
-              schoolProfile={safeSchoolProfile}
-              tolerance={tolerance}
-              selectedStatusFilter={filters.selectedStatus}
-              onSelectStatusFilter={(status) => setFilters((prev) => ({ ...prev, selectedStatus: status }))}
-              selectedActionFilter={filters.selectedCategory}
-              onSelectActionFilter={(cat) => setFilters((prev) => ({ ...prev, selectedCategory: cat }))}
-              selectedClassFilter={filters.selectedClass}
-              onSelectClassFilter={(cls) => setFilters((prev) => ({ ...prev, selectedClass: cls }))}
-              classList={classList}
-            />
-
-            {/* 3. Master Student Ledger Table */}
+          <div className="space-y-4">
+            {/* Master Student Ledger Table */}
             <MasterStudentTable
               summaries={filteredStudentSummaries}
               schoolProfile={safeSchoolProfile}
               classList={classList}
+              tolerance={tolerance}
               onEditStudent={(updatedStudent) => {
                 setStudents((prev) =>
                   prev.map((s) => (s.id === updatedStudent.id ? updatedStudent : s))
@@ -782,7 +876,7 @@ export default function App() {
               onOpenAddStudent={() => setActiveModal('ADD_STUDENT')}
               onOpenBulkUpload={() => setActiveModal('BULK_UPLOAD')}
             />
-          </>
+          </div>
         )}
       </main>
 
@@ -806,7 +900,14 @@ export default function App() {
           remainingDueBalance={
             studentSummaries[activeReceiptTransaction.studentId]?.totalDue || 0
           }
+          totalBalance={
+            studentSummaries[activeReceiptTransaction.studentId]?.totalDue || 0
+          }
           nextDueDate={studentSummaries[activeReceiptTransaction.studentId]?.nextDueDate}
+          nextInstallmentDueDate={studentSummaries[activeReceiptTransaction.studentId]?.nextDueDate}
+          nextInstallmentBalance={
+            studentSummaries[activeReceiptTransaction.studentId]?.nextInstallmentBalance || 0
+          }
           onClose={() => {
             setActiveModal('NONE');
             setActiveReceiptTransaction(null);
@@ -917,6 +1018,28 @@ export default function App() {
             setTolerance(newTol);
             saveSchoolProfile(newProfile);
             saveToleranceConfig(newTol);
+          }}
+          onClose={() => setActiveModal('NONE')}
+        />
+      )}
+
+      {activeModal === 'TODAYS_RECEIPTS' && (
+        <TodaysReceiptsModal
+          currentDate={asOfDate}
+          onChangeDate={setAsOfDate}
+          transactions={transactions}
+          students={students}
+          studentSummaries={studentSummaries}
+          schoolProfile={safeSchoolProfile}
+          dailyTarget={dailyTarget}
+          onUpdateDailyTarget={handleUpdateDailyTarget}
+          dayCloseRecords={dayCloseRecords}
+          onCloseDay={handleCloseDay}
+          onReopenDay={handleReopenDay}
+          onUpdateTransactionSlip={handleUpdateTransactionSlip}
+          onOpenReceiptModal={(tx) => {
+            setActiveReceiptTransaction(tx);
+            setActiveModal('RECEIPT');
           }}
           onClose={() => setActiveModal('NONE')}
         />

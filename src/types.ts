@@ -96,6 +96,23 @@ export interface PaymentTransaction {
   cancellationReason?: string;
   cancelledAt?: string;
   collectedBy?: string;
+  permissionDate?: string; // Permission to be given till date (YYYY-MM-DD)
+  slipGiven?: boolean; // Whether permission slip was physically given
+  permissionUpdated?: boolean; // Whether cashier/admin has updated & verified this row
+}
+
+export interface DayCloseRecord {
+  date: string; // YYYY-MM-DD
+  closedAt: string; // ISO string
+  closedBy?: string;
+  target: number;
+  totalAchieved: number;
+  achievedPercent: number;
+  cashTotal: number;
+  upiTotal: number;
+  otherTotal: number;
+  totalReceiptsCount: number;
+  notes?: string;
 }
 
 export interface ToleranceConfig {
@@ -147,6 +164,7 @@ export interface StudentFinancialSummary {
   statusCategory: StatusCategory;
   actionTier: ActionTier;
   nextDueDate: string | null;
+  nextInstallmentBalance?: number;
   daysRemainingOnPermission: number | null;
   isPermissionExpired: boolean;
   hasUncommittedFee: boolean;
@@ -217,3 +235,5 @@ export interface AnalyticsSummary {
   };
   headWiseBifurcation: FeeHeadBifurcation[];
 }
+
+export type AppView = 'LEDGER' | 'ANALYTICS' | 'TRIAL_VERIFICATION';

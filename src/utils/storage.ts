@@ -1,5 +1,6 @@
 import {
   ClassFeeConfig,
+  DayCloseRecord,
   FeeHeadDefinition,
   Installment,
   PaymentTransaction,
@@ -11,18 +12,23 @@ import {
 import { generateStructuredRealData, lookupStandardClassFee } from '../data/trialSpreadsheetData';
 import { DEFAULT_SCRIPT_WEBAPP_URL } from './googleSheetsScript';
 
+const CURRENT_DATA_VERSION = 'v2_kakatiya_actual_sept_2026';
+const DATA_VERSION_KEY = 'sfc_app_data_version';
+
 const STORAGE_KEYS = {
-  STUDENTS: 'sfc_students_v1',
-  FEE_STRUCTURES: 'sfc_fee_structures_v1',
-  INSTALLMENTS: 'sfc_installments_v1',
-  PAYMENTS: 'sfc_payments_v1',
-  CLASS_CONFIGS: 'sfc_class_configs_v1',
-  FEE_HEADS: 'sfc_fee_heads_v1',
-  SCHOOL_PROFILE: 'sfc_school_profile_v1',
-  TOLERANCE: 'sfc_tolerance_v1',
-  SHEETS_SCRIPT_URL: 'sfc_sheets_script_url_v1',
-  SPREADSHEET_URL: 'sfc_spreadsheet_url_v1',
-  SIMULATED_DATE: 'sfc_simulated_date_v1',
+  STUDENTS: 'sfc_students_v2',
+  FEE_STRUCTURES: 'sfc_fee_structures_v2',
+  INSTALLMENTS: 'sfc_installments_v2',
+  PAYMENTS: 'sfc_payments_v2',
+  CLASS_CONFIGS: 'sfc_class_configs_v2',
+  FEE_HEADS: 'sfc_fee_heads_v2',
+  SCHOOL_PROFILE: 'sfc_school_profile_v2',
+  TOLERANCE: 'sfc_tolerance_v2',
+  SHEETS_SCRIPT_URL: 'sfc_sheets_script_url_v2',
+  SPREADSHEET_URL: 'sfc_spreadsheet_url_v2',
+  SIMULATED_DATE: 'sfc_simulated_date_v2',
+  DAY_CLOSE_RECORDS: 'sfc_day_close_records_v2',
+  DAILY_TARGET: 'sfc_daily_collection_target_v2',
 };
 
 export const DEFAULT_SPREADSHEET_URL = 'https://docs.google.com/spreadsheets/d/1Fx7CUTJCHT-m3FPfG_u3_VfYNN1RRWf87-0pIbUwA4M/edit?gid=0#gid=0';
@@ -58,8 +64,8 @@ export const DEFAULT_SCHOOL_PROFILE: SchoolProfile = {
 };
 
 export const DEFAULT_TOLERANCE: ToleranceConfig = {
-  mode: 'percentage',
-  value: 25, // 25% or fixed amount
+  mode: 'fixed_amount',
+  value: 500, // ₹500 default tolerance threshold
 };
 
 export const DEFAULT_CLASS_CONFIGS: ClassFeeConfig[] = [
@@ -107,10 +113,13 @@ export function getInitialSeedData() {
 // Getters & Setters for individual entities
 // -------------------------------------------------------------
 export function getStoredStudents(): Student[] {
+  const version = localStorage.getItem(DATA_VERSION_KEY);
   const raw = localStorage.getItem(STORAGE_KEYS.STUDENTS);
-  if (!raw) {
+
+  if (version !== CURRENT_DATA_VERSION || !raw) {
     const seed = getInitialSeedData();
     saveAllInitialData(seed);
+    localStorage.setItem(DATA_VERSION_KEY, CURRENT_DATA_VERSION);
     return seed.students;
   }
   try {
@@ -118,6 +127,7 @@ export function getStoredStudents(): Student[] {
     if (!Array.isArray(parsed) || parsed.length < 10) {
       const seed = getInitialSeedData();
       saveAllInitialData(seed);
+      localStorage.setItem(DATA_VERSION_KEY, CURRENT_DATA_VERSION);
       return seed.students;
     }
     return parsed.map((s: Student) => ({
@@ -130,6 +140,13 @@ export function getStoredStudents(): Student[] {
   } catch {
     return [];
   }
+}
+
+export function reinitializeToV2Data() {
+  const seed = getInitialSeedData();
+  saveAllInitialData(seed);
+  localStorage.setItem(DATA_VERSION_KEY, CURRENT_DATA_VERSION);
+  return seed;
 }
 
 export function saveStudents(students: Student[]) {
@@ -441,4 +458,45 @@ export function restoreDataFromJson(file: File): Promise<any | null> {
     };
     reader.readAsText(file);
   });
+}
+
+// -------------------------------------------------------------
+// Day Close Records & Daily Target
+// -------------------------------------------------------------
+export function getDayCloseRecords(): Record<string, DayCloseRecord> {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.DAY_CLOSE_RECORDS);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
+export function saveDayCloseRecords(records: Record<string, DayCloseRecord>) {
+  try {
+    localStorage.setItem(STORAGE_KEYS.DAY_CLOSE_RECORDS, JSON.stringify(records));
+  } catch (err) {
+    console.error('Failed to save day close records:', err);
+  }
+}
+
+export function getDailyCollectionTarget(): number {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.DAILY_TARGET);
+    if (raw) {
+      const val = parseFloat(raw);
+      if (!isNaN(val) && val > 0) return val;
+    }
+  } catch {
+    // fallback
+  }
+  return 50000; // Default ₹50,000 daily collection target
+}
+
+export function saveDailyCollectionTarget(target: number) {
+  try {
+    localStorage.setItem(STORAGE_KEYS.DAILY_TARGET, String(target));
+  } catch (err) {
+    console.error('Failed to save daily collection target:', err);
+  }
 }

@@ -10,6 +10,8 @@ import { formatCurrency } from '../utils/numberToWords';
 import { sortClassList } from '../utils/classOrder';
 import {
   AlertCircle,
+  ArrowLeft,
+  ArrowRight,
   Award,
   BookOpen,
   Building2,
@@ -48,6 +50,7 @@ interface FinancialDashboardProps {
   selectedClassFilter: string;
   onSelectClassFilter: (className: string) => void;
   classList: string[];
+  onNavigateToLedger?: () => void;
 }
 
 const REVEALED_CARDS_STORAGE_KEY = 'school_fee_revealed_cards_v2';
@@ -63,6 +66,7 @@ export const FinancialDashboard: React.FC<FinancialDashboardProps> = ({
   selectedClassFilter,
   onSelectClassFilter,
   classList,
+  onNavigateToLedger,
 }) => {
   const currencySymbol = schoolProfile?.currencySymbol || '₹';
 
@@ -183,41 +187,78 @@ export const FinancialDashboard: React.FC<FinancialDashboardProps> = ({
   };
 
   return (
-    <section id="financial-dashboard" className="space-y-3.5">
-      {/* Top Header Controls Bar */}
-      <div className="flex items-center justify-between px-1 flex-wrap gap-2">
-        <div className="flex items-center gap-2 flex-wrap">
-          <div className="p-1.5 rounded-lg bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300">
-            <Coins className="w-4 h-4" />
-          </div>
-          <div>
-            <h2 className="text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white flex items-center gap-2 flex-wrap">
-              <span>Financial Analytics & Fee Health</span>
-            </h2>
+    <section id="financial-dashboard" className="space-y-4">
+      {/* Top Header Controls Bar for Dedicated Page */}
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 sm:p-5 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex items-center gap-3 min-w-0">
+          {onNavigateToLedger && (
+            <button
+              type="button"
+              onClick={onNavigateToLedger}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold text-xs transition-colors shrink-0 cursor-pointer"
+              title="Return to Student Ledger"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              <span>Back to Ledger</span>
+            </button>
+          )}
+
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="p-2.5 rounded-xl bg-emerald-600 text-white shadow-xs shrink-0">
+              <Coins className="w-5 h-5" />
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h1 className="text-base sm:text-lg font-black text-slate-900 dark:text-white tracking-tight">
+                  Financial Analytics & Fee Health
+                </h1>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border border-emerald-300/60 dark:border-emerald-700/50">
+                  AY {schoolProfile.academicYear || '2026-27'}
+                </span>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 dark:bg-indigo-950/60 text-indigo-800 dark:text-indigo-300 border border-indigo-300/60 dark:border-indigo-700/50">
+                  Dedicated View
+                </span>
+              </div>
+              <p className="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400 truncate">
+                Comprehensive fee realization, headwise bifurcation, deficit tracking & target run-rates
+              </p>
+            </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-2 shrink-0 self-start md:self-center">
           {/* Eye Icon: Toggle All Numbers */}
           <button
             id="toggle-all-stats-btn"
             type="button"
             onClick={toggleAllCardsReveal}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all cursor-pointer shadow-2xs"
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-all cursor-pointer shadow-2xs"
             title={areAllCardsRevealed ? 'Hide numbers on all cards' : 'Show numbers on all cards'}
           >
             {areAllCardsRevealed ? (
               <>
                 <EyeOff className="w-3.5 h-3.5 text-slate-500" />
-                <span>Hide All Stats</span>
+                <span>Hide All Numbers</span>
               </>
             ) : (
               <>
                 <Eye className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                <span>Show All Stats</span>
+                <span>Reveal All Numbers</span>
               </>
             )}
           </button>
+
+          {onNavigateToLedger && (
+            <button
+              type="button"
+              onClick={onNavigateToLedger}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition-all shadow-xs cursor-pointer active:scale-95"
+            >
+              <Users className="w-3.5 h-3.5" />
+              <span>Student Ledger ({totalStudents})</span>
+              <ArrowRight className="w-3.5 h-3.5 ml-0.5" />
+            </button>
+          )}
         </div>
       </div>
 
@@ -748,6 +789,209 @@ export const FinancialDashboard: React.FC<FinancialDashboardProps> = ({
               Clear Filter
             </button>
           )}
+        </div>
+
+        {/* Dynamic Action: Jump to Ledger with active filter */}
+        {(selectedStatusFilter !== 'ALL' || selectedActionFilter !== 'ALL' || selectedClassFilter !== 'ALL') && onNavigateToLedger && (
+          <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs flex-wrap gap-2">
+            <span className="text-slate-600 dark:text-slate-400">
+              Filter Active: <strong className="text-slate-900 dark:text-white">
+                {selectedActionFilter !== 'ALL' ? `Tier: ${selectedActionFilter} • ` : ''}
+                {selectedStatusFilter !== 'ALL' ? `Status: ${selectedStatusFilter} • ` : ''}
+                {selectedClassFilter !== 'ALL' ? `Class: ${selectedClassFilter}` : 'All Classes'}
+              </strong>
+            </span>
+            <button
+              type="button"
+              onClick={onNavigateToLedger}
+              className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold transition-all shadow-xs cursor-pointer"
+            >
+              <span>View Filtered Students in Ledger</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Headwise Financial Reconciliation Matrix */}
+      {headWiseBifurcation && headWiseBifurcation.length > 0 && (
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 sm:p-5 shadow-xs space-y-3">
+          <div className="flex items-center justify-between flex-wrap gap-2 pb-2.5 border-b border-slate-100 dark:border-slate-800">
+            <div className="flex items-center gap-2">
+              <div className="p-1.5 rounded-lg bg-blue-100 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300">
+                <Table className="w-4 h-4" />
+              </div>
+              <div>
+                <h3 className="text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white">
+                  Headwise Fee Reconciliation Matrix
+                </h3>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                  Committed, collected till date, overdue deficit, and recovery rate by head
+                </p>
+              </div>
+            </div>
+            <span className="text-[11px] font-mono text-slate-500">
+              {headWiseBifurcation.length} Fee Heads Tracked
+            </span>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs font-mono">
+              <thead>
+                <tr className="border-b border-slate-200 dark:border-slate-700 text-[10px] text-slate-500 uppercase tracking-wider bg-slate-50 dark:bg-slate-850">
+                  <th className="py-2 px-3 font-bold">Fee Head</th>
+                  <th className="py-2 px-3 font-bold text-right">Committed</th>
+                  <th className="py-2 px-3 font-bold text-right">Expected (Due)</th>
+                  <th className="py-2 px-3 font-bold text-right text-emerald-600 dark:text-emerald-400">Collected</th>
+                  <th className="py-2 px-3 font-bold text-right text-rose-600 dark:text-rose-400">Overdue Deficit</th>
+                  <th className="py-2 px-3 font-bold text-right">Total Balance</th>
+                  <th className="py-2 px-3 font-bold text-center">Realization</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                {headWiseBifurcation.map((head) => {
+                  const realizationPct = head.totalExpectedTillDate > 0
+                    ? Math.round((head.totalCollected / head.totalExpectedTillDate) * 100)
+                    : 100;
+                  return (
+                    <tr key={head.headName} className="hover:bg-slate-50 dark:hover:bg-slate-850/60 transition-colors">
+                      <td className="py-2.5 px-3 font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                        {getHeadIcon(head.headName)}
+                        <span>{head.headName}</span>
+                      </td>
+                      <td className="py-2.5 px-3 text-right text-slate-800 dark:text-slate-200">
+                        {formatCurrency(head.totalCommitted, currencySymbol)}
+                      </td>
+                      <td className="py-2.5 px-3 text-right text-slate-700 dark:text-slate-300">
+                        {formatCurrency(head.totalExpectedTillDate, currencySymbol)}
+                      </td>
+                      <td className="py-2.5 px-3 text-right font-bold text-emerald-600 dark:text-emerald-400">
+                        {formatCurrency(head.totalCollected, currencySymbol)}
+                      </td>
+                      <td className="py-2.5 px-3 text-right font-bold text-rose-600 dark:text-rose-400">
+                        {formatCurrency(head.totalDueTillDate, currencySymbol)}
+                      </td>
+                      <td className="py-2.5 px-3 text-right text-slate-600 dark:text-slate-400">
+                        {formatCurrency(head.totalBalanceDue, currencySymbol)}
+                      </td>
+                      <td className="py-2.5 px-3 text-center">
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                          realizationPct >= 80
+                            ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300'
+                            : realizationPct >= 50
+                            ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300'
+                            : 'bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300'
+                        }`}>
+                          {realizationPct}%
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Payment Channel Analysis & Velocity */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+        {/* Payment Modes Card */}
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 sm:p-5 shadow-xs space-y-3">
+          <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
+            <div className="flex items-center gap-2">
+              <CreditCard className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+              <h3 className="text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white">
+                Payment Channel Distribution
+              </h3>
+            </div>
+            <span className="text-[11px] font-mono text-slate-500">
+              {totalTransactionsCount} Total Receipts
+            </span>
+          </div>
+
+          <div className="space-y-3">
+            <div>
+              <div className="flex items-center justify-between text-xs mb-1">
+                <span className="font-semibold text-slate-700 dark:text-slate-300">Cash Collections</span>
+                <span className="font-mono font-bold text-slate-900 dark:text-white">
+                  {formatCurrency(totalCashCollected, currencySymbol)} ({allTimeCashPct}%)
+                </span>
+              </div>
+              <div className="w-full bg-slate-100 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
+                <div
+                  className="bg-emerald-500 h-full rounded-full transition-all"
+                  style={{ width: `${allTimeCashPct}%` }}
+                />
+              </div>
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between text-xs mb-1">
+                <span className="font-semibold text-slate-700 dark:text-slate-300">UPI / Digital Collections</span>
+                <span className="font-mono font-bold text-slate-900 dark:text-white">
+                  {formatCurrency(totalUpiCollected, currencySymbol)} ({allTimeUpiPct}%)
+                </span>
+              </div>
+              <div className="w-full bg-slate-100 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
+                <div
+                  className="bg-indigo-500 h-full rounded-full transition-all"
+                  style={{ width: `${allTimeUpiPct}%` }}
+                />
+              </div>
+            </div>
+
+            <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs text-slate-500">
+              <span>Avg Receipt Size:</span>
+              <strong className="font-mono text-slate-800 dark:text-slate-200">
+                {formatCurrency(averageReceiptAmount, currencySymbol)}
+              </strong>
+            </div>
+          </div>
+        </div>
+
+        {/* Today's Velocity Card */}
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 sm:p-5 shadow-xs space-y-3">
+          <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
+            <div className="flex items-center gap-2">
+              <Clock className="w-4 h-4 text-amber-500" />
+              <h3 className="text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white">
+                Today's Receipt Activity
+              </h3>
+            </div>
+            <span className="text-[11px] font-mono text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/60 px-2 py-0.5 rounded-full border border-amber-200 dark:border-amber-800 font-bold">
+              Real-time
+            </span>
+          </div>
+
+          <div className="space-y-3">
+            <div className="bg-slate-50 dark:bg-slate-850 rounded-xl p-3 border border-slate-100 dark:border-slate-800 flex items-center justify-between">
+              <div>
+                <span className="text-[11px] text-slate-500 block">Today's Total Received</span>
+                <span className="text-lg font-black font-mono text-emerald-600 dark:text-emerald-400">
+                  {formatCurrency(todayCollection, currencySymbol)}
+                </span>
+              </div>
+              <div className="text-right text-[11px] text-slate-500 space-y-0.5 font-mono">
+                <div>Cash: <strong className="text-slate-800 dark:text-slate-200">{formatCurrency(todayCash, currencySymbol)}</strong></div>
+                <div>UPI: <strong className="text-slate-800 dark:text-slate-200">{formatCurrency(todayUpi, currencySymbol)}</strong></div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between text-xs text-slate-500 pt-1">
+              <span>Remaining Days in Month:</span>
+              <strong className="font-mono text-slate-800 dark:text-slate-200">
+                {dailyTargetRunRate.daysRemainingInCycle} days
+              </strong>
+            </div>
+
+            <div className="flex items-center justify-between text-xs text-slate-500">
+              <span>Suggested Follow-ups:</span>
+              <strong className="font-mono text-amber-600 dark:text-amber-400">
+                ~{dailyTargetRunRate.suggestedStudentsPerDay} students/day
+              </strong>
+            </div>
+          </div>
         </div>
       </div>
     </section>

@@ -4,6 +4,7 @@ import {
   Building2,
   Calendar,
   ChevronRight,
+  Coins,
   Download,
   FileSpreadsheet,
   HelpCircle,
@@ -11,6 +12,7 @@ import {
   Menu,
   Moon,
   Plus,
+  Receipt,
   RefreshCw,
   RotateCcw,
   Settings,
@@ -23,7 +25,7 @@ import {
   WifiOff,
   X,
 } from 'lucide-react';
-import { SchoolProfile, ToleranceConfig } from '../types';
+import { AppView, SchoolProfile, ToleranceConfig } from '../types';
 import { formatCurrency } from '../utils/numberToWords';
 
 interface NavbarProps {
@@ -45,8 +47,10 @@ interface NavbarProps {
   onResetDemo: () => void;
   theme: 'light' | 'dark';
   onToggleTheme: () => void;
-  activeView?: 'DASHBOARD' | 'TRIAL_VERIFICATION';
-  onToggleView?: (view: 'DASHBOARD' | 'TRIAL_VERIFICATION') => void;
+  activeView?: AppView;
+  onToggleView?: (view: AppView) => void;
+  onOpenTodaysReceipts?: () => void;
+  todaysStats?: { count: number; total: number; pendingSlips: number };
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -68,8 +72,10 @@ export const Navbar: React.FC<NavbarProps> = ({
   onResetDemo,
   theme,
   onToggleTheme,
-  activeView = 'DASHBOARD',
+  activeView = 'LEDGER',
   onToggleView,
+  onOpenTodaysReceipts,
+  todaysStats,
 }) => {
   const [showDrawer, setShowDrawer] = useState(false);
   const [showToleranceDetails, setShowToleranceDetails] = useState(false);
@@ -97,6 +103,9 @@ export const Navbar: React.FC<NavbarProps> = ({
                   <span className="shrink-0 px-2 py-0.5 text-[10px] sm:text-[11px] font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-300 border border-emerald-300/60 dark:border-emerald-700/50 rounded-full whitespace-nowrap">
                     AY {schoolProfile.academicYear || '2026-27'}
                   </span>
+                  <span className="shrink-0 px-2 py-0.5 text-[10px] sm:text-[11px] font-black bg-indigo-100 text-indigo-800 dark:bg-indigo-950/70 dark:text-indigo-300 border border-indigo-300/60 dark:border-indigo-700/50 rounded-full whitespace-nowrap">
+                    v2.0
+                  </span>
                 </div>
                 <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate hidden sm:block">
                   Accounting Ledger & Smart Installment Knock-Off
@@ -104,8 +113,80 @@ export const Navbar: React.FC<NavbarProps> = ({
               </div>
             </div>
 
+            {/* Center: Navigation Tabs (Desktop & Large Screens) */}
+            <nav className="hidden lg:flex items-center gap-1 bg-slate-100 dark:bg-slate-800/90 p-1 rounded-xl border border-slate-200 dark:border-slate-700">
+              <button
+                id="nav-tab-ledger"
+                type="button"
+                onClick={() => onToggleView?.('LEDGER')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  activeView === 'LEDGER'
+                    ? 'bg-emerald-600 text-white shadow-xs'
+                    : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-slate-750'
+                }`}
+              >
+                <Users className="w-3.5 h-3.5" />
+                <span>Student Ledger</span>
+              </button>
+
+              <button
+                id="nav-tab-analytics"
+                type="button"
+                onClick={() => onToggleView?.('ANALYTICS')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  activeView === 'ANALYTICS'
+                    ? 'bg-emerald-600 text-white shadow-xs'
+                    : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-slate-750'
+                }`}
+              >
+                <Coins className="w-3.5 h-3.5" />
+                <span>Financial Analytics & Fee Health</span>
+              </button>
+
+              {/* Today's Receipts Button in Center Tabs */}
+              {onOpenTodaysReceipts && (
+                <button
+                  id="nav-tab-todays-receipts"
+                  type="button"
+                  onClick={onOpenTodaysReceipts}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-emerald-700 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800 transition-all cursor-pointer"
+                  title="Open Today's Receipts & Day Reconciliation"
+                >
+                  <Receipt className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                  <span>Today's Receipts</span>
+                  {todaysStats && todaysStats.count > 0 && (
+                    <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] font-black bg-emerald-600 text-white">
+                      {todaysStats.count}
+                    </span>
+                  )}
+                </button>
+              )}
+            </nav>
+
             {/* Right: Clean & Uncrowded Action Controls */}
             <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+              {/* Prominent Quick Today's Receipts Button for fast access */}
+              {onOpenTodaysReceipts && (
+                <button
+                  id="btn-quick-todays-receipts"
+                  type="button"
+                  onClick={onOpenTodaysReceipts}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/60 dark:hover:bg-emerald-900/60 text-emerald-800 dark:text-emerald-200 border border-emerald-300 dark:border-emerald-700 text-xs font-bold transition-all shadow-2xs active:scale-95 cursor-pointer"
+                  title="Today's Receipts & Reconciliation"
+                >
+                  <Receipt className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                  <span className="hidden sm:inline">Today's Receipts</span>
+                  {todaysStats && todaysStats.total > 0 && (
+                    <span className="text-[11px] font-black text-emerald-700 dark:text-emerald-300 font-mono">
+                      ({formatCurrency(todaysStats.total, currencySymbol)})
+                    </span>
+                  )}
+                  {todaysStats && todaysStats.pendingSlips > 0 && (
+                    <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" title={`${todaysStats.pendingSlips} slips pending`} />
+                  )}
+                </button>
+              )}
+
               {/* As-Of Date Indicator (Desktop) */}
               <div className="hidden md:flex items-center bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-1 gap-1.5 text-xs">
                 <Calendar className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400 shrink-0" />
@@ -145,7 +226,55 @@ export const Navbar: React.FC<NavbarProps> = ({
               </button>
             </div>
           </div>
+
+          {/* Mobile & Tablet Navigation Tab Bar */}
+          <div className="lg:hidden pb-2.5 pt-0.5">
+            <nav className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
+              <button
+                type="button"
+                onClick={() => onToggleView?.('LEDGER')}
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-all cursor-pointer shrink-0 ${
+                  activeView === 'LEDGER'
+                    ? 'bg-emerald-600 text-white shadow-xs'
+                    : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700'
+                }`}
+              >
+                <Users className="w-3.5 h-3.5" />
+                <span>Student Ledger</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => onToggleView?.('ANALYTICS')}
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-all cursor-pointer shrink-0 ${
+                  activeView === 'ANALYTICS'
+                    ? 'bg-emerald-600 text-white shadow-xs'
+                    : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700'
+                }`}
+              >
+                <Coins className="w-3.5 h-3.5" />
+                <span>Financial Analytics</span>
+              </button>
+
+              {onOpenTodaysReceipts && (
+                <button
+                  type="button"
+                  onClick={onOpenTodaysReceipts}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap bg-emerald-50 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-200 border border-emerald-300 dark:border-emerald-700 transition-all cursor-pointer shrink-0"
+                >
+                  <Receipt className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Today's Receipts</span>
+                  {todaysStats && todaysStats.count > 0 && (
+                    <span className="px-1.5 py-0.2 rounded-full text-[10px] font-black bg-emerald-600 text-white">
+                      {todaysStats.count}
+                    </span>
+                  )}
+                </button>
+              )}
+            </nav>
+          </div>
         </div>
+
       </header>
 
       {/* Slide-Over Drawer for All Secondary Features & Options */}
@@ -365,10 +494,117 @@ export const Navbar: React.FC<NavbarProps> = ({
                 )}
               </div>
 
-              {/* Main Navigation Actions List */}
+              {/* Main Navigation Pages Section */}
+              <div className="space-y-1.5 pb-2 border-b border-slate-200 dark:border-slate-800">
+                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider px-1">
+                  Pages & Navigation
+                </span>
+
+                {/* 1. Student Ledger */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    onToggleView?.('LEDGER');
+                    setShowDrawer(false);
+                  }}
+                  className={`w-full flex items-center justify-between p-3 rounded-xl border transition-colors text-left cursor-pointer ${
+                    activeView === 'LEDGER'
+                      ? 'bg-emerald-50 dark:bg-emerald-950/60 border-emerald-300 dark:border-emerald-700'
+                      : 'bg-slate-50 hover:bg-slate-100 dark:bg-slate-800/60 dark:hover:bg-slate-800 border-slate-200 dark:border-slate-700'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-lg bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300">
+                      <Users className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <div className="font-bold text-slate-900 dark:text-white text-xs flex items-center gap-1.5">
+                        Student Ledger
+                        {activeView === 'LEDGER' && (
+                          <span className="text-[9px] px-1.5 py-0.2 bg-emerald-600 text-white rounded font-bold">
+                            Active
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-[11px] text-slate-500 dark:text-slate-400">
+                        Student accounts, payments, and installment knock-off
+                      </div>
+                    </div>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-slate-400" />
+                </button>
+
+                {/* 2. Financial Analytics & Fee Health */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    onToggleView?.('ANALYTICS');
+                    setShowDrawer(false);
+                  }}
+                  className={`w-full flex items-center justify-between p-3 rounded-xl border transition-colors text-left cursor-pointer ${
+                    activeView === 'ANALYTICS'
+                      ? 'bg-emerald-50 dark:bg-emerald-950/60 border-emerald-300 dark:border-emerald-700'
+                      : 'bg-slate-50 hover:bg-slate-100 dark:bg-slate-800/60 dark:hover:bg-slate-800 border-slate-200 dark:border-slate-700'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-lg bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300">
+                      <Coins className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <div className="font-bold text-slate-900 dark:text-white text-xs flex items-center gap-1.5">
+                        Financial Analytics & Fee Health
+                        {activeView === 'ANALYTICS' && (
+                          <span className="text-[9px] px-1.5 py-0.2 bg-emerald-600 text-white rounded font-bold">
+                            Active
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-[11px] text-slate-500 dark:text-slate-400">
+                        Revenue realization, headwise breakdown & daily run-rate
+                      </div>
+                    </div>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-slate-400" />
+                </button>
+
+                {/* 3. Today's Receipts & Day Reconciliation */}
+                {onOpenTodaysReceipts && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowDrawer(false);
+                      onOpenTodaysReceipts();
+                    }}
+                    className="w-full flex items-center justify-between p-3 rounded-xl border bg-emerald-50/70 hover:bg-emerald-100/80 dark:bg-emerald-950/50 dark:hover:bg-emerald-900/60 border-emerald-300 dark:border-emerald-800 transition-colors text-left cursor-pointer"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-lg bg-emerald-600 text-white shadow-xs">
+                        <Receipt className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <div className="font-bold text-slate-900 dark:text-white text-xs flex items-center gap-1.5">
+                          Today's Receipts & Day Close
+                          {todaysStats && todaysStats.count > 0 && (
+                            <span className="text-[9px] px-1.5 py-0.2 bg-emerald-600 text-white rounded font-bold">
+                              {todaysStats.count} Recorded
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-[11px] text-slate-600 dark:text-slate-400">
+                          Cash vs UPI breakdown, permission slip status, and Day Close
+                        </div>
+                      </div>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-slate-400" />
+                  </button>
+                )}
+              </div>
+
+              {/* Main Features & Modules List */}
               <div className="space-y-1.5">
                 <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider px-1">
-                  Features & Modules
+                  Features & Actions
                 </span>
 
                 {/* Class Fee Master Button */}
@@ -484,36 +720,6 @@ export const Navbar: React.FC<NavbarProps> = ({
                   <ChevronRight className="w-4 h-4 text-purple-600 dark:text-purple-400" />
                 </button>
 
-                {/* Cross-Check Room Toggle */}
-                {onToggleView && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      onToggleView(activeView === 'TRIAL_VERIFICATION' ? 'DASHBOARD' : 'TRIAL_VERIFICATION');
-                      setShowDrawer(false);
-                    }}
-                    className="w-full flex items-center justify-between p-3 rounded-xl bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:hover:bg-indigo-900/60 border border-indigo-200 dark:border-indigo-800 transition-colors text-left"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 rounded-lg bg-indigo-200 dark:bg-indigo-900/80 text-indigo-700 dark:text-indigo-300">
-                        <FileSpreadsheet className="w-4 h-4" />
-                      </div>
-                      <div>
-                        <div className="font-bold text-indigo-900 dark:text-indigo-100 text-xs flex items-center gap-1.5">
-                          {activeView === 'TRIAL_VERIFICATION' ? 'Switch to Financial Dashboard' : 'Spreadsheet Master Data Cross-Check'}
-                          <span className="text-[9px] px-1.5 py-0.2 bg-indigo-600 text-white rounded font-bold">
-                            228
-                          </span>
-                        </div>
-                        <div className="text-[11px] text-indigo-700/80 dark:text-indigo-300/80">
-                          {activeView === 'TRIAL_VERIFICATION' ? 'Return to main dashboard' : 'Row-by-row spreadsheet reconciliation'}
-                        </div>
-                      </div>
-                    </div>
-                    <ChevronRight className="w-4 h-4 text-indigo-400" />
-                  </button>
-                )}
-
                 {/* School Profile Settings */}
                 <button
                   type="button"
@@ -610,15 +816,15 @@ export const Navbar: React.FC<NavbarProps> = ({
                   className="w-full flex items-center justify-center gap-1.5 p-2 rounded-xl text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-xs font-semibold transition-colors mt-2"
                 >
                   <RotateCcw className="w-3.5 h-3.5" />
-                  <span>Reset to Spreadsheet Default Data</span>
+                  <span>Reset to V2 September Master Data</span>
                 </button>
               </div>
             </div>
 
             {/* Drawer Footer */}
             <div className="px-5 py-3 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-850 flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
-              <span>Kakatiya School Ledger v2.1</span>
-              <span>228 Students Active</span>
+              <span>Kakatiya School Ledger v2.0 (Sept Updates)</span>
+              <span>229 Students Active</span>
             </div>
           </div>
         </div>

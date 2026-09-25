@@ -6,6 +6,7 @@ import {
   StudentFinancialSummary,
 } from '../types';
 import { formatCurrency, formatDate } from '../utils/numberToWords';
+import { getInstallmentDisplayName } from '../utils/installmentFormatter';
 import {
   AlertOctagon,
   ArrowRight,
@@ -166,7 +167,12 @@ export const StudentLedgerModal: React.FC<StudentLedgerModalProps> = ({
                         }`}
                       >
                         <td className="py-2 px-3 font-semibold text-slate-800 dark:text-slate-200">
-                          {inst.headName} #{inst.installmentNumber} of {inst.totalInstallments}
+                          {getInstallmentDisplayName(
+                            inst.headName,
+                            inst.installmentNumber,
+                            inst.totalInstallments,
+                            inst.dueDate
+                          )}
                         </td>
                         <td className="py-2 px-3 font-mono text-slate-600 dark:text-slate-400">
                           <span className={isOverdue ? 'text-rose-600 font-bold' : ''}>
