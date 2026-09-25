@@ -368,42 +368,31 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                 </div>
               </div>
 
-              {/* Mandatory UTR Number when UPI selected */}
+              {/* Mandatory UTR Last 5 Digits when UPI selected */}
               {paymentMode === 'UPI' && (
                 <div className="p-3 bg-indigo-50/70 dark:bg-indigo-950/40 border-2 border-indigo-300 dark:border-indigo-800 rounded-xl space-y-1 animate-fadeIn">
                   <label className="block text-xs font-extrabold text-indigo-950 dark:text-indigo-200">
-                    UPI UTR / Reference Number (Mandatory for UPI):
+                    UPI UTR - Last 5 Digits (Mandatory for UPI):
                   </label>
                   <input
                     id="input-payment-ref"
                     type="text"
+                    maxLength={5}
                     value={referenceNo}
                     onChange={(e) => {
-                      setReferenceNo(e.target.value);
+                      setReferenceNo(e.target.value.replace(/\D/g, '').slice(0, 5));
                       setErrorMsg(null);
                     }}
-                    placeholder="Enter 12-digit UPI UTR No (e.g. 427819203811)"
+                    placeholder="Enter last 5 digits (e.g. 48311)"
                     className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-indigo-300 dark:border-indigo-700 rounded-lg text-xs font-mono font-bold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   />
                   <span className="text-[10.5px] text-indigo-700 dark:text-indigo-400 block font-medium">
-                    This UTR number will be printed on the official receipt and saved in audit history.
+                    Only the last 5 digits of the UTR will be recorded as UPI (XXXXX).
                   </span>
                 </div>
               )}
 
-              {/* Collection Date */}
-              <div>
-                <label className="block text-xs font-bold text-slate-800 dark:text-slate-200 mb-1">
-                  Collection Date:
-                </label>
-                <input
-                  id="input-payment-date"
-                  type="date"
-                  value={paymentDate}
-                  onChange={(e) => setPaymentDate(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-semibold text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                />
-              </div>
+
 
               {/* Remarks */}
               <div>
@@ -503,20 +492,13 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                               <span className="text-slate-400 text-xs">{schoolProfile.currencySymbol}</span>
                               <input
                                 type="number"
+                                readOnly
+                                tabIndex={-1}
                                 min="0"
                                 max={inst.balanceAmount}
                                 value={allocatedAmt}
-                                onChange={(e) =>
-                                  handleAllocationChange(
-                                    inst.id,
-                                    parseFloat(e.target.value) || 0
-                                  )
-                                }
-                                className={`w-24 text-right py-1 px-2 rounded-lg font-bold font-mono text-xs focus:outline-none ${
-                                  allocatedAmt > 0
-                                    ? 'bg-emerald-100 text-emerald-900 border border-emerald-300 dark:bg-emerald-900/60 dark:text-emerald-200 dark:border-emerald-700'
-                                    : 'bg-slate-100 text-slate-500 border border-slate-200 dark:bg-slate-800 dark:text-slate-400'
-                                }`}
+                                className="w-24 text-right py-1 px-2 rounded-lg font-bold font-mono text-xs focus:outline-none bg-emerald-100/70 text-emerald-900 border border-emerald-300 dark:bg-emerald-900/40 dark:text-emerald-200 dark:border-emerald-700 cursor-not-allowed"
+                                title="Automatic FIFO allocation (read-only)"
                               />
                             </div>
                           </td>

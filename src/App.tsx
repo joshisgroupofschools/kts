@@ -55,6 +55,8 @@ import {
   saveToleranceConfig,
   saveTransactions,
 } from './utils/storage';
+import { db, COLLECTION_ID, DOC_ID } from './firebase/firebaseClient';
+import { doc, onSnapshot, setDoc } from 'firebase/firestore';
 import { Navbar } from './components/Navbar';
 import { FinancialDashboard } from './components/FinancialDashboard';
 import { MasterStudentTable } from './components/MasterStudentTable';
@@ -123,9 +125,9 @@ export default function App() {
     localStorage.setItem('sfc_theme', theme);
   }, [theme]);
 
-  // Date Simulation (Default: Today)
+  // Date Simulation (Default: Today is 26/9/2026)
   const [asOfDate, setAsOfDate] = useState<string>(
-    () => new Date().toISOString().split('T')[0]
+    () => '2026-09-26'
   );
 
   // Filter State
@@ -197,6 +199,48 @@ export default function App() {
   useEffect(() => {
     saveSchoolProfile(schoolProfile);
   }, [schoolProfile]);
+
+  // Firebase Firestore real-time sync across logins & devices
+  useEffect(() => {
+    const docRef = doc(db, COLLECTION_ID, DOC_ID);
+    const unsubscribe = onSnapshot(docRef, (snapshot) => {
+      if (snapshot.exists()) {
+        const data = snapshot.data();
+        if (data.students && Array.isArray(data.students) && data.students.length > 0) {
+          setStudents(data.students);
+        }
+        if (data.transactions && Array.isArray(data.transactions)) {
+          setTransactions(data.transactions);
+        }
+        if (data.installments && Array.isArray(data.installments)) {
+          setInstallments(data.installments);
+        }
+        if (data.schoolProfile) {
+          setSchoolProfile(data.schoolProfile);
+        }
+      } else {
+        setDoc(docRef, {
+          students,
+          transactions,
+          installments,
+          schoolProfile,
+          updatedAt: new Date().toISOString(),
+        }).catch(() => {});
+      }
+    }, () => {});
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    const docRef = doc(db, COLLECTION_ID, DOC_ID);
+    setDoc(docRef, {
+      students,
+      transactions,
+      installments,
+      schoolProfile,
+      updatedAt: new Date().toISOString(),
+    }, { merge: true }).catch(() => {});
+  }, [students, transactions, installments, schoolProfile]);
 
   // Safe schoolProfile guaranteeing all fields
   const safeSchoolProfile: SchoolProfile = useMemo(() => {
@@ -727,7 +771,7 @@ export default function App() {
       schoolProfile={safeSchoolProfile}
       requiredPasscode="2025"
       title="Kakatiya School Administration"
-      subtitle="Protected Area • Enter 4-digit PIN (2025) to access software"
+      subtitle="Protected Area • Enter 4-digit PIN to access software"
     >
       <div className="min-h-screen bg-slate-100 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col font-sans transition-colors">
         {/* 1. Global Navigation Bar */}
@@ -826,7 +870,7 @@ export default function App() {
             schoolProfile={safeSchoolProfile}
             requiredPasscode="2027"
             title="Financial Analytics & Fee Health"
-            subtitle="Executive Fee Health & Analytics • Enter 4-digit PIN (2027) to access"
+            subtitle="Executive Fee Health & Analytics • Enter 4-digit PIN to access"
             onBackToLedger={() => handleSetCurrentView('LEDGER')}
           >
             <FinancialDashboard

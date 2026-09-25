@@ -602,6 +602,43 @@ export const MasterStudentTable: React.FC<MasterStudentTableProps> = ({
     return counts;
   }, [summaries]);
 
+  // Exclusive vs Non-Exclusive Breakdown X and Y for selected month
+  const monthBreakdownXY = useMemo(() => {
+    if (selectedDueMonth === 'ALL') return null;
+    const mInfo = ACADEMIC_MONTHS.find(m => m.key === selectedDueMonth);
+    const mIdx = ACADEMIC_MONTHS.findIndex(m => m.key === selectedDueMonth);
+    const priorMonths = ACADEMIC_MONTHS.slice(0, mIdx);
+
+    let countX = 0;
+    let amountX = 0;
+    let countY = 0;
+    let amountY = 0;
+
+    summaries.forEach((s) => {
+      const res = getStudentMonthDue(s, selectedDueMonth);
+      if (res.hasDue) {
+        const hasPrior = priorMonths.some(pm => getStudentMonthDue(s, pm.key).hasDue);
+        if (!hasPrior) {
+          countX++;
+          amountX += res.dueAmount;
+        } else {
+          countY++;
+          amountY += res.dueAmount;
+        }
+      }
+    });
+
+    return {
+      monthLabel: mInfo?.label || selectedDueMonth,
+      countX,
+      amountX,
+      countY,
+      amountY,
+      totalCount: countX + countY,
+      totalAmount: amountX + amountY,
+    };
+  }, [summaries, selectedDueMonth]);
+
   // Total amount due in the selected month across filtered students
   const totalMonthDueAmount = useMemo(() => {
     if (selectedDueMonth === 'ALL') {
@@ -839,7 +876,7 @@ export const MasterStudentTable: React.FC<MasterStudentTableProps> = ({
                   const counts = monthDueCounts[m.key];
                   return (
                     <option key={m.key} value={m.key}>
-                      {m.label} ({counts.total})
+                      {m.label} ({counts.exclusive}/{counts.total})
                     </option>
                   );
                 })}
@@ -929,206 +966,6 @@ export const MasterStudentTable: React.FC<MasterStudentTableProps> = ({
             </div>
           </div>
         </div>
-
-        {/* Row 2: Status Breakdown Badges Filter */}
-        <div className="flex flex-wrap items-center gap-1.5 pt-1 border-t border-slate-200/60 dark:border-slate-800/60 text-xs">
-          <span className="text-[11px] font-black uppercase text-slate-500 tracking-wider mr-1">
-            Status Breakdown:
-          </span>
-
-          <button
-            type="button"
-            onClick={() => setSelectedStatus('ALL')}
-            className={`px-2 py-0.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-              selectedStatus === 'ALL'
-                ? 'bg-slate-800 text-white dark:bg-slate-200 dark:text-slate-900'
-                : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700 hover:bg-slate-100'
-            }`}
-          >
-            All
-          </button>
-
-          {/* Cleared */}
-          <button
-            type="button"
-            onClick={() => setSelectedStatus(selectedStatus === 'STRONG_GREEN' ? 'ALL' : 'STRONG_GREEN')}
-            className={`px-2 py-0.5 rounded-lg text-[11px] font-semibold border flex items-center gap-1 transition-all cursor-pointer ${
-              selectedStatus === 'STRONG_GREEN'
-                ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
-                : 'bg-emerald-50 text-emerald-800 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800 hover:bg-emerald-100'
-            }`}
-          >
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-            <span>Cleared (0 Due): <strong>{statusCounts.strongGreen}</strong></span>
-          </button>
-
-          {/* Within Tolerance / Due till {tolStr} */}
-          <button
-            type="button"
-            onClick={() => setSelectedStatus(selectedStatus === 'LIGHT_GREEN' ? 'ALL' : 'LIGHT_GREEN')}
-            className={`px-2 py-0.5 rounded-lg text-[11px] font-semibold border flex items-center gap-1 transition-all cursor-pointer ${
-              selectedStatus === 'LIGHT_GREEN'
-                ? 'bg-green-600 text-white border-green-600 shadow-xs'
-                : 'bg-green-50 text-green-800 border-green-200 dark:bg-green-950/40 dark:text-green-300 dark:border-green-800 hover:bg-green-100'
-            }`}
-          >
-            <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
-            <span>
-              {getStatusCategoryMeta('LIGHT_GREEN', tolerance, currencySymbol).label}:{' '}
-              <strong>{statusCounts.lightGreen}</strong>
-            </span>
-          </button>
-
-          {/* Partial Deficit / Due more than {tolStr} */}
-          <button
-            type="button"
-            onClick={() => setSelectedStatus(selectedStatus === 'LIGHT_YELLOW' ? 'ALL' : 'LIGHT_YELLOW')}
-            className={`px-2 py-0.5 rounded-lg text-[11px] font-semibold border flex items-center gap-1 transition-all cursor-pointer ${
-              selectedStatus === 'LIGHT_YELLOW'
-                ? 'bg-amber-600 text-white border-amber-600 shadow-xs'
-                : 'bg-amber-50 text-amber-900 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800 hover:bg-amber-100'
-            }`}
-          >
-            <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
-            <span>
-              {getStatusCategoryMeta('LIGHT_YELLOW', tolerance, currencySymbol).label}:{' '}
-              <strong>{statusCounts.lightYellow}</strong>
-            </span>
-          </button>
-
-          {/* Zero Paid */}
-          <button
-            type="button"
-            onClick={() => setSelectedStatus(selectedStatus === 'LIGHT_RED' ? 'ALL' : 'LIGHT_RED')}
-            className={`px-2 py-0.5 rounded-lg text-[11px] font-semibold border flex items-center gap-1 transition-all cursor-pointer ${
-              selectedStatus === 'LIGHT_RED'
-                ? 'bg-rose-600 text-white border-rose-600 shadow-xs'
-                : 'bg-rose-50 text-rose-900 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800 hover:bg-rose-100'
-            }`}
-          >
-            <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
-            <span>Zero Paid: <strong>{statusCounts.lightRed}</strong></span>
-          </button>
-
-          {/* Uncommitted Fee */}
-          <button
-            type="button"
-            onClick={() => setSelectedStatus(selectedStatus === 'STRONG_RED' ? 'ALL' : 'STRONG_RED')}
-            className={`px-2 py-0.5 rounded-lg text-[11px] font-semibold border flex items-center gap-1 transition-all cursor-pointer ${
-              selectedStatus === 'STRONG_RED'
-                ? 'bg-red-700 text-white border-red-700 shadow-xs'
-                : 'bg-red-50 text-red-900 border-red-200 dark:bg-red-950/40 dark:text-red-300 dark:border-red-800 hover:bg-red-100'
-            }`}
-          >
-            <span className="w-1.5 h-1.5 rounded-full bg-red-600"></span>
-            <span>Uncommitted Fee: <strong>{statusCounts.strongRed}</strong></span>
-          </button>
-        </div>
-      </div>
-
-      {/* Dedicated Option Bar: June to March Quick Click with Exclusive Toggle */}
-      <div className="px-3 py-2 bg-slate-50 dark:bg-slate-850/80 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between gap-2 overflow-x-auto no-scrollbar">
-        <div className="flex items-center gap-1 sm:gap-1.5 shrink-0 flex-nowrap">
-          <span className="text-[11px] font-black uppercase tracking-wider text-slate-600 dark:text-slate-400 flex items-center gap-1 mr-1 shrink-0">
-            <CalendarClock className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400" />
-            <span>Monthwise Due:</span>
-          </span>
-
-          {/* Exclusive Toggle Switch */}
-          <button
-            type="button"
-            onClick={() => {
-              setIsExclusiveMonthDue(!isExclusiveMonthDue);
-              setCurrentPage(1);
-            }}
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap shrink-0 border ${
-              isExclusiveMonthDue
-                ? 'bg-purple-600 text-white border-purple-600 shadow-xs ring-2 ring-purple-300 dark:ring-purple-900'
-                : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-100'
-            }`}
-            title="Exclusive Toggle: When ON, shows students whose earliest pending dues are in that month (e.g. August shows 56/82: 56 exclusive to August without lingering prior July/June dues out of 82 total)"
-          >
-            <span>Exclusive</span>
-            <span
-              className={`w-2 h-2 rounded-full ${
-                isExclusiveMonthDue ? 'bg-amber-300 animate-pulse' : 'bg-slate-300 dark:bg-slate-600'
-              }`}
-            />
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              setSelectedDueMonth('ALL');
-              setCurrentPage(1);
-            }}
-            className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap shrink-0 ${
-              selectedDueMonth === 'ALL'
-                ? 'bg-emerald-600 text-white shadow-xs'
-                : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700'
-            }`}
-          >
-            All ({summaries.length})
-          </button>
-
-          {ACADEMIC_MONTHS.map((m) => {
-            const counts = monthDueCounts[m.key];
-            const isSelected = selectedDueMonth === m.key;
-            const displayCount = isExclusiveMonthDue
-              ? `${counts.exclusive}/${counts.total}`
-              : `${counts.total}`;
-            const hasDues = counts.total > 0;
-
-            return (
-              <button
-                key={m.key}
-                type="button"
-                onClick={() => {
-                  setSelectedDueMonth(m.key);
-                  setCurrentPage(1);
-                }}
-                className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap shrink-0 ${
-                  isSelected
-                    ? 'bg-rose-600 text-white shadow-sm ring-2 ring-rose-300 dark:ring-rose-800'
-                    : hasDues
-                    ? 'bg-white dark:bg-slate-800 text-rose-700 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 border border-rose-200 dark:border-rose-900/40'
-                    : 'bg-white dark:bg-slate-800 text-slate-400 dark:text-slate-500 border border-slate-200 dark:border-slate-700 hover:bg-slate-50'
-                }`}
-                title={
-                  isExclusiveMonthDue
-                    ? `${m.label}: ${counts.exclusive} exclusive (${counts.exclusive}/${counts.total} total)`
-                    : `Click to show students with dues in ${m.label}`
-                }
-              >
-                <span>{m.shortLabel}</span>
-                <span
-                  className={`text-[9.5px] px-1 py-0.2 rounded-full font-mono font-bold ${
-                    isSelected
-                      ? 'bg-white/25 text-white'
-                      : hasDues
-                      ? 'bg-rose-100 dark:bg-rose-950 text-rose-800 dark:text-rose-300'
-                      : 'bg-slate-100 dark:bg-slate-700 text-slate-400'
-                  }`}
-                >
-                  {displayCount}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-
-        {selectedDueMonth !== 'ALL' && (
-          <button
-            type="button"
-            onClick={() => {
-              setSelectedDueMonth('ALL');
-              setCurrentPage(1);
-            }}
-            className="text-xs text-rose-600 dark:text-rose-400 hover:underline font-bold shrink-0 flex items-center gap-1 cursor-pointer"
-          >
-            <span>✕ Clear Filter</span>
-          </button>
-        )}
       </div>
 
       {/* Active Filter Notification: Showing ONLY those names */}

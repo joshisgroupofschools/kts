@@ -100,8 +100,16 @@ export const DualA5ReceiptModal: React.FC<DualA5ReceiptModalProps> = ({
             <div className="p-1 px-2">
               <span className="text-gray-600 font-semibold">Payment Mode: </span>
               <strong className="font-mono font-black text-black">
-                {transaction.paymentMode.toUpperCase()}
-                {transaction.referenceNo ? ` [UTR: ${transaction.referenceNo}]` : ''}
+                {(() => {
+                  if (transaction.paymentMode === 'UPI') {
+                    const rawRef = transaction.referenceNo || '';
+                    const isInvalidRef = rawRef.startsWith('Commitment') || rawRef.startsWith('Rct') || rawRef.length < 5;
+                    const ref = isInvalidRef ? '' : rawRef.replace(/\D/g, '');
+                    const last5 = ref.length >= 5 ? ref.slice(-5) : 'XXXXX';
+                    return `UPI (${last5})`;
+                  }
+                  return transaction.paymentMode.toUpperCase();
+                })()}
               </strong>
             </div>
           </div>
@@ -316,8 +324,8 @@ export const DualA5ReceiptModal: React.FC<DualA5ReceiptModalProps> = ({
               page-break-inside: avoid !important;
             }
             @page {
-              size: A4 landscape;
-              margin: 4mm;
+              size: A5 landscape;
+              margin: 3mm;
             }
           }
         `}</style>

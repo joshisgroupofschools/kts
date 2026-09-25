@@ -127,14 +127,24 @@ export const TodaysReceiptsModal: React.FC<TodaysReceiptsModalProps> = ({
       }
     });
 
-    // Automatic target calculation based on total remaining due divided by 30 days (or run rate)
+    // Automatic target calculation: Total Overdue Deficit ÷ Days Remaining in Current Cycle
     let autoTarget = dailyTarget;
     if (!autoTarget || autoTarget <= 0) {
-      let totalRemainingDue = 0;
+      const todayStr = selectedDate || new Date().toISOString().split('T')[0];
+      const todayDateObj = new Date(todayStr);
+      const lastDayOfMonth = new Date(todayDateObj.getFullYear(), todayDateObj.getMonth() + 1, 0).getDate();
+      const currentDay = todayDateObj.getDate();
+      const daysRemainingInCycle = Math.max(1, lastDayOfMonth - currentDay + 1);
+
+      let totalOverdueDeficit = 0;
       Object.values(studentSummaries).forEach((s: any) => {
-        totalRemainingDue += Number(s.totalDue) || 0;
+        (s.installments || []).forEach((ins: any) => {
+          if (ins.balanceAmount > 0 && ins.dueDate <= todayStr && ins.status !== 'paid') {
+            totalOverdueDeficit += ins.balanceAmount;
+          }
+        });
       });
-      autoTarget = Math.round(totalRemainingDue / 30) || 133970;
+      autoTarget = Math.round(totalOverdueDeficit / daysRemainingInCycle) || 133970;
     }
     const target = autoTarget;
     const collectionPercent = Math.min(999, (totalCollected / target) * 100);
@@ -251,13 +261,20 @@ export const TodaysReceiptsModal: React.FC<TodaysReceiptsModalProps> = ({
 
   return (
     <div
-      id="modal-todays-receipts"
-      className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-950/75 backdrop-blur-xs overflow-y-auto animate-fadeIn"
+      id="page-todays-receipts"
+      className="fixed inset-0 z-50 bg-white dark:bg-slate-900 overflow-y-auto flex flex-col animate-fadeIn"
     >
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 w-full max-w-6xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[94vh]">
+      <div className="w-full min-h-screen flex flex-col bg-slate-50 dark:bg-slate-950">
         {/* Header Bar */}
-        <div className="px-5 py-4 bg-slate-900 text-white flex flex-wrap items-center justify-between gap-3 border-b border-slate-800">
+        <div className="px-6 py-4 bg-slate-900 text-white flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 shadow-md">
           <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold border border-slate-700 flex items-center gap-1.5 cursor-pointer transition-colors"
+            >
+              ← Back to Dashboard
+            </button>
             <div className="p-2.5 rounded-xl bg-emerald-600 text-white shadow-sm">
               <Receipt className="w-5 h-5" />
             </div>
@@ -334,43 +351,17 @@ export const TodaysReceiptsModal: React.FC<TodaysReceiptsModalProps> = ({
         {/* Top Summary Cards (TARGET, TOTAL ACHIEVED, ACHIEVED %, UPI, CASH, MONTH) */}
         <div className="p-4 sm:p-5 bg-slate-50 dark:bg-slate-850/50 border-b border-slate-200 dark:border-slate-800">
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3">
-            {/* 1. TARGET */}
+            {/* 1. TARGET RUN-RATE */}
             <div className="p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-2xs">
-              <div className="flex items-center justify-between text-slate-500 dark:text-slate-400 text-[11px] font-bold uppercase tracking-wider mb-1">
-                <span>Daily Target</span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setTempTarget(String(stats.target));
-                    setIsEditingTarget(true);
-                  }}
-                  className="text-emerald-600 dark:text-emerald-400 hover:underline text-[10px] lowercase"
-                  title="Edit Daily Target"
-                >
-                  Edit
-                </button>
+              <div className="text-slate-500 dark:text-slate-400 text-[11px] font-bold uppercase tracking-wider mb-1">
+                Target Run-Rate
               </div>
-              {isEditingTarget ? (
-                <div className="flex items-center gap-1 mt-1">
-                  <input
-                    type="number"
-                    value={tempTarget}
-                    onChange={(e) => setTempTarget(e.target.value)}
-                    className="w-full px-1.5 py-0.5 text-xs font-bold font-mono border rounded bg-slate-50 dark:bg-slate-900 border-emerald-500"
-                    autoFocus
-                  />
-                  <button
-                    onClick={handleSaveTarget}
-                    className="px-1.5 py-0.5 text-[10px] bg-emerald-600 text-white rounded font-bold"
-                  >
-                    ✓
-                  </button>
-                </div>
-              ) : (
-                <div className="text-base sm:text-lg font-black font-mono text-slate-800 dark:text-slate-100">
-                  {formatCurrency(stats.target, currencySymbol)}
-                </div>
-              )}
+              <div className="text-base sm:text-lg font-black font-mono text-slate-800 dark:text-slate-100">
+                {formatCurrency(stats.target, currencySymbol)}
+              </div>
+              <span className="text-[9.5px] text-slate-400 dark:text-slate-500 block mt-0.5">
+                Overdue Deficit ÷ Days Left
+              </span>
             </div>
 
             {/* 2. TOTAL COLLECTED */}
