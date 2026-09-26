@@ -817,8 +817,9 @@ export const TrialVerificationView: React.FC<TrialVerificationViewProps> = ({
                                         </div>
                                       )}
                                       {row.oldDueFee > 0 && OLD_DUE_DATES.map((date, idx) => {
-                                        const base = Math.floor(row.oldDueFee / 7);
-                                        const rem = row.oldDueFee % 7;
+                                        const oldDueInstallmentCount = OLD_DUE_DATES.length;
+                                        const base = Math.floor(row.oldDueFee / oldDueInstallmentCount);
+                                        const rem = row.oldDueFee % oldDueInstallmentCount;
                                         const instAmt = idx === 0 ? base + rem : base;
                                         return (
                                           <div

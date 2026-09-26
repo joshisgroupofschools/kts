@@ -150,7 +150,7 @@ export const TodaysReceiptsModal: React.FC<TodaysReceiptsModalProps> = ({
     const diffTime = new Date(`${nextMonthTenth}T00:00:00Z`).getTime() - new Date(`${todayStr}T00:00:00Z`).getTime();
     const daysRemaining = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
 
-    const target = dailyTarget && dailyTarget > 0 && dailyTarget !== 50000 ? dailyTarget : (Math.round(totalOverdueDeficit / daysRemaining) || 57416);
+    const target = Math.ceil(totalOverdueDeficit / daysRemaining) || 0;
     const collectionPercent = Math.min(999, (totalCollected / target) * 100);
     const canCloseDay = dayTransactions.length > 0 && pendingCount === 0;
 
@@ -169,7 +169,7 @@ export const TodaysReceiptsModal: React.FC<TodaysReceiptsModalProps> = ({
       daysRemaining,
       nextMonthTenth,
     };
-  }, [dayTransactions, dailyTarget, studentSummaries]);
+  }, [dayTransactions, studentSummaries]);
 
   // Month stats for month target & month collected
   const monthStats = useMemo(() => {
@@ -182,7 +182,7 @@ export const TodaysReceiptsModal: React.FC<TodaysReceiptsModalProps> = ({
         monthCollected += tx.amount || 0;
       }
     });
-    const monthTarget = stats.target * 30;
+    const monthTarget = stats.totalOverdueDeficit;
     const monthCollectionPercent = Math.min(999, (monthCollected / monthTarget) * 100);
     return {
       monthCollected,
@@ -434,7 +434,7 @@ export const TodaysReceiptsModal: React.FC<TodaysReceiptsModalProps> = ({
             {/* 6. MONTHLY TARGET & COLLECTED */}
             <div className="p-3 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800/80 rounded-xl shadow-2xs col-span-2 sm:col-span-1">
               <div className="flex items-center justify-between text-blue-700 dark:text-blue-300 text-[10.5px] font-bold uppercase tracking-wider mb-1">
-                <span>Month Target & Collected</span>
+                <span>Backlog Target & Collected</span>
                 <span className="text-[9.5px] font-mono">{monthStats.monthCollectionPercent.toFixed(1)}%</span>
               </div>
               <div className="text-sm font-black font-mono text-blue-800 dark:text-blue-200">

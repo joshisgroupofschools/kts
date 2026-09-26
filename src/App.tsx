@@ -500,24 +500,27 @@ export default function App() {
         struct.committedFee,
         struct.installmentsCount
       );
+      const existingHeadInstallments = existingStudentInstallments
+        .filter((ei) => ei.headName === struct.headName)
+        .sort((a, b) => a.dueDate.localeCompare(b.dueDate) || a.installmentNumber - b.installmentNumber);
+      let paidToCarryForward = existingHeadInstallments.reduce((sum, ei) => sum + Math.max(0, ei.paidAmount || 0), 0);
+
       generated.forEach((genInst) => {
         const existingPaidMatch = existingStudentInstallments.find(
           (ei) => ei.headName === genInst.headName && ei.installmentNumber === genInst.installmentNumber
         );
-        if (existingPaidMatch && existingPaidMatch.paidAmount > 0) {
-          const reconciledPaid = existingPaidMatch.paidAmount;
-          const reconciledBal = Math.max(0, genInst.amount - reconciledPaid);
-          const reconciledStatus = reconciledBal === 0 ? ('paid' as const) : ('partial' as const);
-          newInstallmentsList.push({
-            ...genInst,
-            id: existingPaidMatch.id,
-            paidAmount: reconciledPaid,
-            balanceAmount: reconciledBal,
-            status: reconciledStatus,
-          });
-        } else {
-          newInstallmentsList.push(genInst);
-        }
+        const reconciledPaid = Math.min(genInst.amount, paidToCarryForward);
+        paidToCarryForward -= reconciledPaid;
+        const reconciledBal = Math.max(0, genInst.amount - reconciledPaid);
+        const reconciledStatus: Installment['status'] =
+          reconciledBal === 0 ? 'paid' : reconciledPaid > 0 ? 'partial' : 'unpaid';
+        newInstallmentsList.push({
+          ...genInst,
+          id: existingPaidMatch?.id || genInst.id,
+          paidAmount: reconciledPaid,
+          balanceAmount: reconciledBal,
+          status: reconciledStatus,
+        });
       });
     });
 

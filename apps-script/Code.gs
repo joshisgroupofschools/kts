@@ -267,6 +267,25 @@ function upsertRows(sheet, idColumnIndex, rows) {
   }
 }
 
+function deleteRowsByStudentIds(sheet, studentIds) {
+  if (!sheet || !studentIds || studentIds.length === 0) return;
+  var studentIdSet = {};
+  studentIds.forEach(function(id) {
+    if (id) studentIdSet[String(id)] = true;
+  });
+  var data = sheet.getDataRange().getValues();
+  if (data.length < 2) return;
+  var headers = data[0];
+  var studentIdCol = headers.indexOf('studentId');
+  if (studentIdCol < 0) return;
+  for (var r = data.length - 1; r >= 1; r--) {
+    var rowStudentId = String(parseRowValue(data[r][studentIdCol]) || '').trim();
+    if (studentIdSet[rowStudentId]) {
+      sheet.deleteRow(r + 1);
+    }
+  }
+}
+
 function logAudit(ss, entry) {
   try {
     var sheet = ss.getSheetByName(TAB_NAMES.AUDIT_LOG);
@@ -772,6 +791,18 @@ function bulkAddStudentsHandler(ss, payload) {
 function saveFeeStructureHandler(ss, payload) {
   var structures = payload.structures || (payload.structure ? [payload.structure] : []);
   var installments = payload.installments || [];
+  var studentIds = {};
+  structures.forEach(function(structure) {
+    if (structure && structure.studentId) studentIds[String(structure.studentId)] = true;
+  });
+  installments.forEach(function(installment) {
+    if (installment && installment.studentId) studentIds[String(installment.studentId)] = true;
+  });
+  var studentIdList = Object.keys(studentIds);
+  if (studentIdList.length > 0) {
+    deleteRowsByStudentIds(ss.getSheetByName(TAB_NAMES.FEE_STRUCTURES), studentIdList);
+    deleteRowsByStudentIds(ss.getSheetByName(TAB_NAMES.INSTALLMENTS), studentIdList);
+  }
   if (structures.length > 0) upsertRows(ss.getSheetByName(TAB_NAMES.FEE_STRUCTURES), 1, structures);
   if (installments.length > 0) upsertRows(ss.getSheetByName(TAB_NAMES.INSTALLMENTS), 1, installments);
   return createJsonResponse({ success: true, message: 'Fee structures & installments saved.', serverTime: new Date().toISOString() });

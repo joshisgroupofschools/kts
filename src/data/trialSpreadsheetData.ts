@@ -7691,7 +7691,7 @@ export const TRANSPORT_FEE_DUE_DATES = [
 ];
 
 export const OLD_DUE_DATES = [
-  "2026-09-10", "2026-10-10", "2026-11-10", "2026-12-10", "2027-01-10", "2027-02-10", "2027-03-10"
+  "2027-02-10", "2027-03-10", "2027-04-10"
 ];
 
 function splitInstallmentAmounts(total: number, count: number): number[] {
@@ -7836,7 +7836,7 @@ export function generateStructuredRealData() {
       });
     }
 
-    // 3. Old Due (7 Installments: Sept 10 to March 10)
+    // 3. Old Due (3 Installments: Feb 10 to Apr 10)
     if (row.oldDueFee > 0) {
       const fsOldId = "fs_old_" + studentId;
       feeStructures.push({
@@ -7847,12 +7847,12 @@ export function generateStructuredRealData() {
         committedFee: row.oldDueFee,
         concession: 0,
         commitmentDate: "2026-06-15",
-        installmentsCount: 7,
+        installmentsCount: 3,
         isSpotFee: false,
         remarks: "Previous Year Pending Due",
       });
 
-      const oldAmounts = splitInstallmentAmounts(row.oldDueFee, 7);
+      const oldAmounts = splitInstallmentAmounts(row.oldDueFee, 3);
       oldAmounts.forEach((amt, i) => {
         installments.push({
           id: "inst_old_" + studentId + "_" + (i + 1),
@@ -7860,7 +7860,7 @@ export function generateStructuredRealData() {
           studentId,
           headName: "Old Due Carryover",
           installmentNumber: i + 1,
-          totalInstallments: 7,
+          totalInstallments: 3,
           amount: amt,
           dueDate: OLD_DUE_DATES[i],
           paidAmount: 0,

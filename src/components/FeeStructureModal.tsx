@@ -131,14 +131,17 @@ export const FeeStructureModal: React.FC<FeeStructureModalProps> = ({
       remarks?: string;
     }>
   >(
-    existingOtherMiscFees.map((m) => ({
-      id: m.id,
-      headName: m.headName,
-      amount: m.committedFee,
-      installments: m.installmentsCount,
-      isSpotFee: !!m.isSpotFee,
-      remarks: m.remarks,
-    }))
+    existingOtherMiscFees.map((m) => {
+      const isOldFee = /old|previous|arrear|carryover/i.test(m.headName);
+      return {
+        id: m.id,
+        headName: m.headName,
+        amount: m.committedFee,
+        installments: isOldFee ? 3 : m.installmentsCount,
+        isSpotFee: !!m.isSpotFee,
+        remarks: m.remarks,
+      };
+    })
   );
 
   // Computed totals
@@ -202,6 +205,7 @@ export const FeeStructureModal: React.FC<FeeStructureModalProps> = ({
 
     // 3. Other Misc and Spot Fees
     otherMiscFeeList.forEach((m) => {
+      const isOldFee = /old|previous|arrear|carryover/i.test(m.headName);
       newStructures.push({
         id: m.id,
         studentId: student.id,
@@ -210,7 +214,7 @@ export const FeeStructureModal: React.FC<FeeStructureModalProps> = ({
         committedFee: m.amount,
         concession: 0,
         commitmentDate: todayStr,
-        installmentsCount: m.installments,
+        installmentsCount: isOldFee ? 3 : m.installments,
         isSpotFee: m.isSpotFee,
         remarks: m.remarks,
       });

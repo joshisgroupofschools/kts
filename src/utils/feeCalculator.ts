@@ -16,7 +16,7 @@ import { getKolkataToday } from './dateUtils';
  * Head Defaults:
  * - School Tuition: 7 Installments (July 10 to January 10) -> startMonthIndex = 6 (July)
  * - Transport / Bus: 10 Installments (June 10 to March 10) -> startMonthIndex = 5 (June)
- * - Old Due Carryover: 7 Installments (September 10 to March 10) -> startMonthIndex = 8 (Sept)
+ * - Old Due Carryover: 3 Installments (February 10 to April 10) -> startMonthIndex = 1 (Feb)
  */
 export function generateInstallments(
   feeStructureId: string,
@@ -38,8 +38,8 @@ export function generateInstallments(
     finalCount = finalCount || 10;
     if (finalStartMonth === undefined) finalStartMonth = 5; // June
   } else if (lowerHead.includes('old') || lowerHead.includes('previous')) {
-    finalCount = finalCount || 7;
-    if (finalStartMonth === undefined) finalStartMonth = 8; // September
+    finalCount = 3;
+    finalStartMonth = 1; // February
   } else {
     // School Tuition / Default
     finalCount = finalCount || 7;
