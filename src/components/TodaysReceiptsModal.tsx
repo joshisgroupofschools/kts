@@ -151,7 +151,7 @@ export const TodaysReceiptsModal: React.FC<TodaysReceiptsModalProps> = ({
     const daysRemaining = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
 
     const target = Math.ceil(totalOverdueDeficit / daysRemaining) || 0;
-    const collectionPercent = Math.min(999, (totalCollected / target) * 100);
+    const collectionPercent = target > 0 ? Math.min(999, (totalCollected / target) * 100) : 0;
     const canCloseDay = dayTransactions.length > 0 && pendingCount === 0;
 
     return {
@@ -169,7 +169,7 @@ export const TodaysReceiptsModal: React.FC<TodaysReceiptsModalProps> = ({
       daysRemaining,
       nextMonthTenth,
     };
-  }, [dayTransactions, studentSummaries]);
+  }, [dayTransactions, studentSummaries, selectedDate]);
 
   // Check if day is already closed
   const existingDayClose = dayCloseRecords[selectedDate];
@@ -348,13 +348,13 @@ export const TodaysReceiptsModal: React.FC<TodaysReceiptsModalProps> = ({
           </div>
         )}
 
-        {/* Top Summary Cards (TARGET, TOTAL ACHIEVED, ACHIEVED %, UPI, CASH, MONTH) */}
+        {/* Daily collection summary */}
         <div className="p-4 sm:p-5 bg-slate-50 dark:bg-slate-850/50 border-b border-slate-200 dark:border-slate-800">
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-7 gap-3">
             {/* 1. TODAY YOU MUST COLLECT */}
             <div className="p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-2xs">
               <div className="text-slate-500 dark:text-slate-400 text-[11px] font-bold uppercase tracking-wider mb-1">
-                Today you must collect
+                Day Wise Target
               </div>
               <div className="text-base sm:text-lg font-black font-mono text-slate-800 dark:text-slate-100">
                 {formatCurrency(stats.target, currencySymbol)}
@@ -367,14 +367,23 @@ export const TodaysReceiptsModal: React.FC<TodaysReceiptsModalProps> = ({
             {/* 2. TOTAL COLLECTED */}
             <div className="p-3 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/80 rounded-xl shadow-2xs">
               <span className="text-emerald-700 dark:text-emerald-300 text-[11px] font-bold uppercase tracking-wider block mb-1">
-                Total Collected
+                Today Collected
               </span>
               <div className="text-base sm:text-lg font-black font-mono text-emerald-700 dark:text-emerald-300">
                 {formatCurrency(stats.totalCollected, currencySymbol)}
               </div>
             </div>
 
-            {/* 3. COLLECTION % */}
+            <div className="p-3 bg-orange-50 dark:bg-orange-950/40 border border-orange-200 dark:border-orange-800/80 rounded-xl shadow-2xs">
+              <span className="text-orange-700 dark:text-orange-300 text-[11px] font-bold uppercase tracking-wider block mb-1">
+                Today Yet to Collect
+              </span>
+              <div className="text-base sm:text-lg font-black font-mono text-orange-700 dark:text-orange-300">
+                {formatCurrency(Math.max(0, stats.target - stats.totalCollected), currencySymbol)}
+              </div>
+            </div>
+
+            {/* COLLECTION % */}
             <div className="p-3 bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800/80 rounded-xl shadow-2xs">
               <div className="flex items-center justify-between text-indigo-700 dark:text-indigo-300 text-[11px] font-bold uppercase tracking-wider mb-1">
                 <span>Collection %</span>
