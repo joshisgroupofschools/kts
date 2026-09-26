@@ -143,6 +143,7 @@ export const FinancialDashboard: React.FC<FinancialDashboardProps> = ({
     categoryCounts,
     actionTierCounts,
     headWiseBifurcation = [],
+    monthWiseOutstandingAnalysis = [],
   } = analytics;
 
   // Actual fee fallback
@@ -814,7 +815,7 @@ export const FinancialDashboard: React.FC<FinancialDashboardProps> = ({
       </div>
 
       {/* Headwise Financial Reconciliation Matrix */}
-      {headWiseBifurcation && headWiseBifurcation.length > 0 && (
+      {monthWiseOutstandingAnalysis.length > 0 && (
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 sm:p-5 shadow-xs space-y-3">
           <div className="flex items-center justify-between flex-wrap gap-2 pb-2.5 border-b border-slate-100 dark:border-slate-800">
             <div className="flex items-center gap-2">
@@ -823,23 +824,23 @@ export const FinancialDashboard: React.FC<FinancialDashboardProps> = ({
               </div>
               <div>
                 <h3 className="text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white">
-                  Head-wise Outstanding Student Analysis
+                  Month-wise Outstanding Student Analysis
                 </h3>
                 <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                  Exclusive = owes only this head. Previous head due = also owes an earlier configured fee head.
+                  Exclusive = this row is the student's earliest outstanding item. Previous due = an earlier row is also unpaid.
                 </p>
               </div>
             </div>
             <span className="text-[11px] font-mono text-slate-500">
-              {headWiseBifurcation.length} Fee Heads Tracked
+              {monthWiseOutstandingAnalysis.length} Ordered Instalment Rows
             </span>
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs font-mono">
+            <table id="month-wise-outstanding-table" className="w-full min-w-[1100px] text-left text-xs font-mono">
               <thead>
                 <tr className="border-b border-slate-200 dark:border-slate-700 text-[10px] text-slate-500 uppercase tracking-wider bg-slate-50 dark:bg-slate-850">
-                  <th className="py-2 px-3 font-bold">Fee Head</th>
+                  <th className="py-2 px-3 font-bold">Month / Fee Instalment</th>
                   <th className="py-2 px-3 font-bold text-right">Total Amount to Receive</th>
                   <th className="py-2 px-3 font-bold text-center">OS Students</th>
                   <th className="py-2 px-3 font-bold text-center">Exclusive Students</th>
@@ -849,30 +850,30 @@ export const FinancialDashboard: React.FC<FinancialDashboardProps> = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {headWiseBifurcation.map((head) => {
+                {monthWiseOutstandingAnalysis.map((row, index) => {
                   return (
-                    <tr key={head.headName} className="hover:bg-slate-50 dark:hover:bg-slate-850/60 transition-colors">
+                    <tr key={row.key} data-analysis-key={row.key} className="hover:bg-slate-50 dark:hover:bg-slate-850/60 transition-colors">
                       <td className="py-2.5 px-3 font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                        {getHeadIcon(head.headName)}
-                        <span>{head.headName}</span>
+                        {getHeadIcon(row.rowLabel)}
+                        <span>{index + 1}. {row.rowLabel}</span>
                       </td>
                       <td className="py-2.5 px-3 text-right font-bold text-rose-600 dark:text-rose-400">
-                        {formatCurrency(head.totalBalanceDue, currencySymbol)}
+                        {formatCurrency(row.totalAmountToReceive, currencySymbol)}
                       </td>
                       <td className="py-2.5 px-3 text-center font-bold text-slate-800 dark:text-slate-200">
-                        {head.outstandingStudentsCount}
+                        {row.outstandingStudentsCount}
                       </td>
                       <td className="py-2.5 px-3 text-center font-bold text-indigo-700 dark:text-indigo-300">
-                        {head.exclusiveStudentsCount}
+                        {row.exclusiveStudentsCount}
                       </td>
                       <td className="py-2.5 px-3 text-right font-bold text-indigo-700 dark:text-indigo-300">
-                        {formatCurrency(head.exclusiveStudentsAmount, currencySymbol)}
+                        {formatCurrency(row.exclusiveStudentsAmount, currencySymbol)}
                       </td>
                       <td className="py-2.5 px-3 text-center font-bold text-amber-700 dark:text-amber-300">
-                        {head.previousHeadDueStudentsCount}
+                        {row.previousDueStudentsCount}
                       </td>
                       <td className="py-2.5 px-3 text-right font-bold text-amber-700 dark:text-amber-300">
-                        {formatCurrency(head.previousHeadDueStudentsAmount, currencySymbol)}
+                        {formatCurrency(row.previousDueStudentsAmount, currencySymbol)}
                       </td>
                     </tr>
                   );

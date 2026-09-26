@@ -199,6 +199,17 @@ export interface FeeHeadBifurcation {
   isSpotFee?: boolean;
 }
 
+export interface MonthWiseOutstandingRow {
+  key: string;
+  rowLabel: string;
+  totalAmountToReceive: number;
+  outstandingStudentsCount: number;
+  exclusiveStudentsCount: number;
+  exclusiveStudentsAmount: number;
+  previousDueStudentsCount: number;
+  previousDueStudentsAmount: number;
+}
+
 export interface AnalyticsSummary {
   totalStudents: number;
   activeStudents: number;
@@ -239,6 +250,7 @@ export interface AnalyticsSummary {
     actionRequired: number;
   };
   headWiseBifurcation: FeeHeadBifurcation[];
+  monthWiseOutstandingAnalysis: MonthWiseOutstandingRow[];
 }
 
 export type BackendMode = 'GOOGLE_SHEETS' | 'LOCAL_CACHE';

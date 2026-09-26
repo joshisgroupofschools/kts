@@ -79,8 +79,9 @@ await pause(12000);
 const analytics = await evaluate(`({
   rootLength: document.getElementById('root')?.innerHTML.length || 0,
   textLength: document.body.innerText.length,
-  hasAnalytics: document.body.innerText.toLowerCase().includes('head-wise outstanding student analysis'),
+  hasAnalytics: document.body.innerText.toLowerCase().includes('month-wise outstanding student analysis'),
   hasRequestedTable: document.body.innerText.toLowerCase().includes('total amount to receive'),
+  orderedRows: Array.from(document.querySelectorAll('#month-wise-outstanding-table tbody tr')).map((row) => row.getAttribute('data-analysis-key')),
   bodyPreview: document.body.innerText.slice(0, 500)
 })`);
 
@@ -97,6 +98,12 @@ const flaggedReceipts = await evaluate(`({
 console.log(JSON.stringify({ loginVisible, ledger, payment, analytics, flaggedReceipts, browserErrors }, null, 2));
 socket.close();
 
-if (!loginVisible || !ledger.hasLedger || ledger.hasLoadingBlocker || !payment.modalVisible || !payment.amount || !analytics.hasAnalytics || !analytics.hasRequestedTable || !flaggedReceipts.hasFlaggedReceipts || browserErrors.length) {
+const orderIsCorrect = analytics.orderedRows?.length === 25
+  && analytics.orderedRows[0] === 'BOOKS'
+  && analytics.orderedRows[1] === 'TRANSPORT_1'
+  && analytics.orderedRows[2] === 'SCHOOL_1'
+  && analytics.orderedRows[24] === 'OLD_7';
+
+if (!loginVisible || !ledger.hasLedger || ledger.hasLoadingBlocker || !payment.modalVisible || !payment.amount || !analytics.hasAnalytics || !analytics.hasRequestedTable || !orderIsCorrect || !flaggedReceipts.hasFlaggedReceipts || browserErrors.length) {
   process.exitCode = 1;
 }

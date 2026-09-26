@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { getKolkataToday } from '../src/utils/dateUtils';
 import { formatWhatsAppReminderMessage, normalizePhoneNumber } from '../src/utils/installmentFormatter';
 import { normalizeInstallments, normalizeTransactions } from '../src/utils/normalizeCloudData';
+import { MONTH_WISE_OUTSTANDING_ORDER } from '../src/utils/analyticsEngine';
 
 assert.equal(getKolkataToday(new Date('2026-09-25T20:00:00Z')), '2026-09-26');
 assert.equal(normalizePhoneNumber('98765 43210'), '919876543210');
@@ -45,4 +46,16 @@ const normalizedInstallment = normalizeInstallments([{
 }])[0];
 assert.equal(normalizedInstallment.dueDate, '2026-07-10');
 
-console.log('Core date, cloud normalization, and WhatsApp verification passed.');
+assert.deepEqual(
+  MONTH_WISE_OUTSTANDING_ORDER.map((row) => row.key),
+  [
+    'BOOKS', 'TRANSPORT_1', 'SCHOOL_1', 'TRANSPORT_2', 'SCHOOL_2', 'TRANSPORT_3',
+    'SCHOOL_3', 'TRANSPORT_4', 'OLD_1', 'SCHOOL_4', 'TRANSPORT_5', 'OLD_2',
+    'SCHOOL_5', 'TRANSPORT_6', 'OLD_3', 'SCHOOL_6', 'TRANSPORT_7', 'OLD_4',
+    'SCHOOL_7', 'TRANSPORT_8', 'OLD_5', 'TRANSPORT_9', 'OLD_6', 'TRANSPORT_10', 'OLD_7',
+  ]
+);
+assert.equal(MONTH_WISE_OUTSTANDING_ORDER[0].rowLabel, 'BOOKS DUE');
+assert.equal(MONTH_WISE_OUTSTANDING_ORDER[24].rowLabel, 'OLD FEES - MARCH INSTALMENT 7/7');
+
+console.log('Core date, cloud normalization, month-wise order, and WhatsApp verification passed.');
