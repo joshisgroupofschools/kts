@@ -139,7 +139,7 @@ export default function App() {
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     const saved = localStorage.getItem('sfc_theme');
     if (saved === 'dark' || saved === 'light') return saved;
-    return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    return 'light';
   });
 
   useEffect(() => {
@@ -322,12 +322,25 @@ export default function App() {
     return sortClassList(Array.from(classSet));
   }, [classConfigs, students]);
 
+  const studentsForActiveScreens = useMemo(() => {
+    const collectedStudentIds = new Set(
+      transactions
+        .filter((tx) => !tx.isCancelled && (tx.amount || 0) > 0)
+        .map((tx) => tx.studentId)
+    );
+    return students.filter((student) => {
+      const name = student.name.trim().toLowerCase();
+      const isTrialChild = name === 'trial' || name.startsWith('trial ');
+      return !isTrialChild || collectedStudentIds.has(student.id);
+    });
+  }, [students, transactions]);
+
   // -------------------------------------------------------------
   // 4. Financial Calculations & Summary Computations
   // -------------------------------------------------------------
   const studentSummaries = useMemo<Record<string, StudentFinancialSummary>>(() => {
     const map: Record<string, StudentFinancialSummary> = {};
-    students.forEach((student) => {
+    studentsForActiveScreens.forEach((student) => {
       map[student.id] = computeStudentFinancialSummary(
         student,
         structures,
@@ -338,12 +351,12 @@ export default function App() {
       );
     });
     return map;
-  }, [students, structures, installments, transactions, tolerance, asOfDate]);
+  }, [studentsForActiveScreens, structures, installments, transactions, tolerance, asOfDate]);
 
   // Overall Financial Analytics
   const analytics = useMemo(() => {
     return computeSystemAnalytics(
-      students,
+      studentsForActiveScreens,
       structures,
       installments,
       transactions,
@@ -351,7 +364,7 @@ export default function App() {
       asOfDate,
       feeHeads
     );
-  }, [students, structures, installments, transactions, tolerance, asOfDate, feeHeads]);
+  }, [studentsForActiveScreens, structures, installments, transactions, tolerance, asOfDate, feeHeads]);
 
   const flaggedReceiptCount = useMemo(
     () => getDuplicateReceiptGroups(transactions).reduce((sum, [, entries]) => sum + entries.length - 1, 0),
@@ -1044,7 +1057,7 @@ export default function App() {
           currentDate={asOfDate}
           onChangeDate={setAsOfDate}
           transactions={transactions}
-          students={students}
+          students={studentsForActiveScreens}
           studentSummaries={studentSummaries}
           schoolProfile={safeSchoolProfile}
           dailyTarget={dailyTarget}
@@ -1057,6 +1070,7 @@ export default function App() {
             setActiveReceiptTransaction(tx);
             setActiveModal('RECEIPT');
           }}
+          onCancelReceipt={handleCancelReceipt}
           onClose={() => setActiveModal('NONE')}
         />
       )}

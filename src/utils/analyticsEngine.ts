@@ -20,6 +20,12 @@ export const MONTH_WISE_OUTSTANDING_ORDER: Array<{
   { key: 'MARCH', rowLabel: 'MARCH', monthNumber: 3 },
 ];
 
+const getNextMonthTenth = (dateString: string): string => {
+  const [yearText, monthText] = dateString.split('-');
+  const nextMonthTenth = new Date(Date.UTC(Number(yearText), Number(monthText), 10));
+  return nextMonthTenth.toISOString().slice(0, 10);
+};
+
 export function computeSystemAnalytics(
   students: Student[],
   feeStructures: StudentFeeStructure[],
@@ -138,18 +144,13 @@ export function computeSystemAnalytics(
       ? Math.min(100, Math.round((totalCollectedTillDate / totalExpectedTillDate) * 100))
       : 100;
 
-  // Smart Daily Recovery Run-Rate Target: collect current backlog by the day
-  // before the next active-student instalment becomes due.
-  const futureDueDates = installments
-    .filter((inst) => activeStudentIdSet.has(inst.studentId) && !isOldFeeInstallment(inst) && inst.balanceAmount > 0 && inst.dueDate > currentDateString)
-    .map((inst) => inst.dueDate)
-    .sort();
-  const nextDueDate = futureDueDates[0] || null;
+  // Smart Daily Recovery Run-Rate Target: collect current backlog by the 10th
+  // of the next month, using active non-old-fee dues only.
+  const nextDueDate = getNextMonthTenth(currentDateString);
   const currentDate = new Date(`${currentDateString}T00:00:00Z`);
-  const nextDue = nextDueDate ? new Date(`${nextDueDate}T00:00:00Z`) : null;
-  const deadlineDate = nextDue ? new Date(nextDue.getTime() - 86400000) : currentDate;
+  const deadlineDate = new Date(`${nextDueDate}T00:00:00Z`);
   const collectionDeadline = deadlineDate.toISOString().slice(0, 10);
-  const daysRemainingInCycle = Math.max(1, Math.floor((deadlineDate.getTime() - currentDate.getTime()) / 86400000) + 1);
+  const daysRemainingInCycle = Math.max(1, Math.ceil((deadlineDate.getTime() - currentDate.getTime()) / 86400000));
 
   const backlogGap = installments
     .filter((inst) => activeStudentIdSet.has(inst.studentId) && !isOldFeeInstallment(inst) && inst.balanceAmount > 0 && inst.dueDate <= currentDateString)

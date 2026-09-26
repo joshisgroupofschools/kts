@@ -1462,6 +1462,16 @@ export const MasterStudentTable: React.FC<MasterStudentTableProps> = ({
                       </td>
                     )}
 
+                    {/* Payable till date */}
+                    {columns.payableTillDate && (
+                      <td
+                        className={`${cellPadding} px-3 text-right font-mono font-black text-sky-800 dark:text-sky-300 bg-sky-50/70 dark:bg-sky-950/30`}
+                        title={`Scheduled payable till selected date: ${formatCurrency(item.expectedTillDate, currencySymbol)}`}
+                      >
+                        {formatCurrency(item.expectedTillDate, currencySymbol)}
+                      </td>
+                    )}
+
                     {/* 12. Due till date */}
                     {columns.dueTillDate && (
                       <td
@@ -1819,6 +1829,13 @@ export const MasterStudentTable: React.FC<MasterStudentTableProps> = ({
                 {columns.totalDue && (
                   <td className="py-2.5 px-2.5 text-right font-mono text-xs font-bold text-slate-800 dark:text-slate-200">
                     {formatCurrency(tableTotals.totalDue, currencySymbol)}
+                  </td>
+                )}
+
+                {/* Payable till date Total */}
+                {columns.payableTillDate && (
+                  <td className="py-2.5 px-3 text-right font-mono text-xs font-black text-sky-800 dark:text-sky-300 bg-sky-100/60 dark:bg-sky-950/60">
+                    {formatCurrency(tableTotals.payableTillDate, currencySymbol)}
                   </td>
                 )}
 

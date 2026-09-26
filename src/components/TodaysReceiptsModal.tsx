@@ -56,6 +56,7 @@ interface TodaysReceiptsModalProps {
     permissionDate?: string
   ) => void;
   onOpenReceiptModal: (transaction: PaymentTransaction) => void;
+  onCancelReceipt: (transactionId: string, cancelReason: string) => Promise<void>;
   onClose: () => void;
 }
 
@@ -73,6 +74,7 @@ export const TodaysReceiptsModal: React.FC<TodaysReceiptsModalProps> = ({
   onReopenDay,
   onUpdateTransactionSlip,
   onOpenReceiptModal,
+  onCancelReceipt,
   onClose,
 }) => {
   const [selectedDate, setSelectedDate] = useState<string>(currentDate);
@@ -82,6 +84,7 @@ export const TodaysReceiptsModal: React.FC<TodaysReceiptsModalProps> = ({
   const [isEditingTarget, setIsEditingTarget] = useState(false);
   const [tempTarget, setTempTarget] = useState<string>(String(dailyTarget));
   const [closeDaySuccess, setCloseDaySuccess] = useState(false);
+  const [cancellingReceiptId, setCancellingReceiptId] = useState<string | null>(null);
 
   const currencySymbol = schoolProfile?.currencySymbol || '₹';
 
@@ -130,26 +133,24 @@ export const TodaysReceiptsModal: React.FC<TodaysReceiptsModalProps> = ({
     // Automatic target calculation: Total Overdue Deficit ÷ Days Remaining until next due date / cycle
     const todayStr = selectedDate || '2026-09-26';
     let totalOverdueDeficit = 0;
-    let nextFutureDueDate: string | null = null;
+    const [yearText, monthText] = todayStr.split('-');
+    const nextMonthTenth = new Date(Date.UTC(Number(yearText), Number(monthText), 10)).toISOString().slice(0, 10);
 
     Object.values(studentSummaries).forEach((s: any) => {
+      if (s.student?.isActive === false) return;
       (s.installments || []).forEach((ins: any) => {
+        const head = String(ins.headName || '').toLowerCase();
+        if (/(old|previous|arrear|carryover)/.test(head)) return;
         if (ins.balanceAmount > 0 && ins.status !== 'paid') {
           if (ins.dueDate <= todayStr) {
             totalOverdueDeficit += ins.balanceAmount;
-          } else if (!nextFutureDueDate || ins.dueDate < nextFutureDueDate) {
-            nextFutureDueDate = ins.dueDate;
           }
         }
       });
     });
 
-    let daysRemaining = 14;
-    if (nextFutureDueDate) {
-      const diffTime = new Date(nextFutureDueDate).getTime() - new Date(todayStr).getTime();
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-      daysRemaining = Math.max(1, diffDays);
-    }
+    const diffTime = new Date(`${nextMonthTenth}T00:00:00Z`).getTime() - new Date(`${todayStr}T00:00:00Z`).getTime();
+    const daysRemaining = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
 
     const target = dailyTarget && dailyTarget > 0 && dailyTarget !== 50000 ? dailyTarget : (Math.round(totalOverdueDeficit / daysRemaining) || 57416);
     const collectionPercent = Math.min(999, (totalCollected / target) * 100);
@@ -166,6 +167,9 @@ export const TodaysReceiptsModal: React.FC<TodaysReceiptsModalProps> = ({
       verifiedCount,
       pendingCount,
       canCloseDay,
+      totalOverdueDeficit,
+      daysRemaining,
+      nextMonthTenth,
     };
   }, [dayTransactions, dailyTarget, studentSummaries]);
 
@@ -264,19 +268,32 @@ export const TodaysReceiptsModal: React.FC<TodaysReceiptsModalProps> = ({
     window.print();
   };
 
+  const handleCancelReceipt = async (tx: PaymentTransaction) => {
+    const reason = window.prompt(`Cancel receipt #${tx.receiptNo}? Enter cancellation reason:`);
+    if (!reason?.trim()) return;
+    try {
+      setCancellingReceiptId(tx.id);
+      await onCancelReceipt(tx.id, reason.trim());
+    } catch (error: any) {
+      window.alert(error?.message || 'Unable to cancel receipt.');
+    } finally {
+      setCancellingReceiptId(null);
+    }
+  };
+
   return (
     <div
       id="page-todays-receipts"
-      className="fixed inset-0 z-50 bg-white dark:bg-slate-900 overflow-y-auto flex flex-col animate-fadeIn"
+      className="fixed inset-0 z-50 bg-slate-50 dark:bg-slate-900 overflow-y-auto flex flex-col animate-fadeIn"
     >
       <div className="w-full min-h-screen flex flex-col bg-slate-50 dark:bg-slate-950">
         {/* Header Bar */}
-        <div className="px-6 py-4 bg-slate-900 text-white flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 shadow-md">
+        <div className="px-6 py-4 bg-white dark:bg-slate-900 text-slate-900 dark:text-white flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-800 shadow-sm">
           <div className="flex items-center gap-3">
             <button
               type="button"
               onClick={onClose}
-              className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold border border-slate-700 flex items-center gap-1.5 cursor-pointer transition-colors"
+              className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-white text-xs font-bold border border-slate-200 dark:border-slate-700 flex items-center gap-1.5 cursor-pointer transition-colors"
             >
               ← Back to Dashboard
             </button>
@@ -285,7 +302,7 @@ export const TodaysReceiptsModal: React.FC<TodaysReceiptsModalProps> = ({
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-base sm:text-lg font-bold text-white tracking-tight">
+                <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white tracking-tight">
                   Today's Receipts & Day Reconciliation
                 </h2>
                 {existingDayClose ? (
@@ -300,7 +317,7 @@ export const TodaysReceiptsModal: React.FC<TodaysReceiptsModalProps> = ({
                   </span>
                 )}
               </div>
-              <p className="text-xs text-slate-400">
+              <p className="text-xs text-slate-500 dark:text-slate-400">
                 {schoolProfile.schoolName || 'Kakatiya School Boduppal'} • Cash & UPI Collections with Permission Slips
               </p>
             </div>
@@ -308,7 +325,7 @@ export const TodaysReceiptsModal: React.FC<TodaysReceiptsModalProps> = ({
 
           <div className="flex items-center gap-2.5">
             {/* Date Selector */}
-            <div className="flex items-center bg-slate-800 border border-slate-700 rounded-xl px-2.5 py-1.5 gap-2 text-xs">
+            <div className="flex items-center bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-2.5 py-1.5 gap-2 text-xs">
               <Calendar className="w-3.5 h-3.5 text-slate-400" />
               <input
                 type="date"
@@ -317,14 +334,14 @@ export const TodaysReceiptsModal: React.FC<TodaysReceiptsModalProps> = ({
                   setSelectedDate(e.target.value);
                   onChangeDate(e.target.value);
                 }}
-                className="bg-transparent text-white font-medium text-xs focus:outline-none cursor-pointer"
+                className="bg-transparent text-slate-900 dark:text-white font-medium text-xs focus:outline-none cursor-pointer"
               />
             </div>
 
             <button
               type="button"
               onClick={handlePrintDailySheet}
-              className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+              className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
               title="Print Daily Collection Sheet"
             >
               <Printer className="w-3.5 h-3.5" />
@@ -334,7 +351,7 @@ export const TodaysReceiptsModal: React.FC<TodaysReceiptsModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+              className="p-1.5 rounded-xl text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
               title="Close"
             >
               <X className="w-5 h-5" />
@@ -365,7 +382,7 @@ export const TodaysReceiptsModal: React.FC<TodaysReceiptsModalProps> = ({
                 {formatCurrency(stats.target, currencySymbol)}
               </div>
               <span className="text-[9.5px] text-slate-400 dark:text-slate-500 block mt-0.5">
-                Overdue Deficit ÷ Days Left
+                Due till date ÷ {stats.daysRemaining} days, till {formatDate(stats.nextMonthTenth)}
               </span>
             </div>
 
@@ -397,11 +414,11 @@ export const TodaysReceiptsModal: React.FC<TodaysReceiptsModalProps> = ({
             </div>
 
             {/* 4. UPI TOTAL */}
-            <div className="p-3 bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800/80 rounded-xl shadow-2xs">
-              <span className="text-purple-700 dark:text-purple-300 text-[11px] font-bold uppercase tracking-wider block mb-1">
+            <div className="p-3 bg-violet-50 dark:bg-violet-950/40 border border-violet-200 dark:border-violet-800/80 rounded-xl shadow-2xs">
+              <span className="text-violet-700 dark:text-violet-300 text-[11px] font-bold uppercase tracking-wider block mb-1">
                 UPI Total
               </span>
-              <div className="text-base sm:text-lg font-black font-mono text-purple-700 dark:text-purple-300">
+              <div className="text-base sm:text-lg font-black font-mono text-violet-700 dark:text-violet-300">
                 {formatCurrency(stats.upiTotal, currencySymbol)}
               </div>
             </div>
@@ -850,6 +867,20 @@ export const TodaysReceiptsModal: React.FC<TodaysReceiptsModalProps> = ({
                                 <MessageCircle className="w-3.5 h-3.5" />
                               </a>
                             )}
+
+                            <button
+                              type="button"
+                              onClick={() => handleCancelReceipt(tx)}
+                              disabled={cancellingReceiptId === tx.id}
+                              className="p-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300 border border-rose-200 dark:border-rose-800 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                              title="Cancel / Void Receipt"
+                            >
+                              {cancellingReceiptId === tx.id ? (
+                                <RotateCcw className="w-3.5 h-3.5 animate-spin" />
+                              ) : (
+                                <ShieldAlert className="w-3.5 h-3.5" />
+                              )}
+                            </button>
                           </div>
                         </td>
                       </tr>
