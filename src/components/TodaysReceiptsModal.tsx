@@ -171,26 +171,6 @@ export const TodaysReceiptsModal: React.FC<TodaysReceiptsModalProps> = ({
     };
   }, [dayTransactions, studentSummaries]);
 
-  // Month stats for month target & month collected
-  const monthStats = useMemo(() => {
-    const [y, m] = selectedDate.split('-');
-    let monthCollected = 0;
-    transactions.forEach((tx) => {
-      if (tx.isCancelled) return;
-      const txDate = tx.date.split(' ')[0];
-      if (txDate.startsWith(`${y}-${m}`)) {
-        monthCollected += tx.amount || 0;
-      }
-    });
-    const monthTarget = stats.totalOverdueDeficit;
-    const monthCollectionPercent = Math.min(999, (monthCollected / monthTarget) * 100);
-    return {
-      monthCollected,
-      monthTarget,
-      monthCollectionPercent,
-    };
-  }, [transactions, selectedDate, stats.target]);
-
   // Check if day is already closed
   const existingDayClose = dayCloseRecords[selectedDate];
 
@@ -370,7 +350,7 @@ export const TodaysReceiptsModal: React.FC<TodaysReceiptsModalProps> = ({
 
         {/* Top Summary Cards (TARGET, TOTAL ACHIEVED, ACHIEVED %, UPI, CASH, MONTH) */}
         <div className="p-4 sm:p-5 bg-slate-50 dark:bg-slate-850/50 border-b border-slate-200 dark:border-slate-800">
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
             {/* 1. TODAY YOU MUST COLLECT */}
             <div className="p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-2xs">
               <div className="text-slate-500 dark:text-slate-400 text-[11px] font-bold uppercase tracking-wider mb-1">
@@ -431,27 +411,7 @@ export const TodaysReceiptsModal: React.FC<TodaysReceiptsModalProps> = ({
               </div>
             </div>
 
-            {/* 6. MONTHLY TARGET & COLLECTED */}
-            <div className="p-3 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800/80 rounded-xl shadow-2xs col-span-2 sm:col-span-1">
-              <div className="flex items-center justify-between text-blue-700 dark:text-blue-300 text-[10.5px] font-bold uppercase tracking-wider mb-1">
-                <span>Backlog Target & Collected</span>
-                <span className="text-[9.5px] font-mono">{monthStats.monthCollectionPercent.toFixed(1)}%</span>
-              </div>
-              <div className="text-sm font-black font-mono text-blue-800 dark:text-blue-200">
-                {formatCurrency(monthStats.monthCollected, currencySymbol)}
-              </div>
-              <div className="text-[10px] text-blue-600 dark:text-blue-400 font-mono truncate">
-                Target: {formatCurrency(monthStats.monthTarget, currencySymbol)}
-              </div>
-              <div className="w-full bg-blue-200 dark:bg-blue-900 h-1.5 rounded-full mt-1 overflow-hidden">
-                <div
-                  className="bg-blue-600 dark:bg-blue-400 h-full rounded-full transition-all duration-500"
-                  style={{ width: `${Math.min(100, monthStats.monthCollectionPercent)}%` }}
-                />
-              </div>
-            </div>
-
-            {/* 7. RECEIPTS COUNT & SLIP STATUS */}
+            {/* 6. RECEIPTS COUNT & SLIP STATUS */}
             <div className="p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-2xs">
               <span className="text-slate-500 dark:text-slate-400 text-[11px] font-bold uppercase tracking-wider block mb-1">
                 Receipts / Slips
