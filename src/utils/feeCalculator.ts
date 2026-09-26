@@ -9,6 +9,7 @@ import {
 } from '../types';
 import { computeStudentStatus, hasOverdueBeyondToleranceMonth } from './statusResolver';
 import { getKolkataToday } from './dateUtils';
+import { compareOfficialInstallmentOrder, getOfficialInstallmentOrder } from './installmentFormatter';
 
 /**
  * Splits an amount evenly across N installments, with any remainder placed on earlier installments.
@@ -86,10 +87,9 @@ export function generateInstallments(
 }
 
 /**
- * Computes Chronological (FIFO) Knock-off Allocation across all unpaid/partial installments.
- * Sorting Rules:
- *  1. Earliest Due Date first.
- *  2. If due dates are equal: Installment with HIGHER balance gets priority.
+ * Computes FIFO Knock-off Allocation across all unpaid/partial installments.
+ * Sorting Rules follow the official school collection structure:
+ * Books, Transport June, School July, Transport July, ... Transport March, Old Fees Feb/Mar/Apr.
  */
 export function calculateFifoAllocations(
   installments: Installment[],
@@ -101,14 +101,7 @@ export function calculateFifoAllocations(
   const pending = installments
     .filter((inst) => inst.balanceAmount > 0)
     .map((inst) => ({ ...inst }))
-    .sort((a, b) => {
-      // 1. Sort by Due Date ASC
-      const dateDiff = new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
-      if (dateDiff !== 0) return dateDiff;
-
-      // 2. Tie-breaker: Highest balance first
-      return b.balanceAmount - a.balanceAmount;
-    });
+    .sort((a, b) => compareOfficialInstallmentOrder(a, b) || b.balanceAmount - a.balanceAmount);
 
   let remainingToAllocate = paymentAmount;
   const allocations: PaymentAllocation[] = [];
@@ -278,38 +271,44 @@ export function computeStudentFinancials(
   let nextInstallmentBalance = 0;
 
   if (unpaidRegularInstallments.length > 0) {
+    let nextInst: Installment | undefined;
     const upcoming = unpaidRegularInstallments
       .filter((inst) => inst.dueDate >= asOfDate)
-      .sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+      .sort(compareOfficialInstallmentOrder);
 
     if (upcoming.length > 0) {
-      nextDueDate = upcoming[0].dueDate;
+      nextInst = upcoming[0];
     } else {
-      const overdue = [...unpaidRegularInstallments].sort((a, b) => a.dueDate.localeCompare(b.dueDate));
-      nextDueDate = overdue[0].dueDate;
+      const overdue = [...unpaidRegularInstallments].sort(compareOfficialInstallmentOrder);
+      nextInst = overdue[0];
     }
 
-    if (nextDueDate) {
+    if (nextInst) {
+      nextDueDate = nextInst.dueDate;
+      const nextOrder = getOfficialInstallmentOrder(nextInst);
       nextInstallmentBalance = unpaidRegularInstallments
-        .filter((inst) => inst.dueDate === nextDueDate)
+        .filter((inst) => getOfficialInstallmentOrder(inst) === nextOrder)
         .reduce((sum, inst) => sum + inst.balanceAmount, 0);
     }
   } else if (studentInstallments.some((inst) => inst.balanceAmount > 0)) {
     const otherUnpaid = studentInstallments.filter((inst) => inst.balanceAmount > 0);
+    let nextInst: Installment | undefined;
     const upcoming = otherUnpaid
       .filter((inst) => inst.dueDate >= asOfDate)
-      .sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+      .sort(compareOfficialInstallmentOrder);
 
     if (upcoming.length > 0) {
-      nextDueDate = upcoming[0].dueDate;
+      nextInst = upcoming[0];
     } else {
-      const overdue = [...otherUnpaid].sort((a, b) => a.dueDate.localeCompare(b.dueDate));
-      nextDueDate = overdue[0].dueDate;
+      const overdue = [...otherUnpaid].sort(compareOfficialInstallmentOrder);
+      nextInst = overdue[0];
     }
 
-    if (nextDueDate) {
+    if (nextInst) {
+      nextDueDate = nextInst.dueDate;
+      const nextOrder = getOfficialInstallmentOrder(nextInst);
       nextInstallmentBalance = otherUnpaid
-        .filter((inst) => inst.dueDate === nextDueDate)
+        .filter((inst) => getOfficialInstallmentOrder(inst) === nextOrder)
         .reduce((sum, inst) => sum + inst.balanceAmount, 0);
     }
   }

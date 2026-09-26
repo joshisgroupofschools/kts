@@ -15,6 +15,57 @@ export function normalizeFeeHead(headName = ''): string {
   return headName.trim() || 'Fees';
 }
 
+const ACADEMIC_MONTH_ORDER = new Map<number, number>([
+  [6, 1],
+  [7, 2],
+  [8, 3],
+  [9, 4],
+  [10, 5],
+  [11, 6],
+  [12, 7],
+  [1, 8],
+  [2, 9],
+  [3, 10],
+  [4, 11],
+]);
+
+export function getOfficialInstallmentOrder(item: {
+  headName?: string;
+  installmentNumber?: number;
+  totalInstallments?: number;
+  dueDate?: string;
+}): number {
+  const head = normalizeFeeHead(item.headName || '');
+  const parsed = parseDateOnly(item.dueDate);
+  const month = parsed?.month || 0;
+  const monthOrder = ACADEMIC_MONTH_ORDER.get(month) || 99;
+  const installmentNumber = Number(item.installmentNumber || 0);
+
+  if (head === 'Books') return 0;
+  if (head === 'Transport') return monthOrder * 10 + 2;
+  if (head === 'School Fees') return monthOrder * 10 + 1;
+  if (head === 'Old Fees') return 1000 + installmentNumber;
+  return monthOrder * 10 + 9;
+}
+
+export function compareOfficialInstallmentOrder(a: {
+  headName?: string;
+  installmentNumber?: number;
+  totalInstallments?: number;
+  dueDate?: string;
+}, b: {
+  headName?: string;
+  installmentNumber?: number;
+  totalInstallments?: number;
+  dueDate?: string;
+}): number {
+  const orderDiff = getOfficialInstallmentOrder(a) - getOfficialInstallmentOrder(b);
+  if (orderDiff) return orderDiff;
+  const dateDiff = String(a.dueDate || '').localeCompare(String(b.dueDate || ''));
+  if (dateDiff) return dateDiff;
+  return Number(a.installmentNumber || 0) - Number(b.installmentNumber || 0);
+}
+
 export function getInstallmentDisplayName(
   headName: string,
   installmentNumber: number,
@@ -38,14 +89,7 @@ export function formatWhatsAppReminderMessage(
   const studentClass = student.className.startsWith('Class') ? student.className : `Class ${student.className}`;
   const dueInstallments = (summary.installments || [])
     .filter((item) => Number(item.balanceAmount) > 0 && item.status !== 'paid' && item.dueDate <= asOfDate)
-    .sort((a, b) => {
-      const dateOrder = String(a.dueDate).localeCompare(String(b.dueDate));
-      if (dateOrder) return dateOrder;
-      const rank = (head: string) => ['School Fees', 'Transport', 'Old Fees'].indexOf(normalizeFeeHead(head));
-      const aRank = rank(a.headName);
-      const bRank = rank(b.headName);
-      return (aRank < 0 ? 99 : aRank) - (bRank < 0 ? 99 : bRank);
-    });
+    .sort(compareOfficialInstallmentOrder);
 
   if (!dueInstallments.length) return { message: '', totalSum: 0, hasDue: false };
 

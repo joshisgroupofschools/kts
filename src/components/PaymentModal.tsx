@@ -11,7 +11,7 @@ import {
 } from '../types';
 import { calculateFifoAllocations } from '../utils/feeCalculator';
 import { formatCurrency, formatDate, getNextMultipleOfFiveDate } from '../utils/numberToWords';
-import { getInstallmentDisplayName } from '../utils/installmentFormatter';
+import { compareOfficialInstallmentOrder, getInstallmentDisplayName } from '../utils/installmentFormatter';
 import {
   AlertCircle,
   ArrowLeft,
@@ -475,7 +475,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                     {(() => {
-                      const sortedInstallments = [...summary.installments].sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+                      const sortedInstallments = [...summary.installments].sort(compareOfficialInstallmentOrder);
                       return sortedInstallments.map((inst) => {
                       const alloc = allocations.find((a) => a.installmentId === inst.id);
                       const allocatedAmt = alloc ? alloc.allocatedAmount : 0;

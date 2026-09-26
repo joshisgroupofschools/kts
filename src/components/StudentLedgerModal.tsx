@@ -6,7 +6,7 @@ import {
   StudentFinancialSummary,
 } from '../types';
 import { formatCurrency, formatDate } from '../utils/numberToWords';
-import { getInstallmentDisplayName } from '../utils/installmentFormatter';
+import { compareOfficialInstallmentOrder, getInstallmentDisplayName } from '../utils/installmentFormatter';
 import {
   AlertOctagon,
   ArrowRight,
@@ -152,7 +152,7 @@ export const StudentLedgerModal: React.FC<StudentLedgerModalProps> = ({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                  {summary.installments.map((inst) => {
+                  {[...summary.installments].sort(compareOfficialInstallmentOrder).map((inst) => {
                     const isOverdue =
                       inst.balanceAmount > 0 &&
                       !!asOfDate && inst.dueDate < asOfDate;
