@@ -12,6 +12,18 @@ import {
   MigrationVerificationReport
 } from '../types';
 
+const REQUEST_TIMEOUT_MS = 25000;
+
+async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit = {}): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  try {
+    return await fetch(input, { ...init, signal: controller.signal });
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
+}
+
 export async function callAppsScriptAction<T = any>(
   scriptUrl: string,
   action: string,
@@ -31,7 +43,7 @@ export async function callAppsScriptAction<T = any>(
   };
 
   try {
-    const response = await fetch(scriptUrl, {
+    const response = await fetchWithTimeout(scriptUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'text/plain;charset=utf-8'
@@ -69,14 +81,17 @@ export async function getBootstrapDataRepo(scriptUrl: string): Promise<GoogleShe
     const fetchUrl = scriptUrl.includes('?')
       ? `${scriptUrl}&action=getBootstrapData`
       : `${scriptUrl}?action=getBootstrapData`;
-    const res = await fetch(fetchUrl, { method: 'GET', redirect: 'follow' });
+    const res = await fetchWithTimeout(fetchUrl, { method: 'GET', redirect: 'follow' });
     const text = await res.text();
     const json = JSON.parse(text);
     if (typeof json.success !== 'boolean') {
       return { success: false, error: 'The Apps Script endpoint uses an outdated response format.' };
     }
     return json;
-  } catch {
+  } catch (error: any) {
+    if (error?.name === 'AbortError') {
+      return { success: false, error: 'Google Sheets took too long to respond. Cached data is shown read-only; use Refresh Now to retry.' };
+    }
     return callAppsScriptAction(scriptUrl, 'getBootstrapData');
   }
 }
@@ -84,7 +99,7 @@ export async function getBootstrapDataRepo(scriptUrl: string): Promise<GoogleShe
 export async function getChangesRepo(scriptUrl: string, revision?: number): Promise<GoogleSheetsResponse> {
   try {
     const separator = scriptUrl.includes('?') ? '&' : '?';
-    const res = await fetch(`${scriptUrl}${separator}action=getChanges&since=${revision ?? ''}`, { method: 'GET', redirect: 'follow' });
+    const res = await fetchWithTimeout(`${scriptUrl}${separator}action=getChanges&since=${revision ?? ''}`, { method: 'GET', redirect: 'follow' });
     const json = await res.json();
     if (typeof json.success !== 'boolean') return { success: false, error: 'The Apps Script endpoint uses an outdated response format.' };
     return json;

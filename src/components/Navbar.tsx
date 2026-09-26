@@ -7,6 +7,7 @@ import {
   Coins,
   Download,
   FileSpreadsheet,
+  Flag,
   HelpCircle,
   LayoutDashboard,
   Menu,
@@ -58,6 +59,7 @@ interface NavbarProps {
   onToggleView?: (view: AppView) => void;
   onOpenTodaysReceipts?: () => void;
   todaysStats?: { count: number; total: number; pendingSlips: number };
+  flaggedReceiptCount?: number;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -89,6 +91,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onToggleView,
   onOpenTodaysReceipts,
   todaysStats,
+  flaggedReceiptCount = 0,
 }) => {
   const [showDrawer, setShowDrawer] = useState(false);
   const [showToleranceDetails, setShowToleranceDetails] = useState(false);
@@ -111,7 +114,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               <div className="min-w-0 truncate">
                 <div className="flex items-center gap-1.5 sm:gap-2">
                   <h1 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white truncate tracking-tight">
-                    {schoolProfile.schoolName || 'Kakatiya School Boduppal'}
+                    KTS BODUPPAL FEES ERP SOFTWARE
                   </h1>
                   <span className="shrink-0 px-2 py-0.5 text-[10px] sm:text-[11px] font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-300 border border-emerald-300/60 dark:border-emerald-700/50 rounded-full whitespace-nowrap">
                     AY {schoolProfile.academicYear || '2026-27'}
@@ -249,7 +252,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 </div>
                 <div>
                   <h2 className="text-sm font-bold text-slate-900 dark:text-white leading-tight">
-                    {schoolProfile.schoolName || 'Kakatiya School'}
+                    KTS BODUPPAL FEES ERP SOFTWARE
                   </h2>
                   <p className="text-[11px] text-slate-500 dark:text-slate-400">
                     Menu & System Controls
@@ -553,6 +556,33 @@ export const Navbar: React.FC<NavbarProps> = ({
                     <ChevronRight className="w-4 h-4 text-slate-400" />
                   </button>
                 )}
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    onToggleView?.('FLAGGED_RECEIPTS');
+                    setShowDrawer(false);
+                  }}
+                  className={`w-full flex items-center justify-between p-3 rounded-xl border transition-colors text-left cursor-pointer ${
+                    activeView === 'FLAGGED_RECEIPTS'
+                      ? 'bg-amber-50 dark:bg-amber-950/60 border-amber-400 dark:border-amber-700'
+                      : 'bg-slate-50 hover:bg-slate-100 dark:bg-slate-800/60 dark:hover:bg-slate-800 border-slate-200 dark:border-slate-700'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-lg bg-amber-100 dark:bg-amber-950/80 text-amber-700 dark:text-amber-300">
+                      <Flag className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <div className="font-bold text-slate-900 dark:text-white text-xs flex items-center gap-1.5">
+                        Flagged Receipts
+                        {flaggedReceiptCount > 0 && <span className="rounded bg-rose-600 px-1.5 text-[9px] font-bold text-white">{flaggedReceiptCount}</span>}
+                      </div>
+                      <div className="text-[11px] text-slate-500 dark:text-slate-400">Review duplicate historical receipt numbers</div>
+                    </div>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-slate-400" />
+                </button>
               </div>
 
               {/* Main Features & Modules List */}
@@ -777,7 +807,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
             {/* Drawer Footer */}
             <div className="px-5 py-3 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-850 flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
-              <span>Kakatiya School Ledger v2.0 (Sept Updates)</span>
+              <span>KTS BODUPPAL FEES ERP SOFTWARE</span>
               <span>229 Students Active</span>
             </div>
           </div>

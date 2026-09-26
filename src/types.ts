@@ -190,6 +190,11 @@ export interface FeeHeadBifurcation {
   totalDueTillDate: number;
   totalBalanceDue: number;
   activeStudentsCount: number;
+  outstandingStudentsCount: number;
+  exclusiveStudentsCount: number;
+  exclusiveStudentsAmount: number;
+  previousHeadDueStudentsCount: number;
+  previousHeadDueStudentsAmount: number;
   collectionRate: number;
   isSpotFee?: boolean;
 }
@@ -281,4 +286,4 @@ export interface MigrationVerificationReport {
   errors: string[];
 }
 
-export type AppView = 'LEDGER' | 'ANALYTICS' | 'TRIAL_VERIFICATION';
+export type AppView = 'LEDGER' | 'ANALYTICS' | 'FLAGGED_RECEIPTS' | 'TRIAL_VERIFICATION';

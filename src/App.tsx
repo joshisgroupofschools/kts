@@ -90,6 +90,7 @@ import { BulkUploadModal } from './components/BulkUploadModal';
 import { TrialVerificationView } from './components/TrialVerificationView';
 import { TodaysReceiptsModal } from './components/TodaysReceiptsModal';
 import { PasscodeGate } from './components/PasscodeGate';
+import { FlaggedReceiptsView, getDuplicateReceiptGroups } from './components/FlaggedReceiptsView';
 import { generateStructuredRealData } from './data/trialSpreadsheetData';
 import { ArrowRight, CheckCircle2, Coins, FileSpreadsheet, Sparkles, Users } from 'lucide-react';
 
@@ -112,6 +113,7 @@ export default function App() {
   const [currentView, setCurrentView] = useState<AppView>(() => {
     const saved = localStorage.getItem('sfc_current_view');
     if (saved === 'ANALYTICS') return 'ANALYTICS';
+    if (saved === 'FLAGGED_RECEIPTS') return 'FLAGGED_RECEIPTS';
     if (saved === 'TRIAL_VERIFICATION') return 'TRIAL_VERIFICATION';
     return 'LEDGER';
   });
@@ -272,8 +274,17 @@ export default function App() {
     saveGoogleScriptUrl(DEFAULT_SCRIPT_WEBAPP_URL);
     saveSpreadsheetUrl(TARGET_GOOGLE_SHEET_URL);
     refreshFromSheets(true);
+    // Never trap users on the startup screen when Apps Script has a cold/slow response.
+    // Cached data remains read-only until the central backend confirms connectivity.
+    const startupFallback = window.setTimeout(() => {
+      setIsInitialLoading(false);
+      setSyncError((current) => current || 'Central data is still loading. Cached data is read-only until synchronization completes.');
+    }, 6000);
     const timer = window.setInterval(() => refreshFromSheets(false), 7000);
-    return () => window.clearInterval(timer);
+    return () => {
+      window.clearTimeout(startupFallback);
+      window.clearInterval(timer);
+    };
   }, [refreshFromSheets]);
 
   // Safe schoolProfile guaranteeing all fields
@@ -329,9 +340,15 @@ export default function App() {
       installments,
       transactions,
       tolerance,
-      asOfDate
+      asOfDate,
+      feeHeads
     );
-  }, [students, structures, installments, transactions, tolerance, asOfDate]);
+  }, [students, structures, installments, transactions, tolerance, asOfDate, feeHeads]);
+
+  const flaggedReceiptCount = useMemo(
+    () => getDuplicateReceiptGroups(transactions).reduce((sum, [, entries]) => sum + entries.length - 1, 0),
+    [transactions]
+  );
 
   // Filtered summaries list based on active dashboard/class filters
   const filteredStudentSummaries = useMemo(() => {
@@ -706,7 +723,7 @@ export default function App() {
     <PasscodeGate
       schoolProfile={safeSchoolProfile}
       requiredPasscode="2025"
-      title="Kakatiya School Administration"
+      title="KTS Boduppal Fees ERP Software"
       subtitle="Protected Area • Enter 4-digit PIN to access software"
     >
       <div className="min-h-screen bg-slate-100 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col font-sans transition-colors">
@@ -749,6 +766,7 @@ export default function App() {
         onToggleView={(v) => handleSetCurrentView(v)}
         onOpenTodaysReceipts={() => setActiveModal('TODAYS_RECEIPTS')}
         todaysStats={todaysStats}
+        flaggedReceiptCount={flaggedReceiptCount}
       />
 
       {/* Main Workspace Container */}
@@ -803,6 +821,12 @@ export default function App() {
               onNavigateToLedger={() => handleSetCurrentView('LEDGER')}
             />
           </PasscodeGate>
+        ) : currentView === 'FLAGGED_RECEIPTS' ? (
+          <FlaggedReceiptsView
+            transactions={transactions}
+            schoolProfile={safeSchoolProfile}
+            onBack={() => handleSetCurrentView('LEDGER')}
+          />
         ) : (
           <div className="space-y-4">
             {/* Master Student Ledger Table */}

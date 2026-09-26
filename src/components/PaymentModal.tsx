@@ -74,10 +74,11 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
 
   const initialAmount = useMemo(() => {
     const list = filteredInstallments.length > 0 && initialFeeType !== 'ALL' ? filteredInstallments : summary.installments;
-    const dueList = list.filter((i) => i.balanceAmount > 0);
-    const sumDue = dueList.reduce((acc, i) => acc + i.balanceAmount, 0);
-    return sumDue > 0 ? sumDue : (summary.dueTillDate > 0 ? summary.dueTillDate : summary.totalDue);
-  }, [filteredInstallments, summary.installments, summary.totalDue, summary.dueTillDate, initialFeeType]);
+    const selectedDate = currentDate || getKolkataToday();
+    return list
+      .filter((i) => i.balanceAmount > 0 && i.dueDate <= selectedDate)
+      .reduce((acc, i) => acc + i.balanceAmount, 0);
+  }, [filteredInstallments, summary.installments, initialFeeType, currentDate]);
 
   const [paymentAmount, setPaymentAmount] = useState<number>(initialAmount);
   const [paymentMode, setPaymentMode] = useState<PaymentMode>('Cash');

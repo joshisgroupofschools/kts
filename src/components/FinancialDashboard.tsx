@@ -823,10 +823,10 @@ export const FinancialDashboard: React.FC<FinancialDashboardProps> = ({
               </div>
               <div>
                 <h3 className="text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white">
-                  Headwise Fee Reconciliation Matrix
+                  Head-wise Outstanding Student Analysis
                 </h3>
                 <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                  Committed, collected till date, overdue deficit, and recovery rate by head
+                  Exclusive = owes only this head. Previous head due = also owes an earlier configured fee head.
                 </p>
               </div>
             </div>
@@ -840,50 +840,39 @@ export const FinancialDashboard: React.FC<FinancialDashboardProps> = ({
               <thead>
                 <tr className="border-b border-slate-200 dark:border-slate-700 text-[10px] text-slate-500 uppercase tracking-wider bg-slate-50 dark:bg-slate-850">
                   <th className="py-2 px-3 font-bold">Fee Head</th>
-                  <th className="py-2 px-3 font-bold text-right">Committed</th>
-                  <th className="py-2 px-3 font-bold text-right">Expected (Due)</th>
-                  <th className="py-2 px-3 font-bold text-right text-emerald-600 dark:text-emerald-400">Collected</th>
-                  <th className="py-2 px-3 font-bold text-right text-rose-600 dark:text-rose-400">Overdue Deficit</th>
-                  <th className="py-2 px-3 font-bold text-right">Total Balance</th>
-                  <th className="py-2 px-3 font-bold text-center">Realization</th>
+                  <th className="py-2 px-3 font-bold text-right">Total Amount to Receive</th>
+                  <th className="py-2 px-3 font-bold text-center">OS Students</th>
+                  <th className="py-2 px-3 font-bold text-center">Exclusive Students</th>
+                  <th className="py-2 px-3 font-bold text-right">Exclusive Amount</th>
+                  <th className="py-2 px-3 font-bold text-center">Previous Head Due Also</th>
+                  <th className="py-2 px-3 font-bold text-right">Amount from Those Students</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                 {headWiseBifurcation.map((head) => {
-                  const realizationPct = head.totalExpectedTillDate > 0
-                    ? Math.round((head.totalCollected / head.totalExpectedTillDate) * 100)
-                    : 100;
                   return (
                     <tr key={head.headName} className="hover:bg-slate-50 dark:hover:bg-slate-850/60 transition-colors">
                       <td className="py-2.5 px-3 font-bold text-slate-900 dark:text-white flex items-center gap-2">
                         {getHeadIcon(head.headName)}
                         <span>{head.headName}</span>
                       </td>
-                      <td className="py-2.5 px-3 text-right text-slate-800 dark:text-slate-200">
-                        {formatCurrency(head.totalCommitted, currencySymbol)}
-                      </td>
-                      <td className="py-2.5 px-3 text-right text-slate-700 dark:text-slate-300">
-                        {formatCurrency(head.totalExpectedTillDate, currencySymbol)}
-                      </td>
-                      <td className="py-2.5 px-3 text-right font-bold text-emerald-600 dark:text-emerald-400">
-                        {formatCurrency(head.totalCollected, currencySymbol)}
-                      </td>
                       <td className="py-2.5 px-3 text-right font-bold text-rose-600 dark:text-rose-400">
-                        {formatCurrency(head.totalDueTillDate, currencySymbol)}
-                      </td>
-                      <td className="py-2.5 px-3 text-right text-slate-600 dark:text-slate-400">
                         {formatCurrency(head.totalBalanceDue, currencySymbol)}
                       </td>
-                      <td className="py-2.5 px-3 text-center">
-                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                          realizationPct >= 80
-                            ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300'
-                            : realizationPct >= 50
-                            ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300'
-                            : 'bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300'
-                        }`}>
-                          {realizationPct}%
-                        </span>
+                      <td className="py-2.5 px-3 text-center font-bold text-slate-800 dark:text-slate-200">
+                        {head.outstandingStudentsCount}
+                      </td>
+                      <td className="py-2.5 px-3 text-center font-bold text-indigo-700 dark:text-indigo-300">
+                        {head.exclusiveStudentsCount}
+                      </td>
+                      <td className="py-2.5 px-3 text-right font-bold text-indigo-700 dark:text-indigo-300">
+                        {formatCurrency(head.exclusiveStudentsAmount, currencySymbol)}
+                      </td>
+                      <td className="py-2.5 px-3 text-center font-bold text-amber-700 dark:text-amber-300">
+                        {head.previousHeadDueStudentsCount}
+                      </td>
+                      <td className="py-2.5 px-3 text-right font-bold text-amber-700 dark:text-amber-300">
+                        {formatCurrency(head.previousHeadDueStudentsAmount, currencySymbol)}
                       </td>
                     </tr>
                   );

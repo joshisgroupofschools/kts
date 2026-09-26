@@ -1,4 +1,4 @@
-import { AnalyticsSummary, Installment, PaymentTransaction, Student, StudentFeeStructure, ToleranceConfig } from '../types';
+import { AnalyticsSummary, FeeHeadDefinition, Installment, PaymentTransaction, Student, StudentFeeStructure, ToleranceConfig } from '../types';
 import { computeStudentFinancials } from './feeCalculator';
 import { computeStudentStatus } from './statusResolver';
 import { getKolkataToday } from './dateUtils';
@@ -9,7 +9,8 @@ export function computeSystemAnalytics(
   installments: Installment[],
   payments: PaymentTransaction[],
   tolerance: ToleranceConfig,
-  currentDateString: string = getKolkataToday()
+  currentDateString: string = getKolkataToday(),
+  configuredFeeHeads: FeeHeadDefinition[] = []
 ): AnalyticsSummary {
   const activeStudentsList = students.filter((s) => s.isActive);
   const inactiveStudentsList = students.filter((s) => !s.isActive);
@@ -144,25 +145,45 @@ export function computeSystemAnalytics(
       totalDueTillDate: number;
       totalBalanceDue: number;
       studentIds: Set<string>;
+      outstandingStudentIds: Set<string>;
+      exclusiveStudentIds: Set<string>;
+      exclusiveStudentsAmount: number;
+      previousHeadDueStudentIds: Set<string>;
+      previousHeadDueStudentsAmount: number;
       isSpotFee: boolean;
     }
   >();
+
+  const createEmptyHeadStat = (headName: string, isSpotFee = false) => ({
+    headName,
+    totalCommitted: 0,
+    totalExpectedTillDate: 0,
+    totalCollected: 0,
+    totalDueTillDate: 0,
+    totalBalanceDue: 0,
+    studentIds: new Set<string>(),
+    outstandingStudentIds: new Set<string>(),
+    exclusiveStudentIds: new Set<string>(),
+    exclusiveStudentsAmount: 0,
+    previousHeadDueStudentIds: new Set<string>(),
+    previousHeadDueStudentsAmount: 0,
+    isSpotFee,
+  });
+
+  // Keep every configured head visible, even when its current values are zero.
+  configuredFeeHeads.forEach((head) => {
+    const name = head.headName.trim();
+    if (name && !headStatsMap.has(name)) {
+      headStatsMap.set(name, createEmptyHeadStat(name, !!head.isSpotFee));
+    }
+  });
 
   // 1. Process fee structures for active students
   feeStructures.forEach((s) => {
     if (!activeStudentIdSet.has(s.studentId)) return;
     const name = s.headName.trim() || 'Miscellaneous Fee';
     if (!headStatsMap.has(name)) {
-      headStatsMap.set(name, {
-        headName: name,
-        totalCommitted: 0,
-        totalExpectedTillDate: 0,
-        totalCollected: 0,
-        totalDueTillDate: 0,
-        totalBalanceDue: 0,
-        studentIds: new Set(),
-        isSpotFee: !!s.isSpotFee,
-      });
+      headStatsMap.set(name, createEmptyHeadStat(name, !!s.isSpotFee));
     }
     const stat = headStatsMap.get(name)!;
     stat.totalCommitted += s.committedFee;
@@ -177,21 +198,13 @@ export function computeSystemAnalytics(
     const name = parentStruct?.headName?.trim() || inst.headName?.trim() || 'Miscellaneous Fee';
 
     if (!headStatsMap.has(name)) {
-      headStatsMap.set(name, {
-        headName: name,
-        totalCommitted: 0,
-        totalExpectedTillDate: 0,
-        totalCollected: 0,
-        totalDueTillDate: 0,
-        totalBalanceDue: 0,
-        studentIds: new Set(),
-        isSpotFee: !!parentStruct?.isSpotFee,
-      });
+      headStatsMap.set(name, createEmptyHeadStat(name, !!parentStruct?.isSpotFee));
     }
 
     const stat = headStatsMap.get(name)!;
     stat.studentIds.add(inst.studentId);
     stat.totalBalanceDue += inst.balanceAmount;
+    if (inst.balanceAmount > 0) stat.outstandingStudentIds.add(inst.studentId);
 
     if (inst.dueDate <= currentDateString) {
       stat.totalExpectedTillDate += inst.amount;
@@ -227,16 +240,14 @@ export function computeSystemAnalytics(
 
         const headKey = matchedKey || allocHead || 'School Tuition Fee';
         if (!headStatsMap.has(headKey)) {
-          headStatsMap.set(headKey, {
-            headName: headKey,
-            totalCommitted: alloc.allocatedAmount,
-            totalExpectedTillDate: alloc.allocatedAmount,
-            totalCollected: 0,
-            totalDueTillDate: 0,
-            totalBalanceDue: 0,
-            studentIds: new Set([txn.studentId]),
-            isSpotFee: allocLower.includes('book') || allocLower.includes('dress') || allocLower.includes('uniform'),
-          });
+          const newStat = createEmptyHeadStat(
+            headKey,
+            allocLower.includes('book') || allocLower.includes('dress') || allocLower.includes('uniform')
+          );
+          newStat.totalCommitted = alloc.allocatedAmount;
+          newStat.totalExpectedTillDate = alloc.allocatedAmount;
+          newStat.studentIds.add(txn.studentId);
+          headStatsMap.set(headKey, newStat);
         }
 
         const stat = headStatsMap.get(headKey)!;
@@ -262,20 +273,55 @@ export function computeSystemAnalytics(
       const defaultSchoolHead = Array.from(headStatsMap.keys()).find((k) => k.toLowerCase().includes('school') || k.toLowerCase().includes('tuition')) || 'School Tuition Fee';
       const headKey = matchedKey || defaultSchoolHead;
       if (!headStatsMap.has(headKey)) {
-        headStatsMap.set(headKey, {
-          headName: headKey,
-          totalCommitted: txn.amount,
-          totalExpectedTillDate: txn.amount,
-          totalCollected: 0,
-          totalDueTillDate: 0,
-          totalBalanceDue: 0,
-          studentIds: new Set([txn.studentId]),
-          isSpotFee: remLower.includes('book') || remLower.includes('dress') || remLower.includes('uniform'),
-        });
+        const newStat = createEmptyHeadStat(
+          headKey,
+          remLower.includes('book') || remLower.includes('dress') || remLower.includes('uniform')
+        );
+        newStat.totalCommitted = txn.amount;
+        newStat.totalExpectedTillDate = txn.amount;
+        newStat.studentIds.add(txn.studentId);
+        headStatsMap.set(headKey, newStat);
       }
       const stat = headStatsMap.get(headKey)!;
       stat.totalCollected += txn.amount;
     }
+  });
+
+  // Build outstanding balances per student/head for the requested cohort analysis.
+  const headOrder = Array.from(headStatsMap.keys());
+  const headOrderIndex = new Map(headOrder.map((name, index) => [name, index]));
+  const studentHeadBalances = new Map<string, Map<string, number>>();
+
+  installments.forEach((inst) => {
+    if (!activeStudentIdSet.has(inst.studentId) || inst.balanceAmount <= 0) return;
+    const parentStruct = inst.feeStructureId ? structureMap.get(inst.feeStructureId) : null;
+    const headName = parentStruct?.headName?.trim() || inst.headName?.trim() || 'Miscellaneous Fee';
+    const balances = studentHeadBalances.get(inst.studentId) || new Map<string, number>();
+    balances.set(headName, (balances.get(headName) || 0) + inst.balanceAmount);
+    studentHeadBalances.set(inst.studentId, balances);
+  });
+
+  studentHeadBalances.forEach((balances, studentId) => {
+    const outstandingHeads = Array.from(balances.entries()).filter(([, amount]) => amount > 0);
+    outstandingHeads.forEach(([headName, amount]) => {
+      const stat = headStatsMap.get(headName);
+      if (!stat) return;
+
+      if (outstandingHeads.length === 1) {
+        stat.exclusiveStudentIds.add(studentId);
+        stat.exclusiveStudentsAmount += amount;
+      }
+
+      const currentIndex = headOrderIndex.get(headName) ?? Number.MAX_SAFE_INTEGER;
+      const hasPreviousHeadDue = outstandingHeads.some(([otherHead]) => {
+        const otherIndex = headOrderIndex.get(otherHead) ?? Number.MAX_SAFE_INTEGER;
+        return otherHead !== headName && otherIndex < currentIndex;
+      });
+      if (hasPreviousHeadDue) {
+        stat.previousHeadDueStudentIds.add(studentId);
+        stat.previousHeadDueStudentsAmount += amount;
+      }
+    });
   });
 
   const headWiseBifurcation = Array.from(headStatsMap.values()).map((stat) => {
@@ -294,6 +340,11 @@ export function computeSystemAnalytics(
       totalDueTillDate: stat.totalDueTillDate,
       totalBalanceDue: stat.totalBalanceDue,
       activeStudentsCount: stat.studentIds.size,
+      outstandingStudentsCount: stat.outstandingStudentIds.size,
+      exclusiveStudentsCount: stat.exclusiveStudentIds.size,
+      exclusiveStudentsAmount: stat.exclusiveStudentsAmount,
+      previousHeadDueStudentsCount: stat.previousHeadDueStudentIds.size,
+      previousHeadDueStudentsAmount: stat.previousHeadDueStudentsAmount,
       collectionRate,
       isSpotFee: stat.isSpotFee,
     };
