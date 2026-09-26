@@ -749,9 +749,17 @@ export default function App() {
         schoolProfile={safeSchoolProfile}
         tolerance={tolerance}
         onUpdateTolerance={async (newTol) => {
-          const result = await saveSettingsRepo(scriptUrl, safeSchoolProfile, newTol, dailyTarget);
-          if (!result.success) throw new Error(result.error || 'Unable to update tolerance.');
-          await refreshFromSheets(true);
+          const previousTolerance = tolerance;
+          setTolerance(newTol);
+          try {
+            const result = await saveSettingsRepo(scriptUrl, safeSchoolProfile, newTol, dailyTarget);
+            if (!result.success) throw new Error(result.error || 'Unable to update tolerance.');
+            revisionRef.current = undefined;
+            await refreshFromSheets(true);
+          } catch (error) {
+            setTolerance(previousTolerance);
+            throw error;
+          }
         }}
         currentDate={asOfDate}
         onChangeDate={(newDate) => setAsOfDate(newDate)}
@@ -1039,9 +1047,20 @@ export default function App() {
           schoolProfile={safeSchoolProfile}
           tolerance={tolerance}
           onSave={async (newProfile, newTol) => {
-            const result = await saveSettingsRepo(scriptUrl, newProfile, newTol, dailyTarget);
-            if (!result.success) throw new Error(result.error || 'Unable to save settings.');
-            await refreshFromSheets(true);
+            const previousProfile = schoolProfile;
+            const previousTolerance = tolerance;
+            setSchoolProfile(newProfile);
+            setTolerance(newTol);
+            try {
+              const result = await saveSettingsRepo(scriptUrl, newProfile, newTol, dailyTarget);
+              if (!result.success) throw new Error(result.error || 'Unable to save settings.');
+              revisionRef.current = undefined;
+              await refreshFromSheets(true);
+            } catch (error) {
+              setSchoolProfile(previousProfile);
+              setTolerance(previousTolerance);
+              throw error;
+            }
           }}
           onClose={() => setActiveModal('NONE')}
         />
