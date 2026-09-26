@@ -12,7 +12,7 @@ interface FlaggedReceiptsViewProps {
 export const getDuplicateReceiptGroups = (transactions: PaymentTransaction[]) => {
   const groups = new Map<string, PaymentTransaction[]>();
   transactions.forEach((transaction) => {
-    const receiptNo = transaction.receiptNo?.trim();
+    const receiptNo = String(transaction.receiptNo ?? '').trim();
     if (!receiptNo) return;
     groups.set(receiptNo, [...(groups.get(receiptNo) || []), transaction]);
   });

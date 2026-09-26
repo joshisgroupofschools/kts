@@ -23,6 +23,14 @@ import {
 import { computeSystemAnalytics } from './utils/analyticsEngine';
 import { DEFAULT_SCRIPT_WEBAPP_URL, TARGET_GOOGLE_SHEET_URL } from './utils/googleSheetsScript';
 import { getKolkataToday } from './utils/dateUtils';
+import {
+  normalizeClassConfigs,
+  normalizeFeeHeads,
+  normalizeInstallments,
+  normalizeStructures,
+  normalizeStudents,
+  normalizeTransactions,
+} from './utils/normalizeCloudData';
 import { sortClassList, STANDARD_CLASS_ORDER } from './utils/classOrder';
 import { formatCurrency, formatDate } from './utils/numberToWords';
 import {
@@ -98,12 +106,12 @@ export default function App() {
   // -------------------------------------------------------------
   // 1. Core State
   // -------------------------------------------------------------
-  const [students, setStudents] = useState<Student[]>(() => getStoredStudents());
-  const [structures, setStructures] = useState<StudentFeeStructure[]>(() => getStoredStructures());
-  const [installments, setInstallments] = useState<Installment[]>(() => getStoredInstallments());
-  const [transactions, setTransactions] = useState<PaymentTransaction[]>(() => getStoredTransactions());
-  const [classConfigs, setClassConfigs] = useState<ClassFeeConfig[]>(() => getStoredClassConfigs());
-  const [feeHeads, setFeeHeads] = useState<FeeHeadDefinition[]>(() => getStoredFeeHeads());
+  const [students, setStudents] = useState<Student[]>(() => normalizeStudents(getStoredStudents()));
+  const [structures, setStructures] = useState<StudentFeeStructure[]>(() => normalizeStructures(getStoredStructures()));
+  const [installments, setInstallments] = useState<Installment[]>(() => normalizeInstallments(getStoredInstallments()));
+  const [transactions, setTransactions] = useState<PaymentTransaction[]>(() => normalizeTransactions(getStoredTransactions()));
+  const [classConfigs, setClassConfigs] = useState<ClassFeeConfig[]>(() => normalizeClassConfigs(getStoredClassConfigs()));
+  const [feeHeads, setFeeHeads] = useState<FeeHeadDefinition[]>(() => normalizeFeeHeads(getStoredFeeHeads()));
   const [tolerance, setTolerance] = useState<ToleranceConfig>(() => getStoredToleranceConfig());
   const [schoolProfile, setSchoolProfile] = useState<SchoolProfile>(() => getStoredSchoolProfile());
   const [dailyTarget, setDailyTarget] = useState<number>(() => getDailyCollectionTarget());
@@ -230,12 +238,12 @@ export default function App() {
     if (!data || !Array.isArray(data.students) || !Array.isArray(data.installments) || !Array.isArray(data.transactions)) {
       throw new Error('The Google Sheets backend returned an incomplete data snapshot.');
     }
-    setStudents(data.students);
-    setStructures(Array.isArray(data.structures) ? data.structures : []);
-    setInstallments(data.installments);
-    setTransactions(data.transactions);
-    if (Array.isArray(data.classConfigs) && data.classConfigs.length) setClassConfigs(data.classConfigs);
-    if (Array.isArray(data.feeHeads) && data.feeHeads.length) setFeeHeads(data.feeHeads);
+    setStudents(normalizeStudents(data.students));
+    setStructures(normalizeStructures(data.structures));
+    setInstallments(normalizeInstallments(data.installments));
+    setTransactions(normalizeTransactions(data.transactions));
+    if (Array.isArray(data.classConfigs) && data.classConfigs.length) setClassConfigs(normalizeClassConfigs(data.classConfigs));
+    if (Array.isArray(data.feeHeads) && data.feeHeads.length) setFeeHeads(normalizeFeeHeads(data.feeHeads));
     if (data.schoolProfile) setSchoolProfile((prev) => ({ ...prev, ...data.schoolProfile }));
     if (data.tolerance) setTolerance((prev) => ({ ...prev, ...data.tolerance }));
     if (typeof data.dailyTarget === 'number') setDailyTarget(data.dailyTarget);

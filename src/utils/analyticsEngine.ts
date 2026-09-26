@@ -12,6 +12,10 @@ export function computeSystemAnalytics(
   currentDateString: string = getKolkataToday(),
   configuredFeeHeads: FeeHeadDefinition[] = []
 ): AnalyticsSummary {
+  const normalizeHeadName = (value: unknown): string => {
+    const normalized = String(value ?? '').trim();
+    return normalized || 'Miscellaneous Fee';
+  };
   const activeStudentsList = students.filter((s) => s.isActive);
   const inactiveStudentsList = students.filter((s) => !s.isActive);
 
@@ -172,8 +176,8 @@ export function computeSystemAnalytics(
 
   // Keep every configured head visible, even when its current values are zero.
   configuredFeeHeads.forEach((head) => {
-    const name = head.headName.trim();
-    if (name && !headStatsMap.has(name)) {
+    const name = normalizeHeadName(head?.headName);
+    if (!headStatsMap.has(name)) {
       headStatsMap.set(name, createEmptyHeadStat(name, !!head.isSpotFee));
     }
   });
@@ -181,7 +185,7 @@ export function computeSystemAnalytics(
   // 1. Process fee structures for active students
   feeStructures.forEach((s) => {
     if (!activeStudentIdSet.has(s.studentId)) return;
-    const name = s.headName.trim() || 'Miscellaneous Fee';
+    const name = normalizeHeadName(s.headName);
     if (!headStatsMap.has(name)) {
       headStatsMap.set(name, createEmptyHeadStat(name, !!s.isSpotFee));
     }
@@ -195,7 +199,7 @@ export function computeSystemAnalytics(
   installments.forEach((inst) => {
     if (!activeStudentIdSet.has(inst.studentId)) return;
     const parentStruct = inst.feeStructureId ? structureMap.get(inst.feeStructureId) : null;
-    const name = parentStruct?.headName?.trim() || inst.headName?.trim() || 'Miscellaneous Fee';
+    const name = normalizeHeadName(parentStruct?.headName || inst.headName);
 
     if (!headStatsMap.has(name)) {
       headStatsMap.set(name, createEmptyHeadStat(name, !!parentStruct?.isSpotFee));
@@ -220,7 +224,7 @@ export function computeSystemAnalytics(
   allActiveTransactions.forEach((txn) => {
     if (txn.allocations && txn.allocations.length > 0) {
       txn.allocations.forEach((alloc) => {
-        const allocHead = alloc.headName || '';
+        const allocHead = String(alloc.headName || '');
         const allocLower = allocHead.toLowerCase();
         
         let matchedKey: string | undefined;
@@ -295,7 +299,7 @@ export function computeSystemAnalytics(
   installments.forEach((inst) => {
     if (!activeStudentIdSet.has(inst.studentId) || inst.balanceAmount <= 0) return;
     const parentStruct = inst.feeStructureId ? structureMap.get(inst.feeStructureId) : null;
-    const headName = parentStruct?.headName?.trim() || inst.headName?.trim() || 'Miscellaneous Fee';
+    const headName = normalizeHeadName(parentStruct?.headName || inst.headName);
     const balances = studentHeadBalances.get(inst.studentId) || new Map<string, number>();
     balances.set(headName, (balances.get(headName) || 0) + inst.balanceAmount);
     studentHeadBalances.set(inst.studentId, balances);
