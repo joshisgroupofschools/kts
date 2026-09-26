@@ -579,7 +579,7 @@ export const TodaysReceiptsModal: React.FC<TodaysReceiptsModalProps> = ({
                     <th className="py-3 px-3 text-right">Amount Paid</th>
                     <th className="py-3 px-2 text-center">Payment Mode</th>
                     <th className="py-3 px-3">Allocations Knocked Off</th>
-                    <th className="py-3 px-3">Remaining Balance</th>
+                    <th className="py-3 px-3">Remaining Balance Till Date</th>
                     <th className="py-3 px-3 min-w-[160px]">
                       Permission To Be Given Till Date
                     </th>
@@ -593,8 +593,9 @@ export const TodaysReceiptsModal: React.FC<TodaysReceiptsModalProps> = ({
                   {filteredList.map((tx) => {
                     const student = students.find((s) => s.id === tx.studentId);
                     const summary = studentSummaries[tx.studentId];
-                    const remainingDue = summary ? summary.totalDue : 0;
-                    const hasRemainingBalance = remainingDue > 0;
+                    const remainingDue = (summary?.installments || []).reduce((sum, installment) =>
+                      sum + (installment.dueDate <= selectedDate ? Math.max(0, installment.balanceAmount) : 0), 0);
+                    const hasRemainingBalance = (summary?.totalDue || 0) > 0;
 
                     // Fallback default permission date if not set
                     const defaultPermDate =
@@ -696,9 +697,9 @@ export const TodaysReceiptsModal: React.FC<TodaysReceiptsModalProps> = ({
                           )}
                         </td>
 
-                        {/* Remaining Balance */}
+                        {/* Remaining Balance Till Date */}
                         <td className="py-3 px-3">
-                          {hasRemainingBalance ? (
+                          {remainingDue > 0 ? (
                             <div>
                               <span className="font-mono font-bold text-rose-600 dark:text-rose-400">
                                 {formatCurrency(remainingDue, currencySymbol)}
@@ -713,7 +714,7 @@ export const TodaysReceiptsModal: React.FC<TodaysReceiptsModalProps> = ({
                                 {currencySymbol}0
                               </span>
                               <span className="block text-[9.5px] text-emerald-600 font-semibold uppercase">
-                                Cleared
+                                Cleared Till Date
                               </span>
                             </div>
                           )}
@@ -824,7 +825,7 @@ export const TodaysReceiptsModal: React.FC<TodaysReceiptsModalProps> = ({
                             {student?.phone && (
                               <a
                                 href={`https://wa.me/91${student.phone.replace(/\D/g, '')}?text=${encodeURIComponent(
-                                  `Dear Parent, receipt #${tx.receiptNo} of ₹${tx.amount.toLocaleString('en-IN')} has been acknowledged for ${tx.studentName} (${tx.studentClass}). Payment Mode: ${tx.paymentMode}. Remaining Due: ₹${remainingDue.toLocaleString('en-IN')}. Thank you.`
+                                  `Dear Parent, receipt #${tx.receiptNo} of ₹${tx.amount.toLocaleString('en-IN')} has been acknowledged for ${tx.studentName} (${tx.studentClass}). Payment Mode: ${tx.paymentMode}. Remaining Balance Till ${formatDate(selectedDate)}: ₹${remainingDue.toLocaleString('en-IN')}. Thank you.`
                                 )}`}
                                 target="_blank"
                                 rel="noreferrer"
