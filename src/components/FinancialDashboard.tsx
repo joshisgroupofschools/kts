@@ -806,7 +806,7 @@ export const FinancialDashboard: React.FC<FinancialDashboardProps> = ({
                   Month-wise Outstanding Student Analysis
                 </h3>
                 <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                  June to March, active students only. Old Fees are not forced into the sequence. Exclusive = student's earliest outstanding month; Previous due = an earlier month is also unpaid.
+                  Month-wise pending fees for active students. "Only that month" means no older month due. "Previous month due" means the student already has an older pending month.
                 </p>
               </div>
             </div>
@@ -820,12 +820,12 @@ export const FinancialDashboard: React.FC<FinancialDashboardProps> = ({
               <thead>
                 <tr className="border-b border-slate-200 dark:border-slate-700 text-[10px] text-slate-500 uppercase tracking-wider bg-slate-50 dark:bg-slate-850">
                   <th className="py-2 px-3 font-bold">Month</th>
-                  <th className="py-2 px-3 font-bold text-right">Total Amount to Receive</th>
-                  <th className="py-2 px-3 font-bold text-center">OS Students</th>
-                  <th className="py-2 px-3 font-bold text-center">Exclusive Students</th>
-                  <th className="py-2 px-3 font-bold text-right">Exclusive Amount</th>
-                  <th className="py-2 px-3 font-bold text-center">Previous Head Due Also</th>
-                  <th className="py-2 px-3 font-bold text-right">Amount from Those Students</th>
+                  <th className="py-2 px-3 font-bold text-center">Total Students Due Count</th>
+                  <th className="py-2 px-3 font-bold text-right">Total Students Due Amount</th>
+                  <th className="py-2 px-3 font-bold text-center">Only That Month Students Due Count</th>
+                  <th className="py-2 px-3 font-bold text-right">Only That Month Students Due Amount</th>
+                  <th className="py-2 px-3 font-bold text-center">Students With Previous Month Due Count</th>
+                  <th className="py-2 px-3 font-bold text-right">Students With Previous Month Due Amount</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -842,11 +842,11 @@ export const FinancialDashboard: React.FC<FinancialDashboardProps> = ({
                         {!isTotalRow && getHeadIcon(row.rowLabel)}
                         <span>{isTotalRow ? 'TOTAL' : `${index + 1}. ${row.rowLabel}`}</span>
                       </td>
-                      <td className={`py-2.5 px-3 text-right font-bold text-rose-600 dark:text-rose-400 ${totalTextClass}`}>
-                        {formatCurrency(row.totalAmountToReceive, currencySymbol)}
-                      </td>
                       <td className={`py-2.5 px-3 text-center font-bold text-slate-800 dark:text-slate-200 ${totalTextClass}`}>
                         {row.outstandingStudentsCount}
+                      </td>
+                      <td className={`py-2.5 px-3 text-right font-bold text-rose-600 dark:text-rose-400 ${totalTextClass}`}>
+                        {formatCurrency(row.totalAmountToReceive, currencySymbol)}
                       </td>
                       <td className={`py-2.5 px-3 text-center font-bold text-indigo-700 dark:text-indigo-300 ${totalTextClass}`}>
                         {row.exclusiveStudentsCount}
