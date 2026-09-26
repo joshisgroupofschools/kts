@@ -323,17 +323,12 @@ export default function App() {
   }, [classConfigs, students]);
 
   const studentsForActiveScreens = useMemo(() => {
-    const collectedStudentIds = new Set(
-      transactions
-        .filter((tx) => !tx.isCancelled && (tx.amount || 0) > 0)
-        .map((tx) => tx.studentId)
-    );
     return students.filter((student) => {
       const name = student.name.trim().toLowerCase();
       const isTrialChild = name === 'trial' || name.startsWith('trial ');
-      return !isTrialChild || collectedStudentIds.has(student.id);
+      return !isTrialChild;
     });
-  }, [students, transactions]);
+  }, [students]);
 
   // -------------------------------------------------------------
   // 4. Financial Calculations & Summary Computations

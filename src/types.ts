@@ -116,7 +116,7 @@ export interface DayCloseRecord {
 }
 
 export interface ToleranceConfig {
-  mode: 'percentage' | 'fixed_amount';
+  mode: 'percentage' | 'fixed_amount' | 'month_until';
   value: number; // e.g. 25 for 25% or 500 for ₹500
 }
 

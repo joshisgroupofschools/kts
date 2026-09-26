@@ -7,7 +7,7 @@ import {
   StudentFinancialSummary,
   ToleranceConfig,
 } from '../types';
-import { computeStudentStatus } from './statusResolver';
+import { computeStudentStatus, hasOverdueBeyondToleranceMonth } from './statusResolver';
 import { getKolkataToday } from './dateUtils';
 
 /**
@@ -355,6 +355,9 @@ export function computeStudentFinancialSummary(
     transactions,
     asOfDate
   );
+  const studentInstallments = installments.filter((i) => i.studentId === student.id);
+  const studentStructures = structures.filter((s) => s.studentId === student.id);
+  const studentTransactions = transactions.filter((t) => t.studentId === student.id);
 
   const statusResult = computeStudentStatus(
     student,
@@ -363,14 +366,11 @@ export function computeStudentFinancialSummary(
       expectedTillDate: fin.expectedTillDate,
       totalPaid: fin.totalPaid,
       hasUncommittedFee: fin.hasUncommittedFee,
+      hasOverdueBeyondToleranceMonth: hasOverdueBeyondToleranceMonth(studentInstallments, tolerance, asOfDate),
     },
     tolerance,
     asOfDate
   );
-
-  const studentInstallments = installments.filter((i) => i.studentId === student.id);
-  const studentStructures = structures.filter((s) => s.studentId === student.id);
-  const studentTransactions = transactions.filter((t) => t.studentId === student.id);
 
   return {
     student,

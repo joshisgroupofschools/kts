@@ -1,5 +1,37 @@
-import { ActionTier, StatusCategory, Student, ToleranceConfig } from '../types';
+import { ActionTier, Installment, StatusCategory, Student, ToleranceConfig } from '../types';
 import { getKolkataToday } from './dateUtils';
+
+const ACADEMIC_MONTH_ORDER = [6, 7, 8, 9, 10, 11, 12, 1, 2, 3];
+const MONTH_LABELS: Record<number, string> = {
+  1: 'January',
+  2: 'February',
+  3: 'March',
+  6: 'June',
+  7: 'July',
+  8: 'August',
+  9: 'September',
+  10: 'October',
+  11: 'November',
+  12: 'December',
+};
+
+export function hasOverdueBeyondToleranceMonth(
+  installments: Installment[],
+  tolerance: ToleranceConfig,
+  asOfDate: string
+): boolean {
+  if (tolerance.mode !== 'month_until') return false;
+  const toleratedMonth = Number(tolerance.value);
+  const toleratedIndex = ACADEMIC_MONTH_ORDER.indexOf(toleratedMonth);
+  if (toleratedIndex < 0) return true;
+
+  return installments.some((inst) => {
+    if (inst.balanceAmount <= 0 || inst.dueDate > asOfDate) return false;
+    const month = Number(inst.dueDate.slice(5, 7));
+    const monthIndex = ACADEMIC_MONTH_ORDER.indexOf(month);
+    return monthIndex < 0 || monthIndex > toleratedIndex;
+  });
+}
 
 export interface StatusComputationResult {
   statusCategory: StatusCategory;
@@ -15,6 +47,7 @@ export function computeStudentStatus(
     expectedTillDate: number;
     totalPaid: number;
     hasUncommittedFee: boolean;
+    hasOverdueBeyondToleranceMonth?: boolean;
   },
   tolerance: ToleranceConfig,
   currentDateString: string = getKolkataToday()
@@ -36,6 +69,8 @@ export function computeStudentStatus(
     let isWithinTolerance = false;
     if (tolerance.mode === 'fixed_amount') {
       isWithinTolerance = dueTillDate <= tolerance.value;
+    } else if (tolerance.mode === 'month_until') {
+      isWithinTolerance = financials.hasOverdueBeyondToleranceMonth === false;
     } else {
       // Percentage mode: dueTillDate / expectedTillDate <= tolerance %
       if (expectedTillDate > 0) {
@@ -110,6 +145,8 @@ export function getToleranceDisplayString(
   const symbol = currencySymbol || '₹';
   if (!tolerance) return `${symbol}500`;
   const val = tolerance.value !== undefined ? tolerance.value : 500;
+  if (tolerance.mode === 'percentage') return `${val}%`;
+  if (tolerance.mode === 'month_until') return `till ${MONTH_LABELS[Number(val)] || 'selected month'}`;
   return `${symbol}${val.toLocaleString('en-IN')}`;
 }
 
@@ -119,6 +156,8 @@ export function getStatusCategoryMeta(
   currencySymbol: string = '₹'
 ) {
   const tolStr = getToleranceDisplayString(tolerance, currencySymbol);
+  const lightGreenLabel = tolerance?.mode === 'month_until' ? `Tolerated ${tolStr}` : `Due till ${tolStr}`;
+  const lightYellowLabel = tolerance?.mode === 'month_until' ? `Beyond ${tolStr}` : `Due more than ${tolStr}`;
 
   switch (category) {
     case 'STRONG_GREEN':
@@ -131,7 +170,7 @@ export function getStatusCategoryMeta(
       };
     case 'LIGHT_GREEN':
       return {
-        label: `Due till ${tolStr}`,
+        label: lightGreenLabel,
         bgClass: 'bg-green-50 text-green-700 border-green-200 dark:bg-green-950/30 dark:text-green-300 dark:border-green-800',
         badgeClass: 'bg-green-500 text-white',
         dotClass: 'bg-green-400',
@@ -139,7 +178,7 @@ export function getStatusCategoryMeta(
       };
     case 'LIGHT_YELLOW':
       return {
-        label: `Due more than ${tolStr}`,
+        label: lightYellowLabel,
         bgClass: 'bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-950/30 dark:text-amber-300 dark:border-amber-800',
         badgeClass: 'bg-amber-500 text-white',
         dotClass: 'bg-amber-400',

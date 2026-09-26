@@ -30,6 +30,19 @@ import { AppView, SchoolProfile, ToleranceConfig } from '../types';
 import { formatCurrency } from '../utils/numberToWords';
 import { getKolkataToday } from '../utils/dateUtils';
 
+const TOLERANCE_MONTHS = [
+  { value: 6, label: 'June' },
+  { value: 7, label: 'July' },
+  { value: 8, label: 'August' },
+  { value: 9, label: 'September' },
+  { value: 10, label: 'October' },
+  { value: 11, label: 'November' },
+  { value: 12, label: 'December' },
+  { value: 1, label: 'January' },
+  { value: 2, label: 'February' },
+  { value: 3, label: 'March' },
+];
+
 interface NavbarProps {
   schoolProfile: SchoolProfile;
   tolerance: ToleranceConfig;
@@ -344,16 +357,20 @@ export const Navbar: React.FC<NavbarProps> = ({
                     Green Status Tolerance
                   </span>
                   <span className="text-[11px] font-mono font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-300 dark:border-emerald-700">
-                    {tolerance.mode === 'percentage' ? `${tolerance.value}%` : `${currencySymbol}${tolerance.value}`}
+                    {tolerance.mode === 'percentage'
+                      ? `${tolerance.value}%`
+                      : tolerance.mode === 'month_until'
+                      ? `Till ${TOLERANCE_MONTHS.find((m) => m.value === Number(tolerance.value))?.label || 'Month'}`
+                      : `${currencySymbol}${tolerance.value}`}
                   </span>
                 </div>
 
                 {showToleranceDetails && (
                   <div className="pt-2 border-t border-slate-200 dark:border-slate-700 space-y-2">
-                    <div className="grid grid-cols-2 gap-1 bg-slate-200 dark:bg-slate-700 p-1 rounded-lg">
+                    <div className="grid grid-cols-3 gap-1 bg-slate-200 dark:bg-slate-700 p-1 rounded-lg">
                       <button
                         type="button"
-                        onClick={() => onUpdateTolerance({ ...tolerance, mode: 'percentage' })}
+                        onClick={() => onUpdateTolerance({ mode: 'percentage', value: tolerance.mode === 'percentage' ? tolerance.value : 25 })}
                         className={`py-1 rounded text-center font-semibold text-xs ${
                           tolerance.mode === 'percentage'
                             ? 'bg-emerald-600 text-white'
@@ -364,7 +381,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                       </button>
                       <button
                         type="button"
-                        onClick={() => onUpdateTolerance({ ...tolerance, mode: 'fixed_amount' })}
+                        onClick={() => onUpdateTolerance({ mode: 'fixed_amount', value: tolerance.mode === 'fixed_amount' ? tolerance.value : 500 })}
                         className={`py-1 rounded text-center font-semibold text-xs ${
                           tolerance.mode === 'fixed_amount'
                             ? 'bg-emerald-600 text-white'
@@ -373,26 +390,51 @@ export const Navbar: React.FC<NavbarProps> = ({
                       >
                         Fixed ({currencySymbol})
                       </button>
+                      <button
+                        type="button"
+                        onClick={() => onUpdateTolerance({ mode: 'month_until', value: tolerance.mode === 'month_until' ? tolerance.value : 8 })}
+                        className={`py-1 rounded text-center font-semibold text-xs ${
+                          tolerance.mode === 'month_until'
+                            ? 'bg-emerald-600 text-white'
+                            : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                        }`}
+                      >
+                        Month
+                      </button>
                     </div>
 
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="number"
-                        min="0"
-                        max={tolerance.mode === 'percentage' ? '100' : '100000'}
-                        value={tolerance.value}
-                        onChange={(e) =>
-                          onUpdateTolerance({
-                            ...tolerance,
-                            value: Math.max(0, parseFloat(e.target.value) || 0),
-                          })
-                        }
+                    {tolerance.mode === 'month_until' ? (
+                      <select
+                        value={Number(tolerance.value) || 8}
+                        onChange={(e) => onUpdateTolerance({ mode: 'month_until', value: Number(e.target.value) })}
                         className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1 text-slate-900 dark:text-slate-100 font-bold focus:outline-none"
-                      />
-                      <span className="font-bold text-slate-600 dark:text-slate-400">
-                        {tolerance.mode === 'percentage' ? '%' : currencySymbol}
-                      </span>
-                    </div>
+                      >
+                        {TOLERANCE_MONTHS.map((month) => (
+                          <option key={month.value} value={month.value}>
+                            Tolerate up to {month.label}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="number"
+                          min="0"
+                          max={tolerance.mode === 'percentage' ? '100' : '100000'}
+                          value={tolerance.value}
+                          onChange={(e) =>
+                            onUpdateTolerance({
+                              ...tolerance,
+                              value: Math.max(0, parseFloat(e.target.value) || 0),
+                            })
+                          }
+                          className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1 text-slate-900 dark:text-slate-100 font-bold focus:outline-none"
+                        />
+                        <span className="font-bold text-slate-600 dark:text-slate-400">
+                          {tolerance.mode === 'percentage' ? '%' : currencySymbol}
+                        </span>
+                      </div>
+                    )}
 
                     {/* Presets */}
                     <div className="flex items-center gap-1.5 pt-1">
@@ -421,7 +463,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                             30%
                           </button>
                         </>
-                      ) : (
+                      ) : tolerance.mode === 'fixed_amount' ? (
                         <>
                           <button
                             type="button"
@@ -443,6 +485,30 @@ export const Navbar: React.FC<NavbarProps> = ({
                             className="px-2 py-0.5 bg-slate-200 dark:bg-slate-700 rounded text-[10px] font-semibold"
                           >
                             {currencySymbol}2,000
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => onUpdateTolerance({ mode: 'month_until', value: 6 })}
+                            className="px-2 py-0.5 bg-slate-200 dark:bg-slate-700 rounded text-[10px] font-semibold"
+                          >
+                            June
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => onUpdateTolerance({ mode: 'month_until', value: 8 })}
+                            className="px-2 py-0.5 bg-slate-200 dark:bg-slate-700 rounded text-[10px] font-semibold"
+                          >
+                            August
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => onUpdateTolerance({ mode: 'month_until', value: 9 })}
+                            className="px-2 py-0.5 bg-slate-200 dark:bg-slate-700 rounded text-[10px] font-semibold"
+                          >
+                            September
                           </button>
                         </>
                       )}

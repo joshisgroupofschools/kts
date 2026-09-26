@@ -60,7 +60,7 @@ export interface ColumnVisibilityState {
   actions: boolean;
 }
 
-const STORAGE_KEY = 'school_fee_column_prefs_v8';
+const STORAGE_KEY = 'school_fee_column_prefs_v9';
 
 const DEFAULT_COLUMNS: ColumnVisibilityState = {
   sno: false,
@@ -72,9 +72,9 @@ const DEFAULT_COLUMNS: ColumnVisibilityState = {
   oldFee: false,
   transportFee: false,
   netPayable: false,
-  totalPaid: false,
+  totalPaid: true,
   totalDue: false,
-  payableTillDate: false,
+  payableTillDate: true,
   dueTillDate: true,
   feeHealth: false,
   actions: true,

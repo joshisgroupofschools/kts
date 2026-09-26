@@ -1,6 +1,6 @@
 import { AnalyticsSummary, FeeHeadDefinition, Installment, PaymentTransaction, Student, StudentFeeStructure, ToleranceConfig } from '../types';
 import { computeStudentFinancials } from './feeCalculator';
-import { computeStudentStatus } from './statusResolver';
+import { computeStudentStatus, hasOverdueBeyondToleranceMonth } from './statusResolver';
 import { getKolkataToday } from './dateUtils';
 
 export const MONTH_WISE_OUTSTANDING_ORDER: Array<{
@@ -39,18 +39,11 @@ export function computeSystemAnalytics(
     const normalized = String(value ?? '').trim();
     return normalized || 'Miscellaneous Fee';
   };
-  const isOldFeeHead = (value: unknown): boolean => {
-    return /(old|previous|arrear|carryover)/.test(String(value ?? '').toLowerCase());
-  };
   const activeStudentsList = students.filter((s) => s.isActive);
   const inactiveStudentsList = students.filter((s) => !s.isActive);
   const activeStudentIdSet = new Set(activeStudentsList.map((s) => s.id));
   const structureMap = new Map<string, StudentFeeStructure>();
   feeStructures.forEach((s) => structureMap.set(s.id, s));
-  const isOldFeeInstallment = (inst: Installment): boolean => {
-    const parentStruct = inst.feeStructureId ? structureMap.get(inst.feeStructureId) : null;
-    return isOldFeeHead(parentStruct?.headName || inst.headName);
-  };
 
   let totalActualRevenue = 0;
   let totalCommittedRevenue = 0;
@@ -84,7 +77,16 @@ export function computeSystemAnalytics(
       currentDateString
     );
 
-    const statusRes = computeStudentStatus(student, fin, tolerance, currentDateString);
+    const studentInstallments = installments.filter((inst) => inst.studentId === student.id);
+    const statusRes = computeStudentStatus(
+      student,
+      {
+        ...fin,
+        hasOverdueBeyondToleranceMonth: hasOverdueBeyondToleranceMonth(studentInstallments, tolerance, currentDateString),
+      },
+      tolerance,
+      currentDateString
+    );
 
     if (student.isActive) {
       // Pure School Fee Baseline (Standard Class Fee rate without other fees)
@@ -93,7 +95,13 @@ export function computeSystemAnalytics(
       totalCommittedRevenue += (fin.committedFees > 0 ? fin.committedFees : (fin.totalPayable - fin.otherFees));
       totalExpectedTillDate += fin.expectedTillDate;
       totalOverdueDeficitTillDate += fin.dueTillDate;
-      totalOverallDue += fin.totalDue;
+      totalOverallDue += installments
+        .filter((inst) => {
+          if (inst.studentId !== student.id || inst.balanceAmount <= 0) return false;
+          const headName = normalizeHeadName(structureMap.get(inst.feeStructureId)?.headName || inst.headName).toLowerCase();
+          return !headName.includes('book') && !headName.includes('dress') && !headName.includes('uniform') && !headName.includes('stationery') && !headName.includes('kit');
+        })
+        .reduce((sum, inst) => sum + inst.balanceAmount, 0);
       if (fin.concession > 0) {
         totalConcessionGiven += fin.concession;
         concessionStudentsCount++;
@@ -152,9 +160,7 @@ export function computeSystemAnalytics(
   const collectionDeadline = deadlineDate.toISOString().slice(0, 10);
   const daysRemainingInCycle = Math.max(1, Math.ceil((deadlineDate.getTime() - currentDate.getTime()) / 86400000));
 
-  const backlogGap = installments
-    .filter((inst) => activeStudentIdSet.has(inst.studentId) && !isOldFeeInstallment(inst) && inst.balanceAmount > 0 && inst.dueDate <= currentDateString)
-    .reduce((sum, inst) => sum + inst.balanceAmount, 0);
+  const backlogGap = totalOverdueDeficitTillDate;
   const targetDailyAmount = Math.ceil(backlogGap / daysRemainingInCycle);
 
   // Suggested students to follow up per day based on average installment size (~₹4,000)
@@ -399,7 +405,7 @@ export function computeSystemAnalytics(
   const studentRowBalances = new Map<string, Map<number, number>>();
 
   installments.forEach((installment) => {
-    if (!activeStudentIdSet.has(installment.studentId) || isOldFeeInstallment(installment) || installment.balanceAmount <= 0) return;
+    if (!activeStudentIdSet.has(installment.studentId) || installment.balanceAmount <= 0) return;
     const monthNumber = Number(installment.dueDate.slice(5, 7));
     const rowIndex = orderedRowIndex.get(monthNumber);
     if (rowIndex === undefined) return;

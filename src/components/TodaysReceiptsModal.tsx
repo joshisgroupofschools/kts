@@ -139,8 +139,6 @@ export const TodaysReceiptsModal: React.FC<TodaysReceiptsModalProps> = ({
     Object.values(studentSummaries).forEach((s: any) => {
       if (s.student?.isActive === false) return;
       (s.installments || []).forEach((ins: any) => {
-        const head = String(ins.headName || '').toLowerCase();
-        if (/(old|previous|arrear|carryover)/.test(head)) return;
         if (ins.balanceAmount > 0 && ins.status !== 'paid') {
           if (ins.dueDate <= todayStr) {
             totalOverdueDeficit += ins.balanceAmount;
