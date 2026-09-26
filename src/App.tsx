@@ -710,15 +710,6 @@ export default function App() {
     await refreshFromSheets(true);
   };
 
-  if (isInitialLoading) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-slate-900 text-slate-100">
-        <div className="w-12 h-12 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-        <h2 className="text-lg font-bold">Loading latest data from Google Sheets...</h2>
-      </div>
-    );
-  }
-
   return (
     <PasscodeGate
       schoolProfile={safeSchoolProfile}
@@ -730,6 +721,11 @@ export default function App() {
         {!isOnline && (
           <div className="bg-rose-600 text-white px-4 py-2 text-center text-xs font-black tracking-wider uppercase shadow-md flex items-center justify-center gap-2 z-50">
             <span>⚠️ OFFLINE / NOT SYNCHRONIZED — DO NOT COLLECT PAYMENT</span>
+          </div>
+        )}
+        {isInitialLoading && (
+          <div className="bg-amber-500 text-slate-950 px-4 py-2 text-center text-xs font-black tracking-wide shadow-sm">
+            Opening cached ledger now - latest Google Sheets data is syncing in the background...
           </div>
         )}
         {/* 1. Global Navigation Bar */}
