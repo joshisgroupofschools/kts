@@ -1,7 +1,7 @@
 import React, { useRef } from 'react';
 import { PaymentTransaction, SchoolProfile, Student } from '../types';
 import { formatCurrency, formatDate, numberToWords } from '../utils/numberToWords';
-import { getInstallmentDisplayName } from '../utils/installmentFormatter';
+import { compareOfficialInstallmentOrder, getInstallmentDisplayName } from '../utils/installmentFormatter';
 import { CheckCircle2, ExternalLink, Printer, X } from 'lucide-react';
 
 interface DualA5ReceiptModalProps {
@@ -127,11 +127,11 @@ export const DualA5ReceiptModal: React.FC<DualA5ReceiptModalProps> = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-black font-mono text-[10.5px]">
-              {transaction.allocations.map((alloc, idx) => {
+              {[...transaction.allocations].sort(compareOfficialInstallmentOrder).map((alloc, idx) => {
                 const displayName = getInstallmentDisplayName(
                   alloc.headName,
                   alloc.installmentNumber,
-                  undefined,
+                  alloc.totalInstallments,
                   alloc.dueDate
                 );
 

@@ -334,15 +334,21 @@ function getBootstrapData(ss) {
   var counterList = getSheetDataAsJson(ss.getSheetByName(TAB_NAMES.RECEIPT_COUNTER));
 
   // Map Allocations back to Transactions
+  var allocationInstallments = {};
+  for (var ai = 0; ai < installments.length; ai++) {
+    allocationInstallments[installments[ai].id] = installments[ai];
+  }
   var allocMap = {};
   for (var a = 0; a < rawAllocations.length; a++) {
     var alc = rawAllocations[a];
+    var linkedInstallment = allocationInstallments[alc.installmentId] || {};
     if (!allocMap[alc.transactionId]) allocMap[alc.transactionId] = [];
     allocMap[alc.transactionId].push({
       installmentId: alc.installmentId,
       headName: alc.headName,
-      installmentNumber: Number(alc.installmentNumber || 1),
-      dueDate: alc.dueDate || '',
+      installmentNumber: Number(alc.installmentNumber || linkedInstallment.installmentNumber || 1),
+      totalInstallments: Number(alc.totalInstallments || linkedInstallment.totalInstallments || 0),
+      dueDate: alc.dueDate || linkedInstallment.dueDate || '',
       allocatedAmount: Number(alc.allocatedAmount || 0)
     });
   }

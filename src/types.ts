@@ -75,6 +75,7 @@ export interface PaymentAllocation {
   installmentId: string;
   headName: string;
   installmentNumber: number;
+  totalInstallments?: number;
   dueDate: string;
   allocatedAmount: number;
 }

@@ -109,7 +109,7 @@ export default function App() {
   const [students, setStudents] = useState<Student[]>(() => normalizeStudents(getStoredStudents()));
   const [structures, setStructures] = useState<StudentFeeStructure[]>(() => normalizeStructures(getStoredStructures()));
   const [installments, setInstallments] = useState<Installment[]>(() => normalizeInstallments(getStoredInstallments()));
-  const [transactions, setTransactions] = useState<PaymentTransaction[]>(() => normalizeTransactions(getStoredTransactions()));
+  const [transactions, setTransactions] = useState<PaymentTransaction[]>(() => normalizeTransactions(getStoredTransactions(), installments));
   const [classConfigs, setClassConfigs] = useState<ClassFeeConfig[]>(() => normalizeClassConfigs(getStoredClassConfigs()));
   const [feeHeads, setFeeHeads] = useState<FeeHeadDefinition[]>(() => normalizeFeeHeads(getStoredFeeHeads()));
   const [tolerance, setTolerance] = useState<ToleranceConfig>(() => getStoredToleranceConfig());
@@ -241,7 +241,7 @@ export default function App() {
     setStudents(normalizeStudents(data.students));
     setStructures(normalizeStructures(data.structures));
     setInstallments(normalizeInstallments(data.installments));
-    setTransactions(normalizeTransactions(data.transactions));
+    setTransactions(normalizeTransactions(data.transactions, normalizeInstallments(data.installments)));
     if (Array.isArray(data.classConfigs) && data.classConfigs.length) setClassConfigs(normalizeClassConfigs(data.classConfigs));
     if (Array.isArray(data.feeHeads) && data.feeHeads.length) setFeeHeads(normalizeFeeHeads(data.feeHeads));
     if (data.schoolProfile) setSchoolProfile((prev) => ({ ...prev, ...data.schoolProfile }));

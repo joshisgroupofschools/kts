@@ -153,6 +153,16 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
       return;
     }
 
+    const officialAllocations = calculateFifoAllocations(summary.installments, paymentAmount);
+    const actualAmounts = new Map<string, number>();
+    allocations.forEach(a => actualAmounts.set(a.installmentId, (actualAmounts.get(a.installmentId) || 0) + a.allocatedAmount));
+    if (officialAllocations.some(a => Math.abs((actualAmounts.get(a.installmentId) || 0) - a.allocatedAmount) > 0.01)) {
+      setAllocations(officialAllocations);
+      setIsManualOverride(true);
+      setErrorMsg('Allocation corrected to the required fee collection order. Review the amounts and confirm again.');
+      return;
+    }
+
     const now = new Date();
     const timeStr = new Intl.DateTimeFormat('en-GB', {
       timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: false,

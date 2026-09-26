@@ -71,21 +71,31 @@ export const normalizeInstallments = (rows: any[]): Installment[] => (Array.isAr
 const normalizeAllocation = (row: any): PaymentAllocation => ({
   installmentId: asString(row.installmentId), headName: asString(row.headName) || 'Miscellaneous Fee',
   installmentNumber: asNumber(row.installmentNumber), dueDate: normalizeDateOnlyValue(row.dueDate),
+  totalInstallments: asNumber(row.totalInstallments) || undefined,
   allocatedAmount: asNumber(row.allocatedAmount),
 });
 
-export const normalizeTransactions = (rows: any[]): PaymentTransaction[] => (Array.isArray(rows) ? rows : []).map((row) => ({
+export const normalizeTransactions = (rows: any[], installments: Installment[] = []): PaymentTransaction[] => {
+ const byId = new Map(installments.map(inst => [inst.id, inst]));
+ return (Array.isArray(rows) ? rows : []).map((row) => ({
   ...row,
   id: asString(row.id), receiptNo: asString(row.receiptNo), studentId: asString(row.studentId),
   studentName: asString(row.studentName), studentRollNo: asString(row.studentRollNo), studentClass: asString(row.studentClass),
   date: normalizeDateTimeValue(row.date), amount: asNumber(row.amount), paymentMode: asString(row.paymentMode) as PaymentTransaction['paymentMode'],
   referenceNo: asString(row.referenceNo), remarks: asString(row.remarks),
-  allocations: (Array.isArray(row.allocations) ? row.allocations : []).map(normalizeAllocation),
+  allocations: (Array.isArray(row.allocations) ? row.allocations : []).map((allocation: any) => {
+    const inst = byId.get(asString(allocation.installmentId));
+    return normalizeAllocation(inst && !allocation.dueDate ? {
+      ...allocation, headName: inst.headName, installmentNumber: inst.installmentNumber,
+      totalInstallments: inst.totalInstallments, dueDate: inst.dueDate,
+    } : allocation);
+  }),
   isCancelled: asBoolean(row.isCancelled), cancellationReason: asString(row.cancellationReason),
   cancelledAt: normalizeDateTimeValue(row.cancelledAt), collectedBy: asString(row.collectedBy),
   permissionDate: normalizeDateOnlyValue(row.permissionDate), slipGiven: asBoolean(row.slipGiven),
   permissionUpdated: asBoolean(row.permissionUpdated),
 }));
+};
 
 export const normalizeClassConfigs = (rows: any[]): ClassFeeConfig[] => (Array.isArray(rows) ? rows : []).map((row) => ({
   ...row,

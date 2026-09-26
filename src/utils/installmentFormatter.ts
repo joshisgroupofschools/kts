@@ -72,10 +72,13 @@ export function getInstallmentDisplayName(
   totalInstallments?: number,
   dueDate?: string,
 ): string {
+  const head = normalizeFeeHead(headName);
+  if (head === 'Books') return 'BOOKS DUE';
   const parsed = parseDateOnly(dueDate);
   const month = parsed ? MONTHS[parsed.month - 1] : '';
-  const sequence = totalInstallments ? `${installmentNumber}/${totalInstallments}` : String(installmentNumber);
-  return `${normalizeFeeHead(headName)}${month ? ` – ${month}` : ''} Instalment ${sequence}`;
+  const count = totalInstallments || ({ 'School Fees': 7, Transport: 10, 'Old Fees': 3 }[head]);
+  const sequence = count ? `${installmentNumber}/${count}` : String(installmentNumber);
+  return `${head.toUpperCase()}${month ? ` – ${month.toUpperCase()}` : ''} INSTALMENT ${sequence}`;
 }
 
 export function formatWhatsAppReminderMessage(

@@ -115,6 +115,7 @@ export function calculateFifoAllocations(
         installmentId: inst.id,
         headName: inst.headName,
         installmentNumber: inst.installmentNumber,
+        totalInstallments: inst.totalInstallments,
         dueDate: inst.dueDate,
         allocatedAmount: allocAmount,
       });
