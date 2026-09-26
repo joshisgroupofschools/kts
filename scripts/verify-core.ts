@@ -49,13 +49,11 @@ assert.equal(normalizedInstallment.dueDate, '2026-07-10');
 assert.deepEqual(
   MONTH_WISE_OUTSTANDING_ORDER.map((row) => row.key),
   [
-    'BOOKS', 'TRANSPORT_1', 'SCHOOL_1', 'TRANSPORT_2', 'SCHOOL_2', 'TRANSPORT_3',
-    'SCHOOL_3', 'TRANSPORT_4', 'OLD_1', 'SCHOOL_4', 'TRANSPORT_5', 'OLD_2',
-    'SCHOOL_5', 'TRANSPORT_6', 'OLD_3', 'SCHOOL_6', 'TRANSPORT_7', 'OLD_4',
-    'SCHOOL_7', 'TRANSPORT_8', 'OLD_5', 'TRANSPORT_9', 'OLD_6', 'TRANSPORT_10', 'OLD_7',
+    'JUNE', 'JULY', 'AUGUST', 'SEPTEMBER', 'OCTOBER',
+    'NOVEMBER', 'DECEMBER', 'JANUARY', 'FEBRUARY', 'MARCH',
   ]
 );
-assert.equal(MONTH_WISE_OUTSTANDING_ORDER[0].rowLabel, 'BOOKS DUE');
-assert.equal(MONTH_WISE_OUTSTANDING_ORDER[24].rowLabel, 'OLD FEES - MARCH INSTALMENT 7/7');
+assert.equal(MONTH_WISE_OUTSTANDING_ORDER[0].rowLabel, 'JUNE');
+assert.equal(MONTH_WISE_OUTSTANDING_ORDER[9].rowLabel, 'MARCH');
 
 console.log('Core date, cloud normalization, month-wise order, and WhatsApp verification passed.');

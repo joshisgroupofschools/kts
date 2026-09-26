@@ -3,49 +3,22 @@ import { computeStudentFinancials } from './feeCalculator';
 import { computeStudentStatus } from './statusResolver';
 import { getKolkataToday } from './dateUtils';
 
-type OutstandingCategory = 'BOOKS' | 'TRANSPORT' | 'SCHOOL' | 'OLD';
-
 export const MONTH_WISE_OUTSTANDING_ORDER: Array<{
   key: string;
   rowLabel: string;
-  category: OutstandingCategory;
-  installmentNumber?: number;
+  monthNumber: number;
 }> = [
-  { key: 'BOOKS', rowLabel: 'BOOKS DUE', category: 'BOOKS' },
-  { key: 'TRANSPORT_1', rowLabel: 'TRANSPORT - JUNE INSTALMENT 1/10', category: 'TRANSPORT', installmentNumber: 1 },
-  { key: 'SCHOOL_1', rowLabel: 'SCHOOL FEES - JULY INSTALMENT 1/7', category: 'SCHOOL', installmentNumber: 1 },
-  { key: 'TRANSPORT_2', rowLabel: 'TRANSPORT - JULY INSTALMENT 2/10', category: 'TRANSPORT', installmentNumber: 2 },
-  { key: 'SCHOOL_2', rowLabel: 'SCHOOL FEES - AUGUST INSTALMENT 2/7', category: 'SCHOOL', installmentNumber: 2 },
-  { key: 'TRANSPORT_3', rowLabel: 'TRANSPORT - AUGUST INSTALMENT 3/10', category: 'TRANSPORT', installmentNumber: 3 },
-  { key: 'SCHOOL_3', rowLabel: 'SCHOOL FEES - SEPTEMBER INSTALMENT 3/7', category: 'SCHOOL', installmentNumber: 3 },
-  { key: 'TRANSPORT_4', rowLabel: 'TRANSPORT - SEPTEMBER INSTALMENT 4/10', category: 'TRANSPORT', installmentNumber: 4 },
-  { key: 'OLD_1', rowLabel: 'OLD FEES - SEPTEMBER INSTALMENT 1/7', category: 'OLD', installmentNumber: 1 },
-  { key: 'SCHOOL_4', rowLabel: 'SCHOOL FEES - OCTOBER INSTALMENT 4/7', category: 'SCHOOL', installmentNumber: 4 },
-  { key: 'TRANSPORT_5', rowLabel: 'TRANSPORT - OCTOBER INSTALMENT 5/10', category: 'TRANSPORT', installmentNumber: 5 },
-  { key: 'OLD_2', rowLabel: 'OLD FEES - OCTOBER INSTALMENT 2/7', category: 'OLD', installmentNumber: 2 },
-  { key: 'SCHOOL_5', rowLabel: 'SCHOOL FEES - NOVEMBER INSTALMENT 5/7', category: 'SCHOOL', installmentNumber: 5 },
-  { key: 'TRANSPORT_6', rowLabel: 'TRANSPORT - NOVEMBER INSTALMENT 6/10', category: 'TRANSPORT', installmentNumber: 6 },
-  { key: 'OLD_3', rowLabel: 'OLD FEES - NOVEMBER INSTALMENT 3/7', category: 'OLD', installmentNumber: 3 },
-  { key: 'SCHOOL_6', rowLabel: 'SCHOOL FEES - DECEMBER INSTALMENT 6/7', category: 'SCHOOL', installmentNumber: 6 },
-  { key: 'TRANSPORT_7', rowLabel: 'TRANSPORT - DECEMBER INSTALMENT 7/10', category: 'TRANSPORT', installmentNumber: 7 },
-  { key: 'OLD_4', rowLabel: 'OLD FEES - DECEMBER INSTALMENT 4/7', category: 'OLD', installmentNumber: 4 },
-  { key: 'SCHOOL_7', rowLabel: 'SCHOOL FEES - JANUARY INSTALMENT 7/7', category: 'SCHOOL', installmentNumber: 7 },
-  { key: 'TRANSPORT_8', rowLabel: 'TRANSPORT - JANUARY INSTALMENT 8/10', category: 'TRANSPORT', installmentNumber: 8 },
-  { key: 'OLD_5', rowLabel: 'OLD FEES - JANUARY INSTALMENT 5/7', category: 'OLD', installmentNumber: 5 },
-  { key: 'TRANSPORT_9', rowLabel: 'TRANSPORT - FEBRUARY INSTALMENT 9/10', category: 'TRANSPORT', installmentNumber: 9 },
-  { key: 'OLD_6', rowLabel: 'OLD FEES - FEBRUARY INSTALMENT 6/7', category: 'OLD', installmentNumber: 6 },
-  { key: 'TRANSPORT_10', rowLabel: 'TRANSPORT - MARCH INSTALMENT 10/10', category: 'TRANSPORT', installmentNumber: 10 },
-  { key: 'OLD_7', rowLabel: 'OLD FEES - MARCH INSTALMENT 7/7', category: 'OLD', installmentNumber: 7 },
+  { key: 'JUNE', rowLabel: 'JUNE', monthNumber: 6 },
+  { key: 'JULY', rowLabel: 'JULY', monthNumber: 7 },
+  { key: 'AUGUST', rowLabel: 'AUGUST', monthNumber: 8 },
+  { key: 'SEPTEMBER', rowLabel: 'SEPTEMBER', monthNumber: 9 },
+  { key: 'OCTOBER', rowLabel: 'OCTOBER', monthNumber: 10 },
+  { key: 'NOVEMBER', rowLabel: 'NOVEMBER', monthNumber: 11 },
+  { key: 'DECEMBER', rowLabel: 'DECEMBER', monthNumber: 12 },
+  { key: 'JANUARY', rowLabel: 'JANUARY', monthNumber: 1 },
+  { key: 'FEBRUARY', rowLabel: 'FEBRUARY', monthNumber: 2 },
+  { key: 'MARCH', rowLabel: 'MARCH', monthNumber: 3 },
 ];
-
-const classifyOutstandingHead = (headName: string): OutstandingCategory | null => {
-  const value = headName.toLowerCase();
-  if (value.includes('book') || value.includes('stationery')) return 'BOOKS';
-  if (value.includes('transport') || value.includes('bus') || value.includes('van')) return 'TRANSPORT';
-  if (value.includes('old') || value.includes('arrear') || value.includes('carryover') || value.includes('previous')) return 'OLD';
-  if (value.includes('school') || value.includes('tuition') || value.includes('academic')) return 'SCHOOL';
-  return null;
-};
 
 export function computeSystemAnalytics(
   students: Student[],
@@ -60,8 +33,18 @@ export function computeSystemAnalytics(
     const normalized = String(value ?? '').trim();
     return normalized || 'Miscellaneous Fee';
   };
+  const isOldFeeHead = (value: unknown): boolean => {
+    return /(old|previous|arrear|carryover)/.test(String(value ?? '').toLowerCase());
+  };
   const activeStudentsList = students.filter((s) => s.isActive);
   const inactiveStudentsList = students.filter((s) => !s.isActive);
+  const activeStudentIdSet = new Set(activeStudentsList.map((s) => s.id));
+  const structureMap = new Map<string, StudentFeeStructure>();
+  feeStructures.forEach((s) => structureMap.set(s.id, s));
+  const isOldFeeInstallment = (inst: Installment): boolean => {
+    const parentStruct = inst.feeStructureId ? structureMap.get(inst.feeStructureId) : null;
+    return isOldFeeHead(parentStruct?.headName || inst.headName);
+  };
 
   let totalActualRevenue = 0;
   let totalCommittedRevenue = 0;
@@ -125,7 +108,7 @@ export function computeSystemAnalytics(
   });
 
   // Calculate All-Time Valid Collections Breakdown (Cash vs UPI) & Grand Total
-  const allActiveTransactions = payments.filter((p) => !p.isCancelled);
+  const allActiveTransactions = payments.filter((p) => !p.isCancelled && activeStudentIdSet.has(p.studentId));
   const totalCollectedTillDate = allActiveTransactions.reduce((sum, p) => sum + p.amount, 0);
   const totalCashCollected = allActiveTransactions
     .filter((p) => p.paymentMode === 'Cash')
@@ -136,8 +119,8 @@ export function computeSystemAnalytics(
 
   // Calculate Today's Collections
   const todayStart = currentDateString;
-  const todayTransactions = payments.filter(
-    (p) => !p.isCancelled && p.date && p.date.startsWith(todayStart)
+  const todayTransactions = allActiveTransactions.filter(
+    (p) => p.date && p.date.startsWith(todayStart)
   );
 
   const todayCollection = todayTransactions.reduce((sum, p) => sum + p.amount, 0);
@@ -155,15 +138,22 @@ export function computeSystemAnalytics(
       ? Math.min(100, Math.round((totalCollectedTillDate / totalExpectedTillDate) * 100))
       : 100;
 
-  // Smart Daily Recovery Run-Rate Target
-  // Calculates remaining days in current calendar month
-  const todayDateObj = new Date(currentDateString);
-  const lastDayOfMonth = new Date(todayDateObj.getFullYear(), todayDateObj.getMonth() + 1, 0).getDate();
-  const currentDay = todayDateObj.getDate();
-  const daysRemainingInCycle = Math.max(1, lastDayOfMonth - currentDay + 1);
+  // Smart Daily Recovery Run-Rate Target: collect current backlog by the day
+  // before the next active-student instalment becomes due.
+  const futureDueDates = installments
+    .filter((inst) => activeStudentIdSet.has(inst.studentId) && !isOldFeeInstallment(inst) && inst.balanceAmount > 0 && inst.dueDate > currentDateString)
+    .map((inst) => inst.dueDate)
+    .sort();
+  const nextDueDate = futureDueDates[0] || null;
+  const currentDate = new Date(`${currentDateString}T00:00:00Z`);
+  const nextDue = nextDueDate ? new Date(`${nextDueDate}T00:00:00Z`) : null;
+  const deadlineDate = nextDue ? new Date(nextDue.getTime() - 86400000) : currentDate;
+  const collectionDeadline = deadlineDate.toISOString().slice(0, 10);
+  const daysRemainingInCycle = Math.max(1, Math.floor((deadlineDate.getTime() - currentDate.getTime()) / 86400000) + 1);
 
-  // Target daily recovery run rate to eliminate backlog
-  const backlogGap = totalOverdueDeficitTillDate;
+  const backlogGap = installments
+    .filter((inst) => activeStudentIdSet.has(inst.studentId) && !isOldFeeInstallment(inst) && inst.balanceAmount > 0 && inst.dueDate <= currentDateString)
+    .reduce((sum, inst) => sum + inst.balanceAmount, 0);
   const targetDailyAmount = Math.ceil(backlogGap / daysRemainingInCycle);
 
   // Suggested students to follow up per day based on average installment size (~₹4,000)
@@ -179,10 +169,6 @@ export function computeSystemAnalytics(
   // -------------------------------------------------------------
   // Fee Head-Wise Due & Collection Bifurcation
   // -------------------------------------------------------------
-  const activeStudentIdSet = new Set(activeStudentsList.map((s) => s.id));
-  const structureMap = new Map<string, StudentFeeStructure>();
-  feeStructures.forEach((s) => structureMap.set(s.id, s));
-
   const headStatsMap = new Map<
     string,
     {
@@ -407,28 +393,21 @@ export function computeSystemAnalytics(
     return b.totalCommitted - a.totalCommitted;
   });
 
-  // Exact 25-row month/instalment sequence requested for outstanding follow-up.
-  const orderedRowIndex = new Map(
-    MONTH_WISE_OUTSTANDING_ORDER.map((row, index) => [
-      row.category === 'BOOKS' ? 'BOOKS' : `${row.category}_${row.installmentNumber}`,
-      index,
-    ])
-  );
+  // June-to-March month buckets for active-student outstanding follow-up.
+  const orderedRowIndex = new Map(MONTH_WISE_OUTSTANDING_ORDER.map((row, index) => [row.monthNumber, index]));
   const studentRowBalances = new Map<string, Map<number, number>>();
 
   installments.forEach((installment) => {
-    if (!activeStudentIdSet.has(installment.studentId) || installment.balanceAmount <= 0) return;
-    const category = classifyOutstandingHead(normalizeHeadName(installment.headName));
-    if (!category) return;
-    const lookupKey = category === 'BOOKS' ? 'BOOKS' : `${category}_${installment.installmentNumber}`;
-    const rowIndex = orderedRowIndex.get(lookupKey);
+    if (!activeStudentIdSet.has(installment.studentId) || isOldFeeInstallment(installment) || installment.balanceAmount <= 0) return;
+    const monthNumber = Number(installment.dueDate.slice(5, 7));
+    const rowIndex = orderedRowIndex.get(monthNumber);
     if (rowIndex === undefined) return;
     const balances = studentRowBalances.get(installment.studentId) || new Map<number, number>();
     balances.set(rowIndex, (balances.get(rowIndex) || 0) + installment.balanceAmount);
     studentRowBalances.set(installment.studentId, balances);
   });
 
-  const monthWiseOutstandingAnalysis = MONTH_WISE_OUTSTANDING_ORDER.map((definition, rowIndex) => {
+  const monthRows = MONTH_WISE_OUTSTANDING_ORDER.map((definition, rowIndex) => {
     let totalAmountToReceive = 0;
     let outstandingStudentsCount = 0;
     let exclusiveStudentsCount = 0;
@@ -462,9 +441,25 @@ export function computeSystemAnalytics(
       previousDueStudentsAmount,
     };
   });
+  const monthWiseOutstandingAnalysis = [
+    ...monthRows,
+    monthRows.reduce((total, row) => ({
+      key: 'TOTAL', rowLabel: 'TOTAL',
+      totalAmountToReceive: total.totalAmountToReceive + row.totalAmountToReceive,
+      outstandingStudentsCount: total.outstandingStudentsCount + row.outstandingStudentsCount,
+      exclusiveStudentsCount: total.exclusiveStudentsCount + row.exclusiveStudentsCount,
+      exclusiveStudentsAmount: total.exclusiveStudentsAmount + row.exclusiveStudentsAmount,
+      previousDueStudentsCount: total.previousDueStudentsCount + row.previousDueStudentsCount,
+      previousDueStudentsAmount: total.previousDueStudentsAmount + row.previousDueStudentsAmount,
+    }), {
+      key: 'TOTAL', rowLabel: 'TOTAL', totalAmountToReceive: 0, outstandingStudentsCount: 0,
+      exclusiveStudentsCount: 0, exclusiveStudentsAmount: 0, previousDueStudentsCount: 0,
+      previousDueStudentsAmount: 0,
+    }),
+  ];
 
   return {
-    totalStudents: students.length,
+    totalStudents: activeStudentsList.length,
     activeStudents: activeStudentsList.length,
     inactiveStudents: inactiveStudentsList.length,
     totalActualRevenue,
@@ -492,6 +487,8 @@ export function computeSystemAnalytics(
       daysRemainingInCycle,
       suggestedStudentsPerDay,
       backlogGap,
+      nextDueDate,
+      collectionDeadline,
     },
     categoryCounts,
     actionTierCounts,

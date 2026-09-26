@@ -8,6 +8,7 @@ import {
 } from '../types';
 import { formatCurrency } from '../utils/numberToWords';
 import { sortClassList } from '../utils/classOrder';
+import { formatDateOnly } from '../utils/dateUtils';
 import {
   AlertCircle,
   ArrowLeft,
@@ -122,7 +123,6 @@ export const FinancialDashboard: React.FC<FinancialDashboardProps> = ({
   const {
     totalStudents,
     activeStudents,
-    inactiveStudents,
     totalActualRevenue = 0,
     totalCommittedRevenue = 0,
     totalExpectedTillDate = 0,
@@ -256,7 +256,7 @@ export const FinancialDashboard: React.FC<FinancialDashboardProps> = ({
               className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition-all shadow-xs cursor-pointer active:scale-95"
             >
               <Users className="w-3.5 h-3.5" />
-              <span>Student Ledger ({totalStudents})</span>
+              <span>Active Student Ledger ({totalStudents})</span>
               <ArrowRight className="w-3.5 h-3.5 ml-0.5" />
             </button>
           )}
@@ -300,18 +300,13 @@ export const FinancialDashboard: React.FC<FinancialDashboardProps> = ({
                 <div className="flex items-center justify-between text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-0.5">
                   <span>1. Active Students</span>
                   <span className="text-[10px] text-slate-500">
-                    Total: {isCardRevealed('set1') ? totalStudents : '••'}
+                    Active Only: {isCardRevealed('set1') ? totalStudents : '••'}
                   </span>
                 </div>
                 <div className="flex items-baseline justify-between">
                   <div className="text-base font-black text-slate-900 dark:text-white font-mono">
                     {isCardRevealed('set1') ? activeStudents : <span className="text-slate-400 font-normal text-sm">••••••</span>}
                   </div>
-                  {inactiveStudents > 0 && (
-                    <span className="text-[10px] font-medium text-slate-500">
-                      Inactive: {isCardRevealed('set1') ? inactiveStudents : '•'}
-                    </span>
-                  )}
                 </div>
               </div>
 
@@ -574,7 +569,7 @@ export const FinancialDashboard: React.FC<FinancialDashboardProps> = ({
                     2. Today you must collect
                   </span>
                   <span className="text-[10px] text-slate-400">
-                    {dailyTargetRunRate.daysRemainingInCycle}d left
+                    {dailyTargetRunRate.daysRemainingInCycle}d till {dailyTargetRunRate.collectionDeadline ? formatDateOnly(dailyTargetRunRate.collectionDeadline, 'short') : 'deadline'}
                   </span>
                 </div>
                 <div className="text-base font-black text-amber-300 font-mono tracking-tight">
@@ -588,7 +583,7 @@ export const FinancialDashboard: React.FC<FinancialDashboardProps> = ({
                   )}
                 </div>
                 <div className="text-[10px] text-slate-300 mt-1.5 pt-1 border-t border-slate-800 flex items-center justify-between">
-                  <span>Today's Recv: <strong>{isCardRevealed('set3') ? formatCurrency(todayCollection, currencySymbol) : '••'}</strong></span>
+                  <span>Backlog: <strong>{isCardRevealed('set3') ? `${formatCurrency(dailyTargetRunRate.backlogGap, currencySymbol)} ÷ ${dailyTargetRunRate.daysRemainingInCycle} days` : '••'}</strong></span>
                   <span>Goal: <strong>{isCardRevealed('set3') ? `~${dailyTargetRunRate.suggestedStudentsPerDay} stds/d` : '••'}</strong></span>
                 </div>
               </div>
@@ -765,22 +760,6 @@ export const FinancialDashboard: React.FC<FinancialDashboardProps> = ({
             </button>
           )}
 
-          {/* Inactive */}
-          {inactiveStudents > 0 && (
-            <button
-              id="filter-inactive"
-              type="button"
-              onClick={() => onSelectStatusFilter(selectedStatusFilter === 'INACTIVE' ? 'ALL' : 'INACTIVE')}
-              className={`px-2.5 py-1 rounded-lg text-xs font-semibold border flex items-center gap-1.5 transition-all cursor-pointer ${
-                selectedStatusFilter === 'INACTIVE'
-                  ? 'bg-slate-700 text-white border-slate-700 shadow-xs'
-                  : 'bg-slate-100 text-slate-700 border-slate-300 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300'
-              }`}
-            >
-              <span>Inactive: <strong>{inactiveStudents}</strong></span>
-            </button>
-          )}
-
           {selectedStatusFilter !== 'ALL' && (
             <button
               type="button"
@@ -814,7 +793,7 @@ export const FinancialDashboard: React.FC<FinancialDashboardProps> = ({
         )}
       </div>
 
-      {/* Headwise Financial Reconciliation Matrix */}
+      {/* Month-wise Outstanding Matrix */}
       {monthWiseOutstandingAnalysis.length > 0 && (
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 sm:p-5 shadow-xs space-y-3">
           <div className="flex items-center justify-between flex-wrap gap-2 pb-2.5 border-b border-slate-100 dark:border-slate-800">
@@ -827,12 +806,12 @@ export const FinancialDashboard: React.FC<FinancialDashboardProps> = ({
                   Month-wise Outstanding Student Analysis
                 </h3>
                 <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                  Exclusive = this row is the student's earliest outstanding item. Previous due = an earlier row is also unpaid.
+                  June to March, active students only. Old Fees are not forced into the sequence. Exclusive = student's earliest outstanding month; Previous due = an earlier month is also unpaid.
                 </p>
               </div>
             </div>
             <span className="text-[11px] font-mono text-slate-500">
-              {monthWiseOutstandingAnalysis.length} Ordered Instalment Rows
+              10 Months + Total
             </span>
           </div>
 
@@ -840,7 +819,7 @@ export const FinancialDashboard: React.FC<FinancialDashboardProps> = ({
             <table id="month-wise-outstanding-table" className="w-full min-w-[1100px] text-left text-xs font-mono">
               <thead>
                 <tr className="border-b border-slate-200 dark:border-slate-700 text-[10px] text-slate-500 uppercase tracking-wider bg-slate-50 dark:bg-slate-850">
-                  <th className="py-2 px-3 font-bold">Month / Fee Instalment</th>
+                  <th className="py-2 px-3 font-bold">Month</th>
                   <th className="py-2 px-3 font-bold text-right">Total Amount to Receive</th>
                   <th className="py-2 px-3 font-bold text-center">OS Students</th>
                   <th className="py-2 px-3 font-bold text-center">Exclusive Students</th>
@@ -851,28 +830,34 @@ export const FinancialDashboard: React.FC<FinancialDashboardProps> = ({
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                 {monthWiseOutstandingAnalysis.map((row, index) => {
+                  const isTotalRow = row.key === 'TOTAL';
+                  const totalTextClass = isTotalRow ? '!text-white dark:!text-slate-900' : '';
                   return (
-                    <tr key={row.key} data-analysis-key={row.key} className="hover:bg-slate-50 dark:hover:bg-slate-850/60 transition-colors">
-                      <td className="py-2.5 px-3 font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                        {getHeadIcon(row.rowLabel)}
-                        <span>{index + 1}. {row.rowLabel}</span>
+                    <tr
+                      key={row.key}
+                      data-analysis-key={row.key}
+                      className={isTotalRow ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 font-black' : 'hover:bg-slate-50 dark:hover:bg-slate-850/60 transition-colors'}
+                    >
+                      <td className={`py-2.5 px-3 font-bold text-slate-900 dark:text-white flex items-center gap-2 ${totalTextClass}`}>
+                        {!isTotalRow && getHeadIcon(row.rowLabel)}
+                        <span>{isTotalRow ? 'TOTAL' : `${index + 1}. ${row.rowLabel}`}</span>
                       </td>
-                      <td className="py-2.5 px-3 text-right font-bold text-rose-600 dark:text-rose-400">
+                      <td className={`py-2.5 px-3 text-right font-bold text-rose-600 dark:text-rose-400 ${totalTextClass}`}>
                         {formatCurrency(row.totalAmountToReceive, currencySymbol)}
                       </td>
-                      <td className="py-2.5 px-3 text-center font-bold text-slate-800 dark:text-slate-200">
+                      <td className={`py-2.5 px-3 text-center font-bold text-slate-800 dark:text-slate-200 ${totalTextClass}`}>
                         {row.outstandingStudentsCount}
                       </td>
-                      <td className="py-2.5 px-3 text-center font-bold text-indigo-700 dark:text-indigo-300">
+                      <td className={`py-2.5 px-3 text-center font-bold text-indigo-700 dark:text-indigo-300 ${totalTextClass}`}>
                         {row.exclusiveStudentsCount}
                       </td>
-                      <td className="py-2.5 px-3 text-right font-bold text-indigo-700 dark:text-indigo-300">
+                      <td className={`py-2.5 px-3 text-right font-bold text-indigo-700 dark:text-indigo-300 ${totalTextClass}`}>
                         {formatCurrency(row.exclusiveStudentsAmount, currencySymbol)}
                       </td>
-                      <td className="py-2.5 px-3 text-center font-bold text-amber-700 dark:text-amber-300">
+                      <td className={`py-2.5 px-3 text-center font-bold text-amber-700 dark:text-amber-300 ${totalTextClass}`}>
                         {row.previousDueStudentsCount}
                       </td>
-                      <td className="py-2.5 px-3 text-right font-bold text-amber-700 dark:text-amber-300">
+                      <td className={`py-2.5 px-3 text-right font-bold text-amber-700 dark:text-amber-300 ${totalTextClass}`}>
                         {formatCurrency(row.previousDueStudentsAmount, currencySymbol)}
                       </td>
                     </tr>
@@ -969,9 +954,16 @@ export const FinancialDashboard: React.FC<FinancialDashboardProps> = ({
             </div>
 
             <div className="flex items-center justify-between text-xs text-slate-500 pt-1">
-              <span>Remaining Days in Month:</span>
+              <span>Days Through Next Collection Deadline:</span>
               <strong className="font-mono text-slate-800 dark:text-slate-200">
                 {dailyTargetRunRate.daysRemainingInCycle} days
+              </strong>
+            </div>
+
+            <div className="flex items-center justify-between text-xs text-slate-500">
+              <span>Next Due / Collection Deadline:</span>
+              <strong className="font-mono text-slate-800 dark:text-slate-200">
+                {dailyTargetRunRate.nextDueDate ? formatDateOnly(dailyTargetRunRate.nextDueDate, 'short') : 'No upcoming due'} / {dailyTargetRunRate.collectionDeadline ? formatDateOnly(dailyTargetRunRate.collectionDeadline, 'short') : 'Today'}
               </strong>
             </div>
 

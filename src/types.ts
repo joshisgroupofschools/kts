@@ -236,6 +236,8 @@ export interface AnalyticsSummary {
     daysRemainingInCycle: number;
     suggestedStudentsPerDay: number;
     backlogGap: number;
+    nextDueDate: string | null;
+    collectionDeadline: string | null;
   };
   categoryCounts: {
     strongGreen: number;

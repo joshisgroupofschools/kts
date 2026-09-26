@@ -81,6 +81,8 @@ const analytics = await evaluate(`({
   textLength: document.body.innerText.length,
   hasAnalytics: document.body.innerText.toLowerCase().includes('month-wise outstanding student analysis'),
   hasRequestedTable: document.body.innerText.toLowerCase().includes('total amount to receive'),
+  hasActiveLedgerButton: document.body.innerText.includes('Active Student Ledger'),
+  hasRunRateDeadline: document.body.innerText.includes('d till') || document.body.innerText.includes('Days Through Next Collection Deadline'),
   orderedRows: Array.from(document.querySelectorAll('#month-wise-outstanding-table tbody tr')).map((row) => row.getAttribute('data-analysis-key')),
   bodyPreview: document.body.innerText.slice(0, 500)
 })`);
@@ -98,12 +100,13 @@ const flaggedReceipts = await evaluate(`({
 console.log(JSON.stringify({ loginVisible, ledger, payment, analytics, flaggedReceipts, browserErrors }, null, 2));
 socket.close();
 
-const orderIsCorrect = analytics.orderedRows?.length === 25
-  && analytics.orderedRows[0] === 'BOOKS'
-  && analytics.orderedRows[1] === 'TRANSPORT_1'
-  && analytics.orderedRows[2] === 'SCHOOL_1'
-  && analytics.orderedRows[24] === 'OLD_7';
+const orderIsCorrect = analytics.orderedRows?.length === 11
+  && analytics.orderedRows[0] === 'JUNE'
+  && analytics.orderedRows[1] === 'JULY'
+  && analytics.orderedRows[4] === 'OCTOBER'
+  && analytics.orderedRows[9] === 'MARCH'
+  && analytics.orderedRows[10] === 'TOTAL';
 
-if (!loginVisible || !ledger.hasLedger || ledger.hasLoadingBlocker || !payment.modalVisible || !payment.amount || !analytics.hasAnalytics || !analytics.hasRequestedTable || !orderIsCorrect || !flaggedReceipts.hasFlaggedReceipts || browserErrors.length) {
+if (!loginVisible || !ledger.hasLedger || ledger.hasLoadingBlocker || !payment.modalVisible || !payment.amount || !analytics.hasAnalytics || !analytics.hasRequestedTable || !analytics.hasActiveLedgerButton || !analytics.hasRunRateDeadline || !orderIsCorrect || !flaggedReceipts.hasFlaggedReceipts || browserErrors.length) {
   process.exitCode = 1;
 }
