@@ -261,6 +261,7 @@ export interface GoogleSheetsResponse<T = any> {
   error?: string;
   serverTime?: string;
   syncedAt?: string;
+  revision?: number;
 }
 
 export interface MigrationVerificationReport {

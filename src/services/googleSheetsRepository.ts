@@ -45,19 +45,14 @@ export async function callAppsScriptAction<T = any>(
     try {
       json = JSON.parse(text);
     } catch {
-      if (response.ok) {
-        return {
-          success: true,
-          message: 'Action executed successfully.',
-          serverTime: new Date().toISOString()
-        };
-      }
       return {
         success: false,
         error: `Server returned non-JSON response (${response.status}): ${text.substring(0, 150)}`
       };
     }
-
+    if (typeof json.success !== 'boolean') {
+      return { success: false, error: 'The Apps Script endpoint uses an outdated response format.' };
+    }
     return json;
   } catch (err: any) {
     console.error(`Google Sheets API call failed [${action}]:`, err);
@@ -76,9 +71,25 @@ export async function getBootstrapDataRepo(scriptUrl: string): Promise<GoogleShe
       : `${scriptUrl}?action=getBootstrapData`;
     const res = await fetch(fetchUrl, { method: 'GET', redirect: 'follow' });
     const text = await res.text();
-    return JSON.parse(text);
+    const json = JSON.parse(text);
+    if (typeof json.success !== 'boolean') {
+      return { success: false, error: 'The Apps Script endpoint uses an outdated response format.' };
+    }
+    return json;
   } catch {
     return callAppsScriptAction(scriptUrl, 'getBootstrapData');
+  }
+}
+
+export async function getChangesRepo(scriptUrl: string, revision?: number): Promise<GoogleSheetsResponse> {
+  try {
+    const separator = scriptUrl.includes('?') ? '&' : '?';
+    const res = await fetch(`${scriptUrl}${separator}action=getChanges&since=${revision ?? ''}`, { method: 'GET', redirect: 'follow' });
+    const json = await res.json();
+    if (typeof json.success !== 'boolean') return { success: false, error: 'The Apps Script endpoint uses an outdated response format.' };
+    return json;
+  } catch (error: any) {
+    return { success: false, error: error?.message || 'Unable to check for Google Sheets changes.' };
   }
 }
 

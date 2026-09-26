@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Student } from '../types';
 import { formatDate, getNextMultipleOfFiveDate } from '../utils/numberToWords';
+import { dateOnlyToUtcDate, getKolkataToday } from '../utils/dateUtils';
 import {
   AlertCircle,
   Award,
@@ -16,22 +17,24 @@ import {
 
 interface PermissionModalProps {
   student: Student;
+  currentDate?: string;
   onClose: () => void;
   onSavePermission: (
     studentId: string,
     permissionExpiresAt: string | undefined,
     permissionReason: string | undefined,
     manualCategoryOverride: 'auto' | 'id_card' | 'permission' | 'action'
-  ) => void;
+  ) => Promise<void>;
 }
 
 export const PermissionModal: React.FC<PermissionModalProps> = ({
   student,
+  currentDate = getKolkataToday(),
   onClose,
   onSavePermission,
 }) => {
   // Default to next multiple of 5 from today (e.g., if today is 21st -> 25th)
-  const defaultNextMultipleOfFive = getNextMultipleOfFiveDate();
+  const defaultNextMultipleOfFive = getNextMultipleOfFiveDate(currentDate);
 
   const [expiryDate, setExpiryDate] = useState<string>(
     student.permissionExpiresAt || defaultNextMultipleOfFive
@@ -44,15 +47,21 @@ export const PermissionModal: React.FC<PermissionModalProps> = ({
   const hasActivePermission = !!student.permissionExpiresAt;
   const isExpired =
     student.permissionExpiresAt &&
-    new Date(student.permissionExpiresAt).getTime() < new Date().setHours(0, 0, 0, 0);
+    student.permissionExpiresAt < currentDate;
 
-  const handleSave = () => {
-    onSavePermission(student.id, expiryDate, reason.trim() || undefined, overrideTier);
+  const addDays = (days: number) => {
+    const date = dateOnlyToUtcDate(currentDate)!;
+    date.setUTCDate(date.getUTCDate() + days);
+    return date.toISOString().slice(0, 10);
+  };
+
+  const handleSave = async () => {
+    await onSavePermission(student.id, expiryDate, reason.trim() || undefined, overrideTier);
     onClose();
   };
 
-  const handleRevoke = () => {
-    onSavePermission(student.id, undefined, undefined, 'auto');
+  const handleRevoke = async () => {
+    await onSavePermission(student.id, undefined, undefined, 'auto');
     onClose();
   };
 
@@ -133,17 +142,15 @@ export const PermissionModal: React.FC<PermissionModalProps> = ({
               <span className="text-[10px] text-slate-400 font-medium">Quick Pick:</span>
               <button
                 type="button"
-                onClick={() => setExpiryDate(getNextMultipleOfFiveDate())}
+                onClick={() => setExpiryDate(getNextMultipleOfFiveDate(currentDate))}
                 className="px-2 py-0.5 rounded-md bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 text-[10px] font-semibold"
               >
-                Next 5th ({formatDate(getNextMultipleOfFiveDate())})
+                Next 5th ({formatDate(getNextMultipleOfFiveDate(currentDate))})
               </button>
               <button
                 type="button"
                 onClick={() => {
-                  const d = new Date();
-                  d.setDate(d.getDate() + 5);
-                  setExpiryDate(d.toISOString().split('T')[0]);
+                  setExpiryDate(addDays(5));
                 }}
                 className="px-2 py-0.5 rounded-md bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 text-[10px] font-medium"
               >
@@ -152,9 +159,7 @@ export const PermissionModal: React.FC<PermissionModalProps> = ({
               <button
                 type="button"
                 onClick={() => {
-                  const d = new Date();
-                  d.setDate(d.getDate() + 10);
-                  setExpiryDate(d.toISOString().split('T')[0]);
+                  setExpiryDate(addDays(10));
                 }}
                 className="px-2 py-0.5 rounded-md bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 text-[10px] font-medium"
               >
@@ -163,11 +168,11 @@ export const PermissionModal: React.FC<PermissionModalProps> = ({
               <button
                 type="button"
                 onClick={() => {
-                  const now = new Date();
-                  const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-                  const y = endOfMonth.getFullYear();
-                  const m = String(endOfMonth.getMonth() + 1).padStart(2, '0');
-                  const day = String(endOfMonth.getDate()).padStart(2, '0');
+                  const now = dateOnlyToUtcDate(currentDate)!;
+                  const endOfMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0));
+                  const y = endOfMonth.getUTCFullYear();
+                  const m = String(endOfMonth.getUTCMonth() + 1).padStart(2, '0');
+                  const day = String(endOfMonth.getUTCDate()).padStart(2, '0');
                   setExpiryDate(`${y}-${m}-${day}`);
                 }}
                 className="px-2 py-0.5 rounded-md bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 text-[10px] font-medium"

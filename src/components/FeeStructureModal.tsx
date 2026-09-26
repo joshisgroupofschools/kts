@@ -9,6 +9,7 @@ import {
 } from '../types';
 import { generateInstallments } from '../utils/feeCalculator';
 import { formatCurrency } from '../utils/numberToWords';
+import { getKolkataToday } from '../utils/dateUtils';
 import {
   AlertCircle,
   Banknote,
@@ -43,7 +44,7 @@ interface FeeStructureModalProps {
     isActive: boolean,
     studentNotes?: string,
     updatedStudent?: Student
-  ) => void;
+  ) => Promise<void>;
 }
 
 export const FeeStructureModal: React.FC<FeeStructureModalProps> = ({
@@ -67,7 +68,7 @@ export const FeeStructureModal: React.FC<FeeStructureModalProps> = ({
   const [altPhone, setAltPhone] = useState<string>(student.altPhone || '');
   const [address, setAddress] = useState<string>(student.address || '');
   const [admissionDate, setAdmissionDate] = useState<string>(
-    student.admissionDate || new Date().toISOString().split('T')[0]
+    student.admissionDate || getKolkataToday()
   );
   const [isActive, setIsActive] = useState<boolean>(student.isActive);
   const [studentNotes, setStudentNotes] = useState<string>(student.notes || '');
@@ -165,8 +166,8 @@ export const FeeStructureModal: React.FC<FeeStructureModalProps> = ({
     setOtherMiscFeeList(otherMiscFeeList.filter((m) => m.id !== id));
   };
 
-  const handleSave = () => {
-    const todayStr = new Date().toISOString().split('T')[0];
+  const handleSave = async () => {
+    const todayStr = getKolkataToday();
     const newStructures: StudentFeeStructure[] = [];
 
     // 1. School Tuition Fee Structure
@@ -231,7 +232,7 @@ export const FeeStructureModal: React.FC<FeeStructureModalProps> = ({
       updatedAt: new Date().toISOString(),
     };
 
-    onSaveStructures(
+    await onSaveStructures(
       student.id,
       newStructures,
       isActive,

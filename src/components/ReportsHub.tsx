@@ -42,10 +42,12 @@ import {
   Zap,
 } from 'lucide-react';
 import { formatCurrency as formatNumWords } from '../utils/numberToWords';
+import { getKolkataToday } from '../utils/dateUtils';
 
 export type ReportSubTab = 'DUE' | 'PAID' | 'SUMMARY';
 
 interface ReportsHubProps {
+  asOfDate?: string;
   initialTab?: ReportSubTab;
   summaries: StudentFinancialSummary[];
   transactions: PaymentTransaction[];
@@ -60,6 +62,7 @@ interface ReportsHubProps {
 }
 
 export const ReportsHub: React.FC<ReportsHubProps> = ({
+  asOfDate = getKolkataToday(),
   initialTab = 'SUMMARY',
   summaries,
   transactions,
@@ -202,7 +205,7 @@ export const ReportsHub: React.FC<ReportsHubProps> = ({
   // 2. PAID REPORT DATA PREPARATION
   // -------------------------------------------------------------
   const paidReportData = useMemo(() => {
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayStr = asOfDate;
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
     const currentMonthStr = todayStr.substring(0, 7);
 
@@ -1095,7 +1098,7 @@ export const ReportsHub: React.FC<ReportsHubProps> = ({
                               )}
 
                               {s.student.phone && (() => {
-                                const { message, hasDue } = formatWhatsAppReminderMessage(s.student, s, schoolProfile);
+                                const { message, hasDue } = formatWhatsAppReminderMessage(s.student, s, schoolProfile, asOfDate);
                                 const phoneNum = normalizePhoneNumber(s.student.phone);
                                 if (!hasDue || !phoneNum) return null;
                                 return (

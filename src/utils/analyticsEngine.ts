@@ -1,6 +1,7 @@
 import { AnalyticsSummary, Installment, PaymentTransaction, Student, StudentFeeStructure, ToleranceConfig } from '../types';
 import { computeStudentFinancials } from './feeCalculator';
 import { computeStudentStatus } from './statusResolver';
+import { getKolkataToday } from './dateUtils';
 
 export function computeSystemAnalytics(
   students: Student[],
@@ -8,7 +9,7 @@ export function computeSystemAnalytics(
   installments: Installment[],
   payments: PaymentTransaction[],
   tolerance: ToleranceConfig,
-  currentDateString: string = new Date().toISOString().split('T')[0]
+  currentDateString: string = getKolkataToday()
 ): AnalyticsSummary {
   const activeStudentsList = students.filter((s) => s.isActive);
   const inactiveStudentsList = students.filter((s) => !s.isActive);

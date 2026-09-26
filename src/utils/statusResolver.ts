@@ -1,4 +1,5 @@
 import { ActionTier, StatusCategory, Student, ToleranceConfig } from '../types';
+import { getKolkataToday } from './dateUtils';
 
 export interface StatusComputationResult {
   statusCategory: StatusCategory;
@@ -16,7 +17,7 @@ export function computeStudentStatus(
     hasUncommittedFee: boolean;
   },
   tolerance: ToleranceConfig,
-  currentDateString: string = new Date().toISOString().split('T')[0]
+  currentDateString: string = getKolkataToday()
 ): StatusComputationResult {
   const { dueTillDate, expectedTillDate, totalPaid, hasUncommittedFee } = financials;
 
@@ -59,8 +60,8 @@ export function computeStudentStatus(
   let hasActivePermission = false;
 
   if (student.permissionExpiresAt) {
-    const todayTime = new Date(currentDateString).getTime();
-    const expiryTime = new Date(student.permissionExpiresAt).getTime();
+    const todayTime = Date.parse(`${currentDateString}T00:00:00Z`);
+    const expiryTime = Date.parse(`${student.permissionExpiresAt}T00:00:00Z`);
     const diffDays = Math.ceil((expiryTime - todayTime) / (1000 * 60 * 60 * 24));
 
     if (diffDays >= 0) {

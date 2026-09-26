@@ -43,7 +43,7 @@ interface PaymentModalProps {
     transaction: PaymentTransaction,
     customAllocations: PaymentAllocation[],
     partialStatusUpdate?: any
-  ) => void;
+  ) => Promise<void>;
 }
 
 export const PaymentModal: React.FC<PaymentModalProps> = ({
@@ -89,9 +89,10 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   const [allocations, setAllocations] = useState<PaymentAllocation[]>([]);
   const [isManualOverride, setIsManualOverride] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   // Generate Preview Receipt No
-  const currentYear = new Date().getFullYear();
+  const currentYear = Number(paymentDate.slice(0, 4));
   const sequenceStr = String(schoolProfile.nextReceiptSequence || 1).padStart(5, '0');
   const previewReceiptNo = `${schoolProfile.receiptPrefix || 'KSB'}-${currentYear}-${sequenceStr}`;
 
@@ -126,7 +127,8 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
 
   const isPartialPayment = paymentAmount > 0 && paymentAmount < summary.totalDue;
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
+    if (isSaving) return;
     if (paymentAmount <= 0) {
       setErrorMsg('Payment amount must be greater than 0.');
       return;
@@ -142,36 +144,18 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
     }
 
     const totalAllocated = allocations.reduce((sum, a) => sum + a.allocatedAmount, 0);
-    let finalAllocations = allocations;
-
     if (totalAllocated === 0 && paymentAmount > 0) {
-      finalAllocations = [
-        {
-          installmentId: `inst_fee_${Date.now()}`,
-          headName: 'School Tuition Fee',
-          installmentNumber: 1,
-          dueDate: paymentDate,
-          allocatedAmount: paymentAmount,
-        },
-      ];
-    } else if (totalAllocated !== paymentAmount) {
+      setErrorMsg('Payment must be allocated to existing installments.');
+      return;
+    } else if (Math.abs(totalAllocated - paymentAmount) > 0.01) {
       setErrorMsg(`Total allocated amount (${formatCurrency(totalAllocated, schoolProfile.currencySymbol)}) does not match payment amount (${formatCurrency(paymentAmount, schoolProfile.currencySymbol)}).`);
       return;
     }
 
-    // Trigger celebratory confetti effect
-    try {
-      confetti({
-        particleCount: 70,
-        spread: 60,
-        origin: { y: 0.6 },
-      });
-    } catch {
-      // ignore
-    }
-
     const now = new Date();
-    const timeStr = now.toTimeString().split(' ')[0].substring(0, 5);
+    const timeStr = new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: false,
+    }).format(now);
     const fullDateTime = `${paymentDate} ${timeStr}`;
 
     const newTransaction: PaymentTransaction = {
@@ -186,11 +170,20 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
       paymentMode,
       referenceNo: referenceNo.trim() || undefined,
       remarks: remarks.trim() || undefined,
-      allocations: finalAllocations,
+      allocations,
       isCancelled: false,
     };
 
-    onSavePayment(newTransaction, finalAllocations);
+    setErrorMsg(null);
+    setIsSaving(true);
+    try {
+      await onSavePayment(newTransaction, allocations);
+      confetti({ particleCount: 70, spread: 60, origin: { y: 0.6 } });
+    } catch (error: any) {
+      setErrorMsg(error?.message || 'Unable to save to the central database. No changes were recorded.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -239,10 +232,11 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
             id="btn-confirm-payment"
             type="button"
             onClick={handleConfirm}
+            disabled={isSaving}
             className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs sm:text-sm shadow-lg shadow-emerald-900/30 transition-all cursor-pointer active:scale-95"
           >
             <Banknote className="w-4 h-4" />
-            <span>Accept & Generate Receipt</span>
+            <span>{isSaving ? 'Saving…' : 'Accept & Generate Receipt'}</span>
           </button>
         </div>
       </header>
@@ -558,9 +552,10 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                 <button
                   type="button"
                   onClick={handleConfirm}
+                  disabled={isSaving}
                   className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg text-xs cursor-pointer shadow-xs"
                 >
-                  Save & Print
+                  {isSaving ? 'Saving…' : 'Save & Print'}
                 </button>
               </div>
             </div>

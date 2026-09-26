@@ -13,6 +13,7 @@ import { getInstallmentDisplayName, formatWhatsAppReminderMessage, normalizePhon
 import { getStatusCategoryMeta } from '../utils/statusResolver';
 import { getClassSortIndex } from '../utils/classOrder';
 import { lookupStandardClassFee } from '../data/trialSpreadsheetData';
+import { getKolkataToday } from '../utils/dateUtils';
 import {
   Award,
   BookOpen,
@@ -124,7 +125,7 @@ interface MasterStudentTableProps {
   onOpenLedgerModal: (student: Student) => void;
   onOpenReceiptModal: (transaction: PaymentTransaction) => void;
   onOpenFeeStructureModal: (student: Student) => void;
-  onEditStudent?: (student: Student) => void;
+  onEditStudent?: (student: Student) => Promise<void>;
   onToggleStudentActive: (studentId: string, currentActive: boolean) => void;
   onUpdateActionStatus?: (
     studentId: string,
@@ -356,7 +357,7 @@ export const MasterStudentTable: React.FC<MasterStudentTableProps> = ({
   onUpdateActionStatus,
 }) => {
   const currencySymbol = schoolProfile?.currencySymbol || '₹';
-  const todayDateStr = asOfDate || new Date().toISOString().split('T')[0];
+  const todayDateStr = asOfDate || getKolkataToday();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTier, setSelectedTier] = useState<ActionTier | 'ALL'>('ALL');
   const [selectedStatus, setSelectedStatus] = useState<StatusCategory | 'ALL'>('ALL');
@@ -365,7 +366,7 @@ export const MasterStudentTable: React.FC<MasterStudentTableProps> = ({
   const [activeStatusDropdownId, setActiveStatusDropdownId] = useState<string | null>(null);
   const [selectedStudentToEdit, setSelectedStudentToEdit] = useState<Student | null>(null);
   const [selectedStatusDate, setSelectedStatusDate] = useState<string>(() =>
-    getNextMultipleOfFiveDate(new Date())
+    getNextMultipleOfFiveDate(todayDateStr)
   );
   const [sortBy, setSortBy] = useState<SortField>('dueTillDate');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
@@ -1892,9 +1893,9 @@ export const MasterStudentTable: React.FC<MasterStudentTableProps> = ({
         <EditStudentModal
           student={selectedStudentToEdit}
           classList={classList}
-          onSave={(updated) => {
+          onSave={async (updated) => {
             if (onEditStudent) {
-              onEditStudent(updated);
+              await onEditStudent(updated);
             }
             setSelectedStudentToEdit(null);
           }}

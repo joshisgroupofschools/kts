@@ -752,7 +752,7 @@ export const TodaysReceiptsModal: React.FC<TodaysReceiptsModalProps> = ({
                                 <button
                                   type="button"
                                   onClick={() => {
-                                    const nextDate = getNextMultipleOfFiveDate(new Date(selectedDate));
+                                      const nextDate = getNextMultipleOfFiveDate(selectedDate);
                                     onUpdateTransactionSlip(tx.id, tx.slipGiven || false, nextDate);
                                   }}
                                   className="text-[9.5px] text-indigo-600 dark:text-indigo-400 hover:underline font-bold"

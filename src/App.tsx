@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState, useRef } from 'react';
+import React, { useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import {
   AppView,
   ClassFeeConfig,
@@ -32,8 +32,6 @@ import {
   exportDataAsJson,
   getDailyCollectionTarget,
   getDayCloseRecords,
-  getGoogleScriptUrl,
-  getSpreadsheetUrl,
   getStoredClassConfigs,
   getStoredFeeHeads,
   getStoredInstallments,
@@ -42,8 +40,6 @@ import {
   getStoredStructures,
   getStoredToleranceConfig,
   getStoredTransactions,
-  pullFromGoogleSheets,
-  pushToGoogleSheets,
   restoreDataFromJson,
   saveClassConfigs,
   saveDailyCollectionTarget,
@@ -57,22 +53,25 @@ import {
   saveToleranceConfig,
   saveTransactions,
 } from './utils/storage';
-import { db, COLLECTION_ID, DOC_ID, disableFirestoreNetwork } from './firebase/firebaseClient';
-import { doc, onSnapshot, setDoc, runTransaction, collection } from 'firebase/firestore';
 import {
-  getMigrationStatus,
-  ROOT_PATH,
-  addStudentWithInstallmentsRepo,
+  addStudentRepo,
+  bulkAddStudentsRepo,
+  cancelPaymentRepo,
+  closeDayRepo,
+  getBootstrapDataRepo,
+  getChangesRepo,
+  importChunkRepo,
+  recordPaymentRepo,
+  reopenDayRepo,
+  saveClassConfigRepo,
   updateStudentRepo,
   saveFeeStructureRepo,
-  savePaymentTransactionRepo,
-  cancelTransactionRepo,
   saveSettingsRepo,
-  saveDayCloseRepo,
-  deleteDayCloseRepo,
-  MigrationMeta
-} from './services/firestoreRepository';
-import { MigrationModal } from './components/MigrationModal';
+  savePermissionRepo,
+  setStudentActiveRepo,
+  updateTransactionSlipRepo,
+  callAppsScriptAction,
+} from './services/googleSheetsRepository';
 import { Navbar } from './components/Navbar';
 import { FinancialDashboard } from './components/FinancialDashboard';
 import { MasterStudentTable } from './components/MasterStudentTable';
@@ -84,6 +83,7 @@ import { FeeStructureModal } from './components/FeeStructureModal';
 import { AddStudentModal } from './components/AddStudentModal';
 import { ClassFeeMasterModal } from './components/ClassFeeMasterModal';
 import { GoogleSheetsSyncModal } from './components/GoogleSheetsSyncModal';
+import { BackupMigrateSheetsModal } from './components/BackupMigrateSheetsModal';
 import { SchoolSettingsModal } from './components/SchoolSettingsModal';
 import { HelpModal } from './components/HelpModal';
 import { BulkUploadModal } from './components/BulkUploadModal';
@@ -157,10 +157,15 @@ export default function App() {
   });
 
   // Backend Sync State
-  const [scriptUrl, setScriptUrl] = useState<string>(() => getGoogleScriptUrl() || DEFAULT_SCRIPT_WEBAPP_URL);
-  const [spreadsheetUrl, setSpreadsheetUrl] = useState<string>(() => getSpreadsheetUrl() || TARGET_GOOGLE_SHEET_URL);
-  const [isSheetsConnected, setIsSheetsConnected] = useState<boolean>(true);
+  const [scriptUrl, setScriptUrl] = useState<string>(DEFAULT_SCRIPT_WEBAPP_URL);
+  const [spreadsheetUrl, setSpreadsheetUrl] = useState<string>(TARGET_GOOGLE_SHEET_URL);
+  const [isSheetsConnected, setIsSheetsConnected] = useState<boolean>(false);
   const [lastSyncTime, setLastSyncTime] = useState<string | undefined>(undefined);
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncError, setSyncError] = useState<string | null>(null);
+  const syncInFlight = useRef(false);
+  const revisionRef = useRef<number | undefined>(undefined);
 
   // -------------------------------------------------------------
   // 2. Modals Active State
@@ -179,6 +184,7 @@ export default function App() {
     | 'HELP'
     | 'BULK_UPLOAD'
     | 'TODAYS_RECEIPTS'
+    | 'BACKUP_MIGRATE'
   >('NONE');
 
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
@@ -216,135 +222,59 @@ export default function App() {
     saveSchoolProfile(schoolProfile);
   }, [schoolProfile]);
 
-  const [migrationMeta, setMigrationMeta] = useState<MigrationMeta | null>(null);
-  const [isMigrationChecking, setIsMigrationChecking] = useState<boolean>(true);
-  const [isOnline, setIsOnline] = useState<boolean>(true);
+  const [isOnline, setIsOnline] = useState<boolean>(false);
 
-  useEffect(() => {
-    async function checkMig() {
-      const meta = await getMigrationStatus();
-      setMigrationMeta(meta);
-      setIsMigrationChecking(false);
+  const applyBootstrapData = useCallback((data: any) => {
+    if (!data || !Array.isArray(data.students) || !Array.isArray(data.installments) || !Array.isArray(data.transactions)) {
+      throw new Error('The Google Sheets backend returned an incomplete data snapshot.');
     }
-    checkMig();
+    setStudents(data.students);
+    setStructures(Array.isArray(data.structures) ? data.structures : []);
+    setInstallments(data.installments);
+    setTransactions(data.transactions);
+    if (Array.isArray(data.classConfigs) && data.classConfigs.length) setClassConfigs(data.classConfigs);
+    if (Array.isArray(data.feeHeads) && data.feeHeads.length) setFeeHeads(data.feeHeads);
+    if (data.schoolProfile) setSchoolProfile((prev) => ({ ...prev, ...data.schoolProfile }));
+    if (data.tolerance) setTolerance((prev) => ({ ...prev, ...data.tolerance }));
+    if (typeof data.dailyTarget === 'number') setDailyTarget(data.dailyTarget);
+    if (data.dayCloseRecords) setDayCloseRecords(data.dayCloseRecords);
   }, []);
 
-  // Multi-collection real-time listeners after migration v3
-  useEffect(() => {
-    if (!migrationMeta?.completed) return;
-    if (localStorage.getItem('sfc_migration_skipped') === 'true') {
-      setIsOnline(true);
-      return;
-    }
-
-    let unsubStudents: (() => void) | undefined;
-    let unsubStructures: (() => void) | undefined;
-    let unsubInstallments: (() => void) | undefined;
-    let unsubTransactions: (() => void) | undefined;
-    let unsubDayCloses: (() => void) | undefined;
-    let unsubClassConfigs: (() => void) | undefined;
-    let unsubFeeHeads: (() => void) | undefined;
-    let unsubSettings: (() => void) | undefined;
-    let unsubReceipts: (() => void) | undefined;
-
-    const handleQuotaErr = (err: any) => {
-      console.warn('Firestore subscription quota / network issue:', err);
-      setIsOnline(true);
-      localStorage.setItem('sfc_migration_skipped', 'true');
-      disableFirestoreNetwork();
-      unsubStudents?.();
-      unsubStructures?.();
-      unsubInstallments?.();
-      unsubTransactions?.();
-      unsubDayCloses?.();
-      unsubClassConfigs?.();
-      unsubFeeHeads?.();
-      unsubSettings?.();
-      unsubReceipts?.();
-    };
-
+  const refreshFromSheets = useCallback(async (showSpinner = false): Promise<boolean> => {
+    if (syncInFlight.current || !scriptUrl) return false;
+    syncInFlight.current = true;
+    if (showSpinner) setIsSyncing(true);
     try {
-      unsubStudents = onSnapshot(collection(db, `${ROOT_PATH}/students`), (snap) => {
-        const list: Student[] = [];
-        snap.forEach((d) => list.push(d.data() as Student));
-        setStudents(list);
-        setIsOnline(true);
-        setLastSyncTime(new Date().toLocaleTimeString());
-      }, handleQuotaErr);
-
-      unsubStructures = onSnapshot(collection(db, `${ROOT_PATH}/feeStructures`), (snap) => {
-        const list: StudentFeeStructure[] = [];
-        snap.forEach((d) => list.push(d.data() as StudentFeeStructure));
-        setStructures(list);
-      }, handleQuotaErr);
-
-      unsubInstallments = onSnapshot(collection(db, `${ROOT_PATH}/installments`), (snap) => {
-        const list: Installment[] = [];
-        snap.forEach((d) => list.push(d.data() as Installment));
-        setInstallments(list);
-      }, handleQuotaErr);
-
-      unsubTransactions = onSnapshot(collection(db, `${ROOT_PATH}/transactions`), (snap) => {
-        const list: PaymentTransaction[] = [];
-        snap.forEach((d) => list.push(d.data() as PaymentTransaction));
-        setTransactions(list);
-      }, handleQuotaErr);
-
-      unsubDayCloses = onSnapshot(collection(db, `${ROOT_PATH}/dayCloses`), (snap) => {
-        const recs: Record<string, DayCloseRecord> = {};
-        snap.forEach((d) => {
-          recs[d.id] = d.data() as DayCloseRecord;
-        });
-        setDayCloseRecords(recs);
-      }, handleQuotaErr);
-
-      unsubClassConfigs = onSnapshot(collection(db, `${ROOT_PATH}/classConfigs`), (snap) => {
-        const list: ClassFeeConfig[] = [];
-        snap.forEach((d) => list.push(d.data() as ClassFeeConfig));
-        if (list.length > 0) setClassConfigs(list);
-      }, handleQuotaErr);
-
-      unsubFeeHeads = onSnapshot(collection(db, `${ROOT_PATH}/feeHeads`), (snap) => {
-        const list: FeeHeadDefinition[] = [];
-        snap.forEach((d) => list.push(d.data() as FeeHeadDefinition));
-        if (list.length > 0) setFeeHeads(list);
-      }, handleQuotaErr);
-
-      unsubSettings = onSnapshot(doc(db, `${ROOT_PATH}/settings`, 'main'), (snap) => {
-        if (snap.exists()) {
-          const data = snap.data();
-          if (data.schoolProfile) setSchoolProfile(data.schoolProfile);
-          if (data.tolerance) setTolerance(data.tolerance);
-          if (typeof data.dailyTarget === 'number') setDailyTarget(data.dailyTarget);
-        }
-      }, handleQuotaErr);
-
-      unsubReceipts = onSnapshot(doc(db, `${ROOT_PATH}/counters`, 'receipts'), (snap) => {
-        if (snap.exists()) {
-          const data = snap.data();
-          if (typeof data.nextReceiptSequence === 'number') {
-            setSchoolProfile((prev) => ({ ...prev, nextReceiptSequence: data.nextReceiptSequence }));
-          }
-        }
-      }, handleQuotaErr);
-
-    } catch (e) {
-      console.error('Subscription error:', e);
+      const response = revisionRef.current === undefined
+        ? await getBootstrapDataRepo(scriptUrl)
+        : await getChangesRepo(scriptUrl, revisionRef.current);
+      if (!response.success || !response.data) throw new Error(response.error || 'Google Sheets synchronization failed.');
+      if (!response.data.unchanged) applyBootstrapData(response.data);
+      revisionRef.current = Number(response.revision ?? response.data.revision ?? revisionRef.current);
+      setIsSheetsConnected(true);
+      setIsOnline(true);
+      setSyncError(null);
+      setLastSyncTime(new Date().toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata' }));
+      return true;
+    } catch (error: any) {
+      setIsSheetsConnected(false);
       setIsOnline(false);
+      setSyncError(error?.message || 'Unable to connect to the central Google Sheets database.');
+      return false;
+    } finally {
+      syncInFlight.current = false;
+      setIsInitialLoading(false);
+      setIsSyncing(false);
     }
+  }, [applyBootstrapData, scriptUrl]);
 
-    return () => {
-      unsubStudents?.();
-      unsubStructures?.();
-      unsubInstallments?.();
-      unsubTransactions?.();
-      unsubDayCloses?.();
-      unsubClassConfigs?.();
-      unsubFeeHeads?.();
-      unsubSettings?.();
-      unsubReceipts?.();
-    };
-  }, [migrationMeta?.completed]);
+  useEffect(() => {
+    saveGoogleScriptUrl(DEFAULT_SCRIPT_WEBAPP_URL);
+    saveSpreadsheetUrl(TARGET_GOOGLE_SHEET_URL);
+    refreshFromSheets(true);
+    const timer = window.setInterval(() => refreshFromSheets(false), 7000);
+    return () => window.clearInterval(timer);
+  }, [refreshFromSheets]);
 
   // Safe schoolProfile guaranteeing all fields
   const safeSchoolProfile: SchoolProfile = useMemo(() => {
@@ -447,147 +377,62 @@ export default function App() {
       permissionReason?: string;
     }
   ) => {
-    try {
-      if (partialStatusUpdate && selectedStudentId) {
-        const target = students.find((s) => s.id === selectedStudentId);
-        if (target) {
-          try {
-            await updateStudentRepo({
-              ...target,
-              manualCategoryOverride: partialStatusUpdate.manualCategoryOverride,
-              permissionExpiresAt: partialStatusUpdate.permissionExpiresAt,
-              permissionReason: partialStatusUpdate.permissionReason,
-              updatedAt: new Date().toISOString(),
-            });
-          } catch (e) {
-            console.warn('Firestore student update fallback:', e);
-          }
-        }
-      }
-      const confirmedTxn = await savePaymentTransactionRepo(transactionData, allocations);
-      setActiveReceiptTransaction(confirmedTxn);
-      setActiveModal('RECEIPT');
-    } catch (err: any) {
-      console.warn('Firestore payment write failed, using local fallback:', err);
-      setIsOnline(false);
-      localStorage.setItem('sfc_migration_skipped', 'true');
-
-      const currentYear = new Date().getFullYear();
-      const seq = schoolProfile.nextReceiptSequence || 1000;
-      const sequenceStr = String(seq).padStart(5, '0');
-      const finalReceiptNo = `KSB-${currentYear}-${sequenceStr}`;
-
-      const confirmedTxn = {
-        ...transactionData,
-        receiptNo: finalReceiptNo,
-      };
-
-      const updatedInstallments = installments.map((inst) => {
-        const matched = allocations.find((a) => a.installmentId === inst.id);
-        if (!matched) return inst;
-        const newPaid = inst.paidAmount + matched.allocatedAmount;
-        const newBal = Math.max(0, inst.amount - newPaid);
-        const newStatus = newBal === 0 ? ('paid' as const) : ('partial' as const);
-        return {
-          ...inst,
-          paidAmount: newPaid,
-          balanceAmount: newBal,
-          status: newStatus,
-          lastPaymentDate: asOfDate,
-        };
-      });
-
-      const updatedTransactions = [confirmedTxn, ...transactions];
-      const updatedProfile = { ...schoolProfile, nextReceiptSequence: seq + 1 };
-
-      setInstallments(updatedInstallments);
-      setTransactions(updatedTransactions);
-      setSchoolProfile(updatedProfile);
-
-      saveInstallments(updatedInstallments);
-      saveTransactions(updatedTransactions);
-      saveSchoolProfile(updatedProfile);
-
-      setActiveReceiptTransaction(confirmedTxn);
-      setActiveModal('RECEIPT');
+    if (!isOnline) {
+      throw new Error('Unable to save to the central database. No changes were recorded. Please check the internet connection and try again.');
     }
+    if (partialStatusUpdate && selectedStudentId) {
+      const target = students.find((student) => student.id === selectedStudentId);
+      if (target) {
+        const permissionResult = await updateStudentRepo(scriptUrl, {
+          ...target,
+          ...partialStatusUpdate,
+          updatedAt: new Date().toISOString(),
+        });
+        if (!permissionResult.success) throw new Error(permissionResult.error || 'Unable to update student permission.');
+      }
+    }
+    const result = await recordPaymentRepo(scriptUrl, { ...transactionData, allocations }, transactionData.id);
+    if (!result.success || !result.data?.transaction) {
+      throw new Error(result.error || 'Unable to record payment in the central database.');
+    }
+    await refreshFromSheets(true);
+    setActiveReceiptTransaction(result.data.transaction);
+    setActiveModal('RECEIPT');
   };
 
   // -------------------------------------------------------------
   // 6. Void / Cancel Receipt Handler (Firestore Transactional Safety)
   // -------------------------------------------------------------
   const handleCancelReceipt = async (transactionId: string, cancelReason: string) => {
-    try {
-      await cancelTransactionRepo(transactionId, cancelReason);
-    } catch (err: any) {
-      console.warn('Firestore cancel failed, using local fallback:', err);
-      setIsOnline(false);
-      localStorage.setItem('sfc_migration_skipped', 'true');
-
-      const txn = transactions.find((t) => t.id === transactionId);
-      if (!txn || txn.isCancelled) return;
-
-      const updatedInstallments = installments.map((inst) => {
-        const matched = txn.allocations.find((a) => a.installmentId === inst.id);
-        if (!matched) return inst;
-        const newPaid = Math.max(0, inst.paidAmount - matched.allocatedAmount);
-        const newBal = inst.amount - newPaid;
-        const newStatus = newPaid === 0 ? ('unpaid' as const) : ('partial' as const);
-        return {
-          ...inst,
-          paidAmount: newPaid,
-          balanceAmount: newBal,
-          status: newStatus,
-        };
-      });
-
-      const updatedTransactions = transactions.map((t) => {
-        if (t.id === transactionId) {
-          return {
-            ...t,
-            isCancelled: true,
-            cancelledAt: new Date().toISOString(),
-            cancellationReason: cancelReason,
-          };
-        }
-        return t;
-      });
-
-      setInstallments(updatedInstallments);
-      setTransactions(updatedTransactions);
-      saveInstallments(updatedInstallments);
-      saveTransactions(updatedTransactions);
-    }
+    if (!cancelReason.trim()) throw new Error('Cancellation reason is required.');
+    const result = await cancelPaymentRepo(scriptUrl, transactionId, cancelReason.trim());
+    if (!result.success) throw new Error(result.error || 'Unable to cancel the receipt.');
+    await refreshFromSheets(true);
   };
 
   // -------------------------------------------------------------
   // 7. Grace Permission Handler
   // -------------------------------------------------------------
-  const handleSavePermission = (
+  const handleSavePermission = async (
     studentId: string,
     permissionExpiresAt: string | undefined,
     permissionReason: string | undefined,
     manualCategoryOverride: 'auto' | 'id_card' | 'permission' | 'action'
   ) => {
-    const updated = students.map((s) => {
-      if (s.id === studentId) {
-        return {
-          ...s,
-          permissionExpiresAt,
-          permissionReason,
-          manualCategoryOverride,
-          updatedAt: new Date().toISOString(),
-        };
-      }
-      return s;
-    });
-    setStudents(updated);
+    const result = await savePermissionRepo(scriptUrl, studentId, permissionExpiresAt || '', permissionReason);
+    if (!result.success) throw new Error(result.error || 'Unable to save permission.');
+    const student = students.find((item) => item.id === studentId);
+    if (student) {
+      const update = await updateStudentRepo(scriptUrl, { ...student, manualCategoryOverride, permissionExpiresAt, permissionReason });
+      if (!update.success) throw new Error(update.error || 'Unable to update student status.');
+    }
+    await refreshFromSheets(true);
   };
 
   // -------------------------------------------------------------
   // 8. Fee Structure & Spot Fees Handler
   // -------------------------------------------------------------
-  const handleSaveFeeStructures = (
+  const handleSaveFeeStructures = async (
     studentId: string,
     newStructures: StudentFeeStructure[],
     isActive: boolean,
@@ -643,17 +488,14 @@ export default function App() {
       });
     });
 
-    setStudents(updatedStudents);
-    setStructures(updatedStructures);
-    setInstallments([...otherInstallments, ...newInstallmentsList]);
-
-    const docRef = doc(db, COLLECTION_ID, DOC_ID);
-    setDoc(docRef, {
-      students: updatedStudents,
-      structures: updatedStructures,
-      installments: [...otherInstallments, ...newInstallmentsList],
-      updatedAt: new Date().toISOString(),
-    }, { merge: true }).catch((err) => console.error('Firestore fee structure write error:', err));
+    const targetStudent = updatedStudents.find((student) => student.id === studentId);
+    if (targetStudent) {
+      const studentResult = await updateStudentRepo(scriptUrl, targetStudent);
+      if (!studentResult.success) throw new Error(studentResult.error || 'Unable to update student.');
+    }
+    const structureResult = await saveFeeStructureRepo(scriptUrl, newStructures, newInstallmentsList);
+    if (!structureResult.success) throw new Error(structureResult.error || 'Unable to save fee structure.');
+    await refreshFromSheets(true);
   };
 
   // -------------------------------------------------------------
@@ -663,44 +505,14 @@ export default function App() {
     newStudent: Student,
     feeStructure?: StudentFeeStructure
   ) => {
-    try {
-      const structList = feeStructure ? [feeStructure] : [];
-      const instList = feeStructure
-        ? generateInstallments(
-            feeStructure.id,
-            newStudent.id,
-            feeStructure.headName,
-            feeStructure.committedFee,
-            feeStructure.installmentsCount
-          )
-        : [];
-      await addStudentWithInstallmentsRepo(newStudent, structList, instList);
-    } catch (err: any) {
-      console.warn('Firestore add student failed, using local fallback:', err);
-      setIsOnline(false);
-      localStorage.setItem('sfc_migration_skipped', 'true');
-
-      const updatedStudents = [newStudent, ...students];
-      const updatedStructures = feeStructure ? [...structures, feeStructure] : structures;
-      const instList = feeStructure
-        ? generateInstallments(
-            feeStructure.id,
-            newStudent.id,
-            feeStructure.headName,
-            feeStructure.committedFee,
-            feeStructure.installmentsCount
-          )
-        : [];
-      const updatedInstallments = [...installments, ...instList];
-
-      setStudents(updatedStudents);
-      setStructures(updatedStructures);
-      setInstallments(updatedInstallments);
-
-      saveStudents(updatedStudents);
-      saveStructures(updatedStructures);
-      saveInstallments(updatedInstallments);
-    }
+    const structList = feeStructure ? [feeStructure] : [];
+    const instList = feeStructure ? generateInstallments(
+      feeStructure.id, newStudent.id, feeStructure.headName,
+      feeStructure.committedFee, feeStructure.installmentsCount,
+    ) : [];
+    const result = await addStudentRepo(scriptUrl, newStudent, structList, instList);
+    if (!result.success) throw new Error(result.error || 'Unable to add student to the central database.');
+    await refreshFromSheets(true);
   };
 
   const handleAddBulkStudents = async (
@@ -712,12 +524,11 @@ export default function App() {
       (c) => c.className.toLowerCase() === targetClassName.toLowerCase()
     );
 
-    try {
-      for (const st of newStudents) {
-        let structList: StudentFeeStructure[] = [];
-        let instList: Installment[] = [];
-        if (autoCommitClassFee && classCfg) {
-          const struct: StudentFeeStructure = {
+    const newStructs: StudentFeeStructure[] = [];
+    const newInsts: Installment[] = [];
+    if (autoCommitClassFee && classCfg) {
+      newStudents.forEach((st) => {
+        const struct: StudentFeeStructure = {
             id: `fs_bulk_${Date.now()}_${st.id}`,
             studentId: st.id,
             headName: 'School Tuition Fee',
@@ -727,110 +538,34 @@ export default function App() {
             commitmentDate: asOfDate,
             installmentsCount: classCfg.defaultInstallments,
             isSpotFee: false,
-          };
-          structList = [struct];
-          instList = generateInstallments(
+        };
+        newStructs.push(struct);
+        newInsts.push(...generateInstallments(
             struct.id,
             st.id,
             struct.headName,
             struct.committedFee,
             struct.installmentsCount,
             undefined,
-            classCfg.defaultDueDayOfMonth
-          );
-        }
-        await addStudentWithInstallmentsRepo(st, structList, instList);
-      }
-    } catch (err: any) {
-      console.warn('Firestore bulk add failed, using local fallback:', err);
-      setIsOnline(false);
-      localStorage.setItem('sfc_migration_skipped', 'true');
-
-      const newStructs: StudentFeeStructure[] = [];
-      const newInsts: Installment[] = [];
-
-      if (autoCommitClassFee && classCfg) {
-        newStudents.forEach((st) => {
-          const struct: StudentFeeStructure = {
-            id: `fs_bulk_${Date.now()}_${st.id}`,
-            studentId: st.id,
-            headName: 'School Tuition Fee',
-            actualFee: classCfg.actualFee,
-            committedFee: classCfg.actualFee,
-            concession: 0,
-            commitmentDate: asOfDate,
-            installmentsCount: classCfg.defaultInstallments,
-            isSpotFee: false,
-          };
-          newStructs.push(struct);
-
-          const instList = generateInstallments(
-            struct.id,
-            st.id,
-            struct.headName,
-            struct.committedFee,
-            struct.installmentsCount,
-            undefined,
-            classCfg.defaultDueDayOfMonth
-          );
-          newInsts.push(...instList);
-        });
-      }
-
-      const updatedStudents = [...newStudents, ...students];
-      const updatedStructures = [...structures, ...newStructs];
-      const updatedInstallments = [...installments, ...newInsts];
-
-      setStudents(updatedStudents);
-      setStructures(updatedStructures);
-      setInstallments(updatedInstallments);
-
-      saveStudents(updatedStudents);
-      saveStructures(updatedStructures);
-      saveInstallments(updatedInstallments);
+            classCfg.defaultDueDayOfMonth,
+          ));
+      });
     }
+    const result = await bulkAddStudentsRepo(scriptUrl, newStudents, newStructs, newInsts);
+    if (!result.success) throw new Error(result.error || 'Unable to add students to the central database.');
+    await refreshFromSheets(true);
   };
 
   // -------------------------------------------------------------
   // 10. Google Sheets Push / Pull Sync
   // -------------------------------------------------------------
   const handlePushToSheets = async (): Promise<boolean> => {
-    const success = await pushToGoogleSheets(
-      scriptUrl,
-      students,
-      structures,
-      installments,
-      transactions,
-      classConfigs,
-      tolerance,
-      safeSchoolProfile
-    );
-    if (success) {
-      setIsSheetsConnected(true);
-      setLastSyncTime(new Date().toLocaleTimeString());
-    }
-    return success;
+    setSyncError('Direct overwrite is disabled to protect newer Google Sheets data. Use the verified migration tool.');
+    return false;
   };
 
   const handlePullFromSheets = async (): Promise<boolean> => {
-    const data = await pullFromGoogleSheets(scriptUrl);
-    if (!data) return false;
-
-    if (data.students) setStudents(data.students);
-    if (data.structures) setStructures(data.structures);
-    if (data.installments) setInstallments(data.installments);
-    if (data.transactions) setTransactions(data.transactions);
-    if (data.classConfigs) setClassConfigs(data.classConfigs);
-    if (data.tolerance && typeof data.tolerance === 'object') {
-      setTolerance((prev) => ({ ...DEFAULT_TOLERANCE, ...prev, ...data.tolerance }));
-    }
-    if (data.schoolProfile && typeof data.schoolProfile === 'object') {
-      setSchoolProfile((prev) => ({ ...DEFAULT_SCHOOL_PROFILE, ...prev, ...data.schoolProfile }));
-    }
-
-    setIsSheetsConnected(true);
-    setLastSyncTime(new Date().toLocaleTimeString());
-    return true;
+    return refreshFromSheets(true);
   };
 
   // Backup handlers
@@ -852,14 +587,10 @@ export default function App() {
     if (!file) return;
     const restored = await restoreDataFromJson(file);
     if (restored) {
-      if (restored.students) setStudents(restored.students);
-      if (restored.structures) setStructures(restored.structures);
-      if (restored.installments) setInstallments(restored.installments);
-      if (restored.transactions) setTransactions(restored.transactions);
-      if (restored.classConfigs) setClassConfigs(restored.classConfigs);
-      if (restored.tolerance) setTolerance(restored.tolerance);
-      if (restored.schoolProfile) setSchoolProfile(restored.schoolProfile);
-      alert('Data backup successfully restored!');
+      const result = await importChunkRepo(scriptUrl, Date.now(), restored);
+      if (!result.success) throw new Error(result.error || 'Unable to import backup into Google Sheets.');
+      await refreshFromSheets(true);
+      alert('Data backup safely merged into Google Sheets.');
     }
   };
 
@@ -869,31 +600,30 @@ export default function App() {
         'Are you sure you want to reset all data to the initial factory seed? All modifications will be replaced with clean demo records.'
       )
     ) {
-      clearAllLocalData();
-      window.location.reload();
+      alert('Factory reset is disabled while Google Sheets is the live database. Existing school data was not changed.');
     }
   };
 
-  const handleBulkImportStudents = (
+  const handleBulkImportStudents = async (
     newStudents: Student[],
     newStructures: StudentFeeStructure[],
     newInstallments: Installment[]
   ) => {
-    setStudents((prev) => [...prev, ...newStudents]);
-    setStructures((prev) => [...prev, ...newStructures]);
-    setInstallments((prev) => [...prev, ...newInstallments]);
+    const result = await bulkAddStudentsRepo(scriptUrl, newStudents, newStructures, newInstallments);
+    if (!result.success) throw new Error(result.error || 'Unable to import students.');
+    await refreshFromSheets(true);
   };
 
-  const handleApplyRealSpreadsheetData = () => {
+  const handleApplyRealSpreadsheetData = async () => {
     const realData = generateStructuredRealData();
-    setStudents(realData.students);
-    setStructures(realData.feeStructures);
-    setInstallments(realData.installments);
-    setTransactions(realData.payments);
-    saveStudents(realData.students);
-    saveStructures(realData.feeStructures);
-    saveInstallments(realData.installments);
-    saveTransactions(realData.payments);
+    const result = await importChunkRepo(scriptUrl, Date.now(), {
+      students: realData.students,
+      structures: realData.feeStructures,
+      installments: realData.installments,
+      transactions: realData.payments,
+    });
+    if (!result.success) throw new Error(result.error || 'Unable to import spreadsheet data.');
+    await refreshFromSheets(true);
     setAppliedSuccessToast(true);
     setDismissedCrossCheckBanner(true);
     localStorage.setItem('sfc_cross_check_dismissed', 'true');
@@ -924,84 +654,51 @@ export default function App() {
     };
   }, [transactions, asOfDate, studentSummaries]);
 
-  const handleUpdateDailyTarget = (target: number) => {
-    setDailyTarget(target);
-    saveDailyCollectionTarget(target);
+  const handleUpdateDailyTarget = async (target: number) => {
+    const result = await callAppsScriptAction(scriptUrl, 'saveDailyTarget', { dailyTarget: target });
+    if (!result.success) throw new Error(result.error || 'Unable to update daily target.');
+    await refreshFromSheets(true);
   };
 
-  const handleCloseDay = (record: DayCloseRecord) => {
-    const updated = { ...dayCloseRecords, [record.date]: record };
-    setDayCloseRecords(updated);
-    saveDayCloseRecords(updated);
+  const handleCloseDay = async (record: DayCloseRecord) => {
+    const result = await closeDayRepo(scriptUrl, record);
+    if (!result.success) throw new Error(result.error || 'Unable to close day.');
+    await refreshFromSheets(true);
   };
 
-  const handleReopenDay = (date: string) => {
-    const updated = { ...dayCloseRecords };
-    delete updated[date];
-    setDayCloseRecords(updated);
-    saveDayCloseRecords(updated);
+  const handleReopenDay = async (date: string) => {
+    const result = await reopenDayRepo(scriptUrl, date);
+    if (!result.success) throw new Error(result.error || 'Unable to reopen day.');
+    await refreshFromSheets(true);
   };
 
-  const handleUpdateTransactionSlip = (
+  const handleUpdateTransactionSlip = async (
     txId: string,
     slipGiven: boolean,
     permissionDate?: string
   ) => {
-    let updatedStudentId: string | null = null;
-    const updatedTransactions = transactions.map((tx) => {
-      if (tx.id === txId) {
-        updatedStudentId = tx.studentId;
-        return {
-          ...tx,
-          slipGiven,
-          permissionDate,
-          permissionUpdated: true,
-        };
-      }
-      return tx;
-    });
-
-    setTransactions(updatedTransactions);
-    saveTransactions(updatedTransactions);
-
-    if (updatedStudentId && permissionDate) {
-      setStudents((prev) =>
-        prev.map((s) => {
-          if (s.id === updatedStudentId) {
-            return {
-              ...s,
-              manualCategoryOverride: slipGiven ? 'permission' : s.manualCategoryOverride,
-              permissionExpiresAt: permissionDate,
-              permissionReason: slipGiven
-                ? `Permission slip issued till ${formatDate(permissionDate)}`
-                : s.permissionReason,
-              updatedAt: new Date().toISOString(),
-            };
-          }
-          return s;
-        })
-      );
+    const result = await updateTransactionSlipRepo(scriptUrl, txId, slipGiven);
+    if (!result.success) throw new Error(result.error || 'Unable to update transaction slip.');
+    const transaction = transactions.find((item) => item.id === txId);
+    const student = transaction ? students.find((item) => item.id === transaction.studentId) : undefined;
+    if (student && permissionDate) {
+      const update = await updateStudentRepo(scriptUrl, {
+        ...student,
+        manualCategoryOverride: slipGiven ? 'permission' : student.manualCategoryOverride,
+        permissionExpiresAt: permissionDate,
+        permissionReason: slipGiven ? `Permission slip issued till ${formatDate(permissionDate)}` : student.permissionReason,
+      });
+      if (!update.success) throw new Error(update.error || 'Unable to update student permission.');
     }
+    await refreshFromSheets(true);
   };
 
-  if (isMigrationChecking) {
+  if (isInitialLoading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-slate-900 text-slate-100">
         <div className="w-12 h-12 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-        <h2 className="text-lg font-bold">Checking migration status...</h2>
+        <h2 className="text-lg font-bold">Loading latest data from Google Sheets...</h2>
       </div>
-    );
-  }
-
-  if (!migrationMeta?.completed) {
-    return (
-      <MigrationModal
-        migrationMeta={migrationMeta}
-        onMigrationComplete={async () => {
-          const meta = await getMigrationStatus();
-          setMigrationMeta(meta);
-        }}
-      />
     );
   }
 
@@ -1022,12 +719,22 @@ export default function App() {
       <Navbar
         schoolProfile={safeSchoolProfile}
         tolerance={tolerance}
-        onUpdateTolerance={(newTol) => setTolerance(newTol)}
+        onUpdateTolerance={async (newTol) => {
+          const result = await saveSettingsRepo(scriptUrl, safeSchoolProfile, newTol, dailyTarget);
+          if (!result.success) throw new Error(result.error || 'Unable to update tolerance.');
+          await refreshFromSheets(true);
+        }}
         currentDate={asOfDate}
         onChangeDate={(newDate) => setAsOfDate(newDate)}
         onResetDate={() => setAsOfDate(getKolkataToday())}
         isSheetsConnected={isSheetsConnected}
+        backendMode={isOnline ? 'GOOGLE_SHEETS' : 'LOCAL_CACHE'}
+        isSyncing={isSyncing}
+        lastSyncTime={lastSyncTime}
+        syncError={syncError}
+        onRefreshNow={() => refreshFromSheets(true)}
         onOpenSheetsSync={() => setActiveModal('SHEETS_SYNC')}
+        onOpenBackupMigrate={() => setActiveModal('BACKUP_MIGRATE')}
         onOpenSettings={() => setActiveModal('SCHOOL_SETTINGS')}
         onOpenAddStudent={() => setActiveModal('ADD_STUDENT')}
         onOpenClassMaster={() => setActiveModal('CLASS_MASTER')}
@@ -1104,13 +811,11 @@ export default function App() {
               schoolProfile={safeSchoolProfile}
               classList={classList}
               tolerance={tolerance}
-              onEditStudent={(updatedStudent) => {
-                setStudents((prev) =>
-                  prev.map((s) => (s.id === updatedStudent.id ? updatedStudent : s))
-                );
-                saveStudents(
-                  students.map((s) => (s.id === updatedStudent.id ? updatedStudent : s))
-                );
+              asOfDate={asOfDate}
+              onEditStudent={async (updatedStudent) => {
+                const result = await updateStudentRepo(scriptUrl, updatedStudent);
+                if (!result.success) throw new Error(result.error || 'Unable to update student.');
+                await refreshFromSheets(true);
               }}
               onOpenCollectModal={(student, initialFeeType = 'ALL') => {
                 setSelectedStudentId(student.id);
@@ -1133,10 +838,10 @@ export default function App() {
                 setSelectedStudentId(student.id);
                 setActiveModal('FEE_STRUCTURE');
               }}
-              onToggleStudentActive={(studentId, currentActive) => {
-                setStudents((prev) =>
-                  prev.map((s) => (s.id === studentId ? { ...s, isActive: !currentActive } : s))
-                );
+              onToggleStudentActive={async (studentId, currentActive) => {
+                const result = await setStudentActiveRepo(scriptUrl, studentId, !currentActive);
+                if (!result.success) throw new Error(result.error || 'Unable to change student status.');
+                await refreshFromSheets(true);
               }}
               onUpdateActionStatus={handleSavePermission}
               onOpenAddStudent={() => setActiveModal('ADD_STUDENT')}
@@ -1185,6 +890,7 @@ export default function App() {
       {activeModal === 'PERMISSION' && selectedStudent && (
         <PermissionModal
           student={selectedStudent}
+          currentDate={asOfDate}
           onClose={() => setActiveModal('NONE')}
           onSavePermission={handleSavePermission}
         />
@@ -1193,6 +899,7 @@ export default function App() {
       {activeModal === 'LEDGER' && selectedStudent && selectedSummary && (
         <StudentLedgerModal
           student={selectedStudent}
+          asOfDate={asOfDate}
           summary={selectedSummary}
           schoolProfile={safeSchoolProfile}
           onClose={() => setActiveModal('NONE')}
@@ -1248,7 +955,11 @@ export default function App() {
           classConfigs={classConfigs}
           schoolProfile={safeSchoolProfile}
           onClose={() => setActiveModal('NONE')}
-          onSaveClassConfigs={(newConfigs) => setClassConfigs(newConfigs)}
+          onSaveClassConfigs={async (newConfigs) => {
+            const result = await saveClassConfigRepo(scriptUrl, newConfigs);
+            if (!result.success) throw new Error(result.error || 'Unable to save class configuration.');
+            await refreshFromSheets(true);
+          }}
         />
       )}
 
@@ -1276,15 +987,25 @@ export default function App() {
         />
       )}
 
+      {activeModal === 'BACKUP_MIGRATE' && (
+        <BackupMigrateSheetsModal
+          scriptUrl={scriptUrl}
+          spreadsheetUrl={spreadsheetUrl}
+          onSaveScriptUrl={setScriptUrl}
+          onSaveSpreadsheetUrl={setSpreadsheetUrl}
+          onMigrationComplete={async () => { await refreshFromSheets(true); }}
+          onClose={() => setActiveModal('NONE')}
+        />
+      )}
+
       {activeModal === 'SCHOOL_SETTINGS' && (
         <SchoolSettingsModal
           schoolProfile={safeSchoolProfile}
           tolerance={tolerance}
-          onSave={(newProfile, newTol) => {
-            setSchoolProfile(newProfile);
-            setTolerance(newTol);
-            saveSchoolProfile(newProfile);
-            saveToleranceConfig(newTol);
+          onSave={async (newProfile, newTol) => {
+            const result = await saveSettingsRepo(scriptUrl, newProfile, newTol, dailyTarget);
+            if (!result.success) throw new Error(result.error || 'Unable to save settings.');
+            await refreshFromSheets(true);
           }}
           onClose={() => setActiveModal('NONE')}
         />

@@ -7,7 +7,7 @@ interface ClassFeeMasterModalProps {
   classConfigs: ClassFeeConfig[];
   schoolProfile: SchoolProfile;
   onClose: () => void;
-  onSaveClassConfigs: (configs: ClassFeeConfig[]) => void;
+  onSaveClassConfigs: (configs: ClassFeeConfig[]) => Promise<void>;
 }
 
 export const ClassFeeMasterModal: React.FC<ClassFeeMasterModalProps> = ({
@@ -43,8 +43,8 @@ export const ClassFeeMasterModal: React.FC<ClassFeeMasterModalProps> = ({
     setConfigs(configs.filter((_, i) => i !== index));
   };
 
-  const handleSave = () => {
-    onSaveClassConfigs(configs);
+  const handleSave = async () => {
+    await onSaveClassConfigs(configs);
     onClose();
   };
 

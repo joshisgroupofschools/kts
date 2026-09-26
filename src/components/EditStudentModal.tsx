@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
+import { getKolkataToday } from '../utils/dateUtils';
 import { Student } from '../types';
 import { Edit3, Phone, Save, User, X } from 'lucide-react';
 
 interface EditStudentModalProps {
   student: Student;
   classList: string[];
-  onSave: (updatedStudent: Student) => void;
+  onSave: (updatedStudent: Student) => Promise<void>;
   onClose: () => void;
 }
 
@@ -24,11 +25,11 @@ export const EditStudentModal: React.FC<EditStudentModalProps> = ({
   const [altPhone, setAltPhone] = useState(student.altPhone || '');
   const [address, setAddress] = useState(student.address || '');
   const [admissionDate, setAdmissionDate] = useState(
-    student.admissionDate || new Date().toISOString().split('T')[0]
+    student.admissionDate || getKolkataToday()
   );
   const [isActive, setIsActive] = useState(student.isActive);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) {
       alert('Student name cannot be empty.');
@@ -50,7 +51,7 @@ export const EditStudentModal: React.FC<EditStudentModalProps> = ({
       updatedAt: new Date().toISOString(),
     };
 
-    onSave(updated);
+    await onSave(updated);
     onClose();
   };
 

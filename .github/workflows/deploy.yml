@@ -30,7 +30,10 @@ jobs:
           node-version: 22
 
       - name: Install dependencies
-        run: npm install --legacy-peer-deps
+        run: npm ci
+
+      - name: Type-check and core verification
+        run: npm run lint && npm run test:core
 
       - name: Build project
         run: npm run build

@@ -6,6 +6,7 @@ import {
   StudentFeeStructure,
 } from '../types';
 import { generateInstallments } from '../utils/feeCalculator';
+import { getKolkataToday } from '../utils/dateUtils';
 import {
   AlertCircle,
   CheckCircle,
@@ -23,12 +24,12 @@ interface AddStudentModalProps {
   classConfigs: ClassFeeConfig[];
   schoolProfile: SchoolProfile;
   onClose: () => void;
-  onAddSingleStudent: (student: Student, feeStructure?: StudentFeeStructure) => void;
+  onAddSingleStudent: (student: Student, feeStructure?: StudentFeeStructure) => Promise<void>;
   onAddBulkStudents: (
     students: Student[],
     autoCommitClassFee: boolean,
     targetClassName: string
-  ) => void;
+  ) => Promise<void>;
 }
 
 export const AddStudentModal: React.FC<AddStudentModalProps> = ({
@@ -40,6 +41,8 @@ export const AddStudentModal: React.FC<AddStudentModalProps> = ({
   onAddBulkStudents,
 }) => {
   const [activeTab, setActiveTab] = useState<'single' | 'bulk'>('single');
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
 
   // Single Add Form State
   const [name, setName] = useState('');
@@ -51,7 +54,7 @@ export const AddStudentModal: React.FC<AddStudentModalProps> = ({
   const [altPhone, setAltPhone] = useState('');
   const [address, setAddress] = useState('');
   const [admissionDate, setAdmissionDate] = useState(
-    new Date().toISOString().split('T')[0]
+    getKolkataToday()
   );
   const [autoCommitFee, setAutoCommitFee] = useState(true);
   const [singleCommittedFee, setSingleCommittedFee] = useState<number>(35000);
@@ -74,7 +77,7 @@ export const AddStudentModal: React.FC<AddStudentModalProps> = ({
     }
   };
 
-  const handleSingleSubmit = (e: React.FormEvent) => {
+  const handleSingleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) {
       alert('Student Name is required.');
@@ -118,11 +121,19 @@ export const AddStudentModal: React.FC<AddStudentModalProps> = ({
       };
     }
 
-    onAddSingleStudent(newStudent, feeStruct);
-    onClose();
+    setIsSaving(true);
+    setSaveError('');
+    try {
+      await onAddSingleStudent(newStudent, feeStruct);
+      onClose();
+    } catch (error: any) {
+      setSaveError(error?.message || 'Unable to save student. No changes were recorded.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  const handleBulkSubmit = () => {
+  const handleBulkSubmit = async () => {
     if (!bulkRawText.trim()) {
       alert('Please paste student rows or enter data.');
       return;
@@ -153,7 +164,7 @@ export const AddStudentModal: React.FC<AddStudentModalProps> = ({
         section: studentSec,
         parentName: studentParent,
         phone: studentPhone,
-        admissionDate: new Date().toISOString().split('T')[0],
+        admissionDate: getKolkataToday(),
         isActive: true,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -165,8 +176,16 @@ export const AddStudentModal: React.FC<AddStudentModalProps> = ({
       return;
     }
 
-    onAddBulkStudents(parsedStudents, bulkAutoCommit, bulkClass);
-    onClose();
+    setIsSaving(true);
+    setSaveError('');
+    try {
+      await onAddBulkStudents(parsedStudents, bulkAutoCommit, bulkClass);
+      onClose();
+    } catch (error: any) {
+      setSaveError(error?.message || 'Unable to save students. No changes were recorded.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -221,7 +240,8 @@ export const AddStudentModal: React.FC<AddStudentModalProps> = ({
         </div>
 
         {/* Body Content */}
-        <div className="p-5 text-xs text-slate-700 dark:text-slate-300 max-h-[70vh] overflow-y-auto">
+          <div className="p-5 text-xs text-slate-700 dark:text-slate-300 max-h-[70vh] overflow-y-auto">
+            {saveError && <div className="mb-4 rounded-lg border border-rose-300 bg-rose-50 p-3 font-bold text-rose-700">{saveError}</div>}
           {activeTab === 'single' ? (
             <form onSubmit={handleSingleSubmit} className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -370,13 +390,14 @@ export const AddStudentModal: React.FC<AddStudentModalProps> = ({
                 >
                   Cancel
                 </button>
-                <button
-                  id="btn-submit-single-student"
-                  type="submit"
+                  <button
+                    id="btn-submit-single-student"
+                    type="submit"
+                    disabled={isSaving}
                   className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold text-xs shadow-md transition-all flex items-center gap-1.5 active:scale-95"
                 >
                   <CheckCircle className="w-4 h-4" />
-                  <span>Register Student</span>
+                    <span>{isSaving ? 'Saving…' : 'Register Student'}</span>
                 </button>
               </div>
             </form>
@@ -445,12 +466,13 @@ export const AddStudentModal: React.FC<AddStudentModalProps> = ({
                 </button>
                 <button
                   id="btn-submit-bulk-students"
-                  type="button"
-                  onClick={handleBulkSubmit}
+                    type="button"
+                    onClick={handleBulkSubmit}
+                    disabled={isSaving}
                   className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold text-xs shadow-md transition-all flex items-center gap-1.5 active:scale-95"
                 >
                   <Upload className="w-4 h-4" />
-                  <span>Batch Import Students</span>
+                    <span>{isSaving ? 'Saving…' : 'Batch Import Students'}</span>
                 </button>
               </div>
             </div>

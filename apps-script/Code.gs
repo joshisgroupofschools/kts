@@ -1,13 +1,4 @@
 /**
- * Pre-written Google Apps Script code (Code.gs) for deployment into Google Sheets Web App.
- * Production-ready backend supporting multi-tab relational storage, script locking,
- * idempotency checks, payment verification, audit logging, and chunked migration.
- */
-export const TARGET_GOOGLE_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1mdQ2KDmMlfKs1vnYeiG0R0ZmPNrnPJF4w3qaUetXyQQ/edit?gid=0#gid=0';
-export const TARGET_SPREADSHEET_ID = '1mdQ2KDmMlfKs1vnYeiG0R0ZmPNrnPJF4w3qaUetXyQQ';
-export const DEFAULT_SCRIPT_WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbyfTRHWZeRICKBlwHt__49kbsdz6pw8nG16eBdboMClcT5U3NwoS8Gsb6Bgt2j2KAD5fw/exec';
-
-export const GOOGLE_APPS_SCRIPT_CODE = `/**
  * =========================================================================
  * SMART SCHOOL FEE COLLECTION SYSTEM - PRODUCTION BACKEND SCRIPT (Code.gs)
  * =========================================================================
@@ -195,7 +186,7 @@ function escapeFormula(val) {
   if (val === null || val === undefined) return '';
   if (typeof val === 'boolean' || typeof val === 'number') return val;
   var str = String(val);
-  if (/^[=+\-@]/.test(str)) {
+  if (/^[=+-@]/.test(str)) {
     return "'" + str;
   }
   return str;
@@ -553,12 +544,12 @@ function recordPaymentHandler(ss, payload) {
 
   for (var receiptIndex = 0; receiptIndex < existingTxns.length; receiptIndex++) {
     var existingReceipt = String(existingTxns[receiptIndex].receiptNo || '');
-    var receiptMatch = existingReceipt.match(/(\\d+)$/);
+    var receiptMatch = existingReceipt.match(/(\d+)$/);
     if (receiptMatch) nextSeq = Math.max(nextSeq, Number(receiptMatch[1]) + 1);
   }
 
   var paymentDateText = String(txn.date || '');
-  var paymentYearMatch = paymentDateText.match(/^(\\d{4})-/);
+  var paymentYearMatch = paymentDateText.match(/^(\d{4})-/);
   var receiptYear = paymentYearMatch ? paymentYearMatch[1] : Utilities.formatDate(new Date(), 'Asia/Kolkata', 'yyyy');
   var prefix = 'KSB-' + receiptYear + '-';
   var receiptNo = prefix + String(nextSeq).padStart(5, '0');
@@ -989,7 +980,7 @@ function verifyMigrationHandler(ss) {
       if (receiptNos[rNo]) duplicateReceiptNumbers.push(rNo);
       receiptNos[rNo] = true;
 
-      var match = rNo.match(/(\\d+)$/);
+      var match = rNo.match(/(\d+)$/);
       if (match) {
         var seq = parseInt(match[1], 10);
         if (seq > highestSeq) highestSeq = seq;
@@ -1064,4 +1055,3 @@ function createJsonResponse(obj) {
   return ContentService.createTextOutput(JSON.stringify(obj))
     .setMimeType(ContentService.MimeType.JSON);
 }
-`;

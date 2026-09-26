@@ -25,7 +25,7 @@ interface BulkUploadModalProps {
     newStudents: Student[],
     newStructures: StudentFeeStructure[],
     newInstallments: Installment[]
-  ) => void;
+  ) => Promise<void>;
   existingStudents: Student[];
   schoolProfile: SchoolProfile;
 }
@@ -230,7 +230,7 @@ export const BulkUploadModal: React.FC<BulkUploadModalProps> = ({
   };
 
   // Execute Bulk Import
-  const handleCommitImport = () => {
+  const handleCommitImport = async () => {
     const validRows = parsedRows.filter((r) => r.isValid);
     if (validRows.length === 0) {
       alert('No valid student rows to import. Please check validation errors in the preview.');
@@ -297,13 +297,15 @@ export const BulkUploadModal: React.FC<BulkUploadModalProps> = ({
       newInstallments.push(...genInsts);
     });
 
-    onImportStudents(newStudents, newStructures, newInstallments);
-    setIsProcessing(false);
-    setSuccessMsg(`Successfully imported ${validRows.length} students with fee structures and installments!`);
-    
-    setTimeout(() => {
-      onClose();
-    }, 1200);
+    try {
+      await onImportStudents(newStudents, newStructures, newInstallments);
+      setSuccessMsg(`Successfully imported ${validRows.length} students with fee structures and installments!`);
+      setTimeout(() => onClose(), 1200);
+    } catch (error: any) {
+      alert(error?.message || 'Unable to import students. No changes were recorded.');
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const validCount = parsedRows.filter((r) => r.isValid).length;

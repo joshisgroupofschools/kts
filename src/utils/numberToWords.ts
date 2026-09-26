@@ -1,3 +1,5 @@
+import { dateOnlyToUtcDate, formatDateOnly, getKolkataToday } from './dateUtils';
+
 /**
  * Convert numerical currency amount to words (Indian numbering system)
  */
@@ -51,6 +53,9 @@ export function formatCurrency(amount: number, symbol: string = '₹'): string {
 
 export function formatDate(dateString: string): string {
   if (!dateString) return '-';
+  if (/^\d{4}-\d{2}-\d{2}/.test(dateString)) {
+    return formatDateOnly(dateString.slice(0, 10), 'short');
+  }
   try {
     const d = new Date(dateString);
     if (isNaN(d.getTime())) return dateString;
@@ -71,12 +76,14 @@ export function formatDate(dateString: string): string {
  * If today is 28th-31st -> issues till 5th of next month.
  */
 export function getNextMultipleOfFiveDate(baseDateInput?: string | Date): string {
-  const d = baseDateInput ? new Date(baseDateInput) : new Date();
-  if (isNaN(d.getTime())) return new Date().toISOString().split('T')[0];
+  const d = typeof baseDateInput === 'string'
+    ? dateOnlyToUtcDate(baseDateInput)
+    : baseDateInput || dateOnlyToUtcDate(getKolkataToday());
+  if (!d || isNaN(d.getTime())) return getKolkataToday();
 
-  const year = d.getFullYear();
-  const month = d.getMonth();
-  const day = d.getDate();
+  const year = d.getUTCFullYear();
+  const month = d.getUTCMonth();
+  const day = d.getUTCDate();
 
   let targetDay: number;
   let targetMonth = month;
@@ -105,14 +112,14 @@ export function getNextMultipleOfFiveDate(baseDateInput?: string | Date): string
   }
 
   // Cap targetDay at the maximum days in target month if targetDay is 30 but month is February
-  const daysInTargetMonth = new Date(targetYear, targetMonth + 1, 0).getDate();
+  const daysInTargetMonth = new Date(Date.UTC(targetYear, targetMonth + 1, 0)).getUTCDate();
   if (targetDay > daysInTargetMonth) {
     targetDay = daysInTargetMonth;
   }
 
-  const targetDate = new Date(targetYear, targetMonth, targetDay);
-  const y = targetDate.getFullYear();
-  const m = String(targetDate.getMonth() + 1).padStart(2, '0');
-  const dayStr = String(targetDate.getDate()).padStart(2, '0');
+  const targetDate = new Date(Date.UTC(targetYear, targetMonth, targetDay));
+  const y = targetDate.getUTCFullYear();
+  const m = String(targetDate.getUTCMonth() + 1).padStart(2, '0');
+  const dayStr = String(targetDate.getUTCDate()).padStart(2, '0');
   return `${y}-${m}-${dayStr}`;
 }

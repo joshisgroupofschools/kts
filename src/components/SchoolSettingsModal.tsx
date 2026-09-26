@@ -13,14 +13,15 @@ import {
   X,
 } from 'lucide-react';
 import { EditStudentModal } from './EditStudentModal';
+import { getKolkataToday } from '../utils/dateUtils';
 
 interface SchoolSettingsModalProps {
   schoolProfile: SchoolProfile;
   tolerance: ToleranceConfig;
   students?: Student[];
   classList?: string[];
-  onSave: (profile: SchoolProfile, tolerance: ToleranceConfig) => void;
-  onUpdateStudent?: (updatedStudent: Student) => void;
+  onSave: (profile: SchoolProfile, tolerance: ToleranceConfig) => Promise<void>;
+  onUpdateStudent?: (updatedStudent: Student) => Promise<void> | void;
   onClose: () => void;
 }
 
@@ -39,8 +40,8 @@ export const SchoolSettingsModal: React.FC<SchoolSettingsModalProps> = ({
   const [studentSearchQuery, setStudentSearchQuery] = useState('');
   const [selectedStudentToEdit, setSelectedStudentToEdit] = useState<Student | null>(null);
 
-  const handleSave = () => {
-    onSave(profile, tol);
+  const handleSave = async () => {
+    await onSave(profile, tol);
     onClose();
   };
 
@@ -189,7 +190,7 @@ export const SchoolSettingsModal: React.FC<SchoolSettingsModalProps> = ({
                     <div>
                       <label className="block font-semibold mb-1">Preview Format:</label>
                       <div className="px-3 py-1.5 bg-slate-100 dark:bg-slate-800 rounded-lg font-mono font-bold text-slate-800 dark:text-slate-200">
-                        {profile.receiptPrefix}-{new Date().getFullYear()}-{String(profile.nextReceiptSequence).padStart(5, '0')}
+                        {profile.receiptPrefix}-{getKolkataToday().slice(0, 4)}-{String(profile.nextReceiptSequence).padStart(5, '0')}
                       </div>
                     </div>
                   </div>
@@ -309,9 +310,9 @@ export const SchoolSettingsModal: React.FC<SchoolSettingsModalProps> = ({
         <EditStudentModal
           student={selectedStudentToEdit}
           classList={classList}
-          onSave={(updated) => {
+          onSave={async (updated) => {
             if (onUpdateStudent) {
-              onUpdateStudent(updated);
+              await onUpdateStudent(updated);
             }
             setSelectedStudentToEdit(null);
           }}

@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { AppView, SchoolProfile, ToleranceConfig } from '../types';
 import { formatCurrency } from '../utils/numberToWords';
+import { getKolkataToday } from '../utils/dateUtils';
 
 interface NavbarProps {
   schoolProfile: SchoolProfile;
@@ -91,7 +92,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 }) => {
   const [showDrawer, setShowDrawer] = useState(false);
   const [showToleranceDetails, setShowToleranceDetails] = useState(false);
-  const isDateSimulated = currentDate !== new Date().toISOString().split('T')[0];
+  const isDateSimulated = currentDate !== getKolkataToday();
   const currencySymbol = schoolProfile?.currencySymbol || '₹';
 
   return (

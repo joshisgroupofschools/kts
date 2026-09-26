@@ -8,6 +8,7 @@ import {
   ToleranceConfig,
 } from '../types';
 import { computeStudentStatus } from './statusResolver';
+import { getKolkataToday } from './dateUtils';
 
 /**
  * Splits an amount evenly across N installments, with any remainder placed on earlier installments.
@@ -25,7 +26,7 @@ export function generateInstallments(
   installmentsCount?: number,
   startMonthIndex?: number,
   dueDayOfMonth: number = 10,
-  academicYearStartYear: number = new Date().getFullYear()
+  academicYearStartYear: number = Number(getKolkataToday().slice(0, 4))
 ): Installment[] {
   const lowerHead = (headName || '').toLowerCase();
   
@@ -200,7 +201,7 @@ export function computeStudentFinancials(
   structures: StudentFeeStructure[],
   installments: Installment[],
   transactions: PaymentTransaction[],
-  asOfDate: string = new Date().toISOString().split('T')[0]
+  asOfDate: string = getKolkataToday()
 ) {
   const studentStructures = structures.filter((s) => s.studentId === studentId);
   const studentInstallments = installments.filter((i) => i.studentId === studentId);
@@ -344,7 +345,7 @@ export function computeStudentFinancialSummary(
   installments: Installment[],
   transactions: PaymentTransaction[],
   tolerance: ToleranceConfig,
-  asOfDate: string = new Date().toISOString().split('T')[0]
+  asOfDate: string = getKolkataToday()
 ): StudentFinancialSummary {
   const fin = computeStudentFinancials(
     student.id,

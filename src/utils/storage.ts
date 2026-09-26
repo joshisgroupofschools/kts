@@ -12,6 +12,7 @@ import {
 } from '../types';
 import { generateStructuredRealData, lookupStandardClassFee } from '../data/trialSpreadsheetData';
 import { DEFAULT_SCRIPT_WEBAPP_URL } from './googleSheetsScript';
+import { getKolkataToday } from './dateUtils';
 
 const CURRENT_DATA_VERSION = 'v2_kakatiya_actual_sept_2026';
 const DATA_VERSION_KEY = 'sfc_app_data_version';
@@ -45,7 +46,7 @@ const STORAGE_KEYS = {
   DAILY_TARGET: 'sfc_daily_collection_target_v2',
 };
 
-export const DEFAULT_SPREADSHEET_URL = 'https://docs.google.com/spreadsheets/d/1Fx7CUTJCHT-m3FPfG_u3_VfYNN1RRWf87-0pIbUwA4M/edit?gid=0#gid=0';
+export const DEFAULT_SPREADSHEET_URL = 'https://docs.google.com/spreadsheets/d/1mdQ2KDmMlfKs1vnYeiG0R0ZmPNrnPJF4w3qaUetXyQQ/edit?gid=0#gid=0';
 
 export const DEFAULT_SCHOOL_PROFILE: SchoolProfile = {
   schoolName: 'Kakatiya School Boduppal',
@@ -454,7 +455,7 @@ export function exportDataAsJson(data: any) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `fee_software_backup_${new Date().toISOString().split('T')[0]}.json`;
+  a.download = `fee_software_backup_${getKolkataToday()}.json`;
   a.click();
   URL.revokeObjectURL(url);
 }

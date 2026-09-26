@@ -24,15 +24,17 @@ import {
 } from 'lucide-react';
 
 interface StudentLedgerModalProps {
+  asOfDate?: string;
   student: Student;
   summary: StudentFinancialSummary;
   schoolProfile: SchoolProfile;
   onClose: () => void;
   onPrintReceipt: (transaction: PaymentTransaction) => void;
-  onCancelReceipt: (transactionId: string, reason: string) => void;
+  onCancelReceipt: (transactionId: string, reason: string) => Promise<void>;
 }
 
 export const StudentLedgerModal: React.FC<StudentLedgerModalProps> = ({
+  asOfDate,
   student,
   summary,
   schoolProfile,
@@ -43,12 +45,12 @@ export const StudentLedgerModal: React.FC<StudentLedgerModalProps> = ({
   const [cancellingTxnId, setCancellingTxnId] = useState<string | null>(null);
   const [cancelReason, setCancelReason] = useState('');
 
-  const handleConfirmCancel = (txnId: string) => {
+  const handleConfirmCancel = async (txnId: string) => {
     if (!cancelReason.trim()) {
       alert('Please provide a mandatory reason for cancelling/voiding this receipt.');
       return;
     }
-    onCancelReceipt(txnId, cancelReason.trim());
+    await onCancelReceipt(txnId, cancelReason.trim());
     setCancellingTxnId(null);
     setCancelReason('');
   };
@@ -153,7 +155,7 @@ export const StudentLedgerModal: React.FC<StudentLedgerModalProps> = ({
                   {summary.installments.map((inst) => {
                     const isOverdue =
                       inst.balanceAmount > 0 &&
-                      new Date(inst.dueDate).getTime() < new Date().setHours(0, 0, 0, 0);
+                      !!asOfDate && inst.dueDate < asOfDate;
 
                     return (
                       <tr
