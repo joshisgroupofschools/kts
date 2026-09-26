@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { getKolkataToday } from '../src/utils/dateUtils';
 import { formatWhatsAppReminderMessage, normalizePhoneNumber, getInstallmentDisplayName } from '../src/utils/installmentFormatter';
-import { calculateFifoAllocations } from '../src/utils/feeCalculator';
+import { calculateFifoAllocations, generateInstallments } from '../src/utils/feeCalculator';
 import { normalizeInstallments, normalizeTransactions } from '../src/utils/normalizeCloudData';
 import { MONTH_WISE_OUTSTANDING_ORDER } from '../src/utils/analyticsEngine';
 
@@ -41,6 +41,12 @@ const allocationOrder = [
 const allocated = calculateFifoAllocations(allocationOrder as any, 250);
 assert.deepEqual(allocated.map(a => [a.installmentId, a.allocatedAmount]), [['books', 100], ['transport', 100], ['old', 50]]);
 assert.equal(allocated[1].totalInstallments, 10);
+const officialSchedule = ['Books', 'Transport', 'School Fees', 'Old Fees'].flatMap(head =>
+  generateInstallments(head, 'student', head, 21000, 7, undefined, 10, 2026));
+assert.equal(officialSchedule.length, 21);
+assert.deepEqual(officialSchedule.filter(i => i.headName === 'Old Fees').map(i => i.dueDate),
+  ['2027-02-10', '2027-03-10', '2027-04-10']);
+assert.equal(officialSchedule.reduce((sum, i) => sum + i.amount, 0), 84000);
 const restored = normalizeTransactions([{ allocations: [{ installmentId: 'transport', installmentNumber: 1, allocatedAmount: 100 }] }], allocationOrder as any);
 assert.equal(restored[0].allocations[0].installmentNumber, 10);
 assert.equal(restored[0].allocations[0].dueDate, '2027-03-10');

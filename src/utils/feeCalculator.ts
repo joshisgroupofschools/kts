@@ -9,7 +9,7 @@ import {
 } from '../types';
 import { computeStudentStatus, hasOverdueBeyondToleranceMonth } from './statusResolver';
 import { getKolkataToday } from './dateUtils';
-import { compareOfficialInstallmentOrder, getOfficialInstallmentOrder } from './installmentFormatter';
+import { compareOfficialInstallmentOrder, getOfficialInstallmentOrder, normalizeFeeHead } from './installmentFormatter';
 
 /**
  * Splits an amount evenly across N installments, with any remainder placed on earlier installments.
@@ -27,20 +27,26 @@ export function generateInstallments(
   installmentsCount?: number,
   startMonthIndex?: number,
   dueDayOfMonth: number = 10,
-  academicYearStartYear: number = Number(getKolkataToday().slice(0, 4))
+  academicYearStartYear: number = Number(getKolkataToday().slice(0, 4)) - (Number(getKolkataToday().slice(5, 7)) < 6 ? 1 : 0)
 ): Installment[] {
-  const lowerHead = (headName || '').toLowerCase();
+  const head = normalizeFeeHead(headName);
   
   // Intelligent head-based defaults
   let finalCount = installmentsCount;
   let finalStartMonth = startMonthIndex;
 
-  if (lowerHead.includes('transport') || lowerHead.includes('bus')) {
-    finalCount = finalCount || 10;
-    if (finalStartMonth === undefined) finalStartMonth = 5; // June
-  } else if (lowerHead.includes('old') || lowerHead.includes('previous')) {
+  if (head === 'Transport') {
+    finalCount = 10;
+    finalStartMonth = 5; // June
+  } else if (head === 'Old Fees') {
     finalCount = 3;
-    finalStartMonth = 1; // February
+    finalStartMonth = 13; // February in the following calendar year
+  } else if (head === 'Books') {
+    finalCount = 1;
+    finalStartMonth = 5;
+  } else if (head === 'School Fees') {
+    finalCount = 7;
+    finalStartMonth = 6;
   } else {
     // School Tuition / Default
     finalCount = finalCount || 7;

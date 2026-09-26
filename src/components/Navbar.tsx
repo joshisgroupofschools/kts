@@ -190,17 +190,6 @@ export const Navbar: React.FC<NavbarProps> = ({
                 </button>
               )}
 
-              {onOpenBackupMigrate && (
-                <button
-                  type="button"
-                  onClick={onOpenBackupMigrate}
-                  className="px-2.5 py-1 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-lg text-[11px] font-bold shadow-xs transition-all flex items-center gap-1"
-                  title="Open Backup & Migrate to Google Sheets Admin Modal"
-                >
-                  <Sparkles className="w-3 h-3" />
-                  <span>Migrate</span>
-                </button>
-              )}
             </div>
 
             {/* Right: Clean & Uncrowded Action Controls */}
