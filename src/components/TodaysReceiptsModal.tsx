@@ -37,6 +37,7 @@ import {
   StudentFinancialSummary,
 } from '../types';
 import { formatCurrency, formatDate, getNextMultipleOfFiveDate } from '../utils/numberToWords';
+import { compareOfficialInstallmentOrder, getInstallmentDisplayName } from '../utils/installmentFormatter';
 
 interface TodaysReceiptsModalProps {
   currentDate: string;
@@ -578,7 +579,7 @@ export const TodaysReceiptsModal: React.FC<TodaysReceiptsModalProps> = ({
                     <th className="py-3 px-3">Student & Class</th>
                     <th className="py-3 px-3 text-right">Amount Paid</th>
                     <th className="py-3 px-2 text-center">Payment Mode</th>
-                    <th className="py-3 px-3">Allocations Knocked Off</th>
+                    <th className="py-3 px-3">Fees Paid For</th>
                     <th className="py-3 px-3">Remaining Balance Till Date</th>
                     <th className="py-3 px-3 min-w-[160px]">
                       Permission To Be Given Till Date
@@ -595,7 +596,7 @@ export const TodaysReceiptsModal: React.FC<TodaysReceiptsModalProps> = ({
                     const summary = studentSummaries[tx.studentId];
                     const remainingDue = (summary?.installments || []).reduce((sum, installment) =>
                       sum + (installment.dueDate <= selectedDate ? Math.max(0, installment.balanceAmount) : 0), 0);
-                    const hasRemainingBalance = (summary?.totalDue || 0) > 0;
+                    const hasRemainingBalance = remainingDue > 0;
 
                     // Fallback default permission date if not set
                     const defaultPermDate =
@@ -681,9 +682,9 @@ export const TodaysReceiptsModal: React.FC<TodaysReceiptsModalProps> = ({
                         <td className="py-3 px-3 text-slate-600 dark:text-slate-400 text-[11px]">
                           {tx.allocations && tx.allocations.length > 0 ? (
                             <div className="space-y-0.5">
-                              {tx.allocations.slice(0, 2).map((a, idx) => (
+                              {[...tx.allocations].sort(compareOfficialInstallmentOrder).slice(0, 2).map((a, idx) => (
                                 <div key={idx} className="truncate max-w-[200px]">
-                                  {a.headName} #{a.installmentNumber}: <strong className="text-slate-800 dark:text-slate-200">{formatCurrency(a.allocatedAmount, currencySymbol)}</strong>
+                                  {getInstallmentDisplayName(a.headName, a.installmentNumber, a.totalInstallments, a.dueDate)}: <strong className="text-slate-800 dark:text-slate-200">{formatCurrency(a.allocatedAmount, currencySymbol)}</strong>
                                 </div>
                               ))}
                               {tx.allocations.length > 2 && (
@@ -749,7 +750,7 @@ export const TodaysReceiptsModal: React.FC<TodaysReceiptsModalProps> = ({
                             </div>
                           ) : (
                             <span className="text-[11px] text-slate-400 italic">
-                              Not required (0 Due)
+                              Issue ID Card
                             </span>
                           )}
                         </td>
@@ -805,7 +806,7 @@ export const TodaysReceiptsModal: React.FC<TodaysReceiptsModalProps> = ({
                           ) : (
                             <span className="inline-flex items-center gap-1 text-[11px] text-emerald-600 dark:text-emerald-400 font-bold">
                               <CheckCircle2 className="w-3.5 h-3.5" />
-                              Fully Cleared
+                              Issue ID Card
                             </span>
                           )}
                         </td>

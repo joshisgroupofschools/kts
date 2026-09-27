@@ -2,6 +2,7 @@ import { AnalyticsSummary, FeeHeadDefinition, Installment, PaymentTransaction, S
 import { computeStudentFinancials } from './feeCalculator';
 import { computeStudentStatus, hasOverdueBeyondToleranceMonth } from './statusResolver';
 import { getKolkataToday } from './dateUtils';
+import { compareOfficialInstallmentOrder, normalizeFeeHead } from './installmentFormatter';
 
 export const MONTH_WISE_OUTSTANDING_ORDER: Array<{
   key: string;
@@ -253,78 +254,38 @@ export function computeSystemAnalytics(
     }
   });
 
-  // 3. Attribute actual transaction collections to corresponding fee heads
+  // 3. Rebuild the head-wise collection split from each student's total receipts
+  // using the official collection sequence. Legacy allocation labels are not trusted
+  // here because some imported receipts assigned money to Old Fees too early.
   headStatsMap.forEach((stat) => {
     stat.totalCollected = 0;
   });
 
+  const matchHeadKey = (headName: string): string | undefined => {
+    const officialHead = normalizeFeeHead(headName);
+    return Array.from(headStatsMap.keys()).find((key) => normalizeFeeHead(key) === officialHead);
+  };
+  const collectedByStudent = new Map<string, number>();
   allActiveTransactions.forEach((txn) => {
-    if (txn.allocations && txn.allocations.length > 0) {
-      txn.allocations.forEach((alloc) => {
-        const allocHead = String(alloc.headName || '');
-        const allocLower = allocHead.toLowerCase();
-        
-        let matchedKey: string | undefined;
-        for (const [key] of headStatsMap.entries()) {
-          const keyLower = key.toLowerCase();
-          if (
-            (allocLower.includes('book') && keyLower.includes('book')) ||
-            ((allocLower.includes('dress') || allocLower.includes('uniform')) && (keyLower.includes('dress') || keyLower.includes('uniform'))) ||
-            ((allocLower.includes('transport') || allocLower.includes('bus')) && (keyLower.includes('transport') || keyLower.includes('bus'))) ||
-            ((allocLower.includes('old') || allocLower.includes('due') || allocLower.includes('arrear')) && (keyLower.includes('old') || keyLower.includes('due') || keyLower.includes('arrear'))) ||
-            ((allocLower.includes('school') || allocLower.includes('tuition') || allocLower.includes('academic')) && (keyLower.includes('school') || keyLower.includes('tuition') || keyLower.includes('academic')))
-          ) {
-            matchedKey = key;
-            break;
-          }
-        }
-
-        const headKey = matchedKey || allocHead || 'School Tuition Fee';
-        if (!headStatsMap.has(headKey)) {
-          const newStat = createEmptyHeadStat(
-            headKey,
-            allocLower.includes('book') || allocLower.includes('dress') || allocLower.includes('uniform')
-          );
-          newStat.totalCommitted = alloc.allocatedAmount;
-          newStat.totalExpectedTillDate = alloc.allocatedAmount;
-          newStat.studentIds.add(txn.studentId);
-          headStatsMap.set(headKey, newStat);
-        }
-
-        const stat = headStatsMap.get(headKey)!;
-        stat.totalCollected += alloc.allocatedAmount;
-      });
-    } else {
-      const remLower = (txn.remarks || '').toLowerCase();
-      let matchedKey: string | undefined;
-      for (const [key] of headStatsMap.entries()) {
-        const keyLower = key.toLowerCase();
-        if (
-          (remLower.includes('book') && keyLower.includes('book')) ||
-          ((remLower.includes('dress') || remLower.includes('uniform')) && (keyLower.includes('dress') || keyLower.includes('uniform'))) ||
-          ((remLower.includes('transport') || remLower.includes('bus')) && (keyLower.includes('transport') || keyLower.includes('bus'))) ||
-          ((remLower.includes('old') || remLower.includes('due')) && (keyLower.includes('old') || keyLower.includes('due'))) ||
-          ((remLower.includes('school') || remLower.includes('tuition')) && (keyLower.includes('school') || keyLower.includes('tuition')))
-        ) {
-          matchedKey = key;
-          break;
-        }
-      }
-
-      const defaultSchoolHead = Array.from(headStatsMap.keys()).find((k) => k.toLowerCase().includes('school') || k.toLowerCase().includes('tuition')) || 'School Tuition Fee';
-      const headKey = matchedKey || defaultSchoolHead;
-      if (!headStatsMap.has(headKey)) {
-        const newStat = createEmptyHeadStat(
-          headKey,
-          remLower.includes('book') || remLower.includes('dress') || remLower.includes('uniform')
-        );
-        newStat.totalCommitted = txn.amount;
-        newStat.totalExpectedTillDate = txn.amount;
-        newStat.studentIds.add(txn.studentId);
-        headStatsMap.set(headKey, newStat);
-      }
-      const stat = headStatsMap.get(headKey)!;
-      stat.totalCollected += txn.amount;
+    collectedByStudent.set(txn.studentId, (collectedByStudent.get(txn.studentId) || 0) + txn.amount);
+  });
+  collectedByStudent.forEach((collected, studentId) => {
+    let remaining = collected;
+    const ordered = installments
+      .filter((inst) => inst.studentId === studentId && inst.amount > 0)
+      .sort(compareOfficialInstallmentOrder);
+    ordered.forEach((inst) => {
+      if (remaining <= 0) return;
+      const allocated = Math.min(inst.amount, remaining);
+      const sourceHead = structureMap.get(inst.feeStructureId)?.headName || inst.headName;
+      const headKey = matchHeadKey(sourceHead) || normalizeHeadName(sourceHead);
+      if (!headStatsMap.has(headKey)) headStatsMap.set(headKey, createEmptyHeadStat(headKey, false));
+      headStatsMap.get(headKey)!.totalCollected += allocated;
+      remaining -= allocated;
+    });
+    if (remaining > 0) {
+      const schoolKey = Array.from(headStatsMap.keys()).find((key) => normalizeFeeHead(key) === 'School Fees');
+      if (schoolKey) headStatsMap.get(schoolKey)!.totalCollected += remaining;
     }
   });
 
