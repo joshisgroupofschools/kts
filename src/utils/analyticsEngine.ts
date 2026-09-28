@@ -40,6 +40,10 @@ export function computeSystemAnalytics(
     const normalized = String(value ?? '').trim();
     return normalized || 'Miscellaneous Fee';
   };
+  const isExcludedFromCoreDue = (headName: string, isSpotFee?: boolean): boolean => {
+    const normalized = headName.toLowerCase();
+    return !!isSpotFee || normalized.includes('book') || normalized.includes('dress') || normalized.includes('uniform') || normalized.includes('stationery') || normalized.includes('kit');
+  };
   const activeStudentsList = students.filter((s) => s.isActive);
   const inactiveStudentsList = students.filter((s) => !s.isActive);
   const activeStudentIdSet = new Set(activeStudentsList.map((s) => s.id));
@@ -99,8 +103,9 @@ export function computeSystemAnalytics(
       totalOverallDue += installments
         .filter((inst) => {
           if (inst.studentId !== student.id || inst.balanceAmount <= 0) return false;
-          const headName = normalizeHeadName(structureMap.get(inst.feeStructureId)?.headName || inst.headName).toLowerCase();
-          return !headName.includes('book') && !headName.includes('dress') && !headName.includes('uniform') && !headName.includes('stationery') && !headName.includes('kit');
+          const parentStruct = inst.feeStructureId ? structureMap.get(inst.feeStructureId) : null;
+          const headName = normalizeHeadName(parentStruct?.headName || inst.headName);
+          return !isExcludedFromCoreDue(headName, parentStruct?.isSpotFee);
         })
         .reduce((sum, inst) => sum + inst.balanceAmount, 0);
       if (fin.concession > 0) {
@@ -276,8 +281,9 @@ export function computeSystemAnalytics(
       .sort(compareOfficialInstallmentOrder);
     ordered.forEach((inst) => {
       if (remaining <= 0) return;
-      const allocated = Math.min(inst.amount, remaining);
       const sourceHead = structureMap.get(inst.feeStructureId)?.headName || inst.headName;
+      if (normalizeFeeHead(sourceHead) === 'Old Fees' && inst.dueDate > currentDateString) return;
+      const allocated = Math.min(inst.amount, remaining);
       const headKey = matchHeadKey(sourceHead) || normalizeHeadName(sourceHead);
       if (!headStatsMap.has(headKey)) headStatsMap.set(headKey, createEmptyHeadStat(headKey, false));
       headStatsMap.get(headKey)!.totalCollected += allocated;
@@ -367,6 +373,9 @@ export function computeSystemAnalytics(
 
   installments.forEach((installment) => {
     if (!activeStudentIdSet.has(installment.studentId) || installment.balanceAmount <= 0) return;
+    const parentStruct = installment.feeStructureId ? structureMap.get(installment.feeStructureId) : null;
+    const headName = normalizeHeadName(parentStruct?.headName || installment.headName);
+    if (isExcludedFromCoreDue(headName, parentStruct?.isSpotFee)) return;
     const monthNumber = Number(installment.dueDate.slice(5, 7));
     const rowIndex = orderedRowIndex.get(monthNumber);
     if (rowIndex === undefined) return;

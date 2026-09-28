@@ -128,7 +128,7 @@ export default function App() {
   const [currentView, setCurrentView] = useState<AppView>(() => {
     const saved = localStorage.getItem('sfc_current_view');
     if (saved === 'ANALYTICS') return 'ANALYTICS';
-    if (saved === 'FLAGGED_RECEIPTS') return 'FLAGGED_RECEIPTS';
+    if (saved === 'FLAGGED_RECEIPTS') return 'LEDGER';
     if (saved === 'TRIAL_VERIFICATION') return 'TRIAL_VERIFICATION';
     return 'LEDGER';
   });

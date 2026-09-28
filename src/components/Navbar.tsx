@@ -132,13 +132,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                   <span className="shrink-0 px-2 py-0.5 text-[10px] sm:text-[11px] font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-300 border border-emerald-300/60 dark:border-emerald-700/50 rounded-full whitespace-nowrap">
                     AY {schoolProfile.academicYear || '2026-27'}
                   </span>
-                  <span className="shrink-0 px-2 py-0.5 text-[10px] sm:text-[11px] font-black bg-indigo-100 text-indigo-800 dark:bg-indigo-950/70 dark:text-indigo-300 border border-indigo-300/60 dark:border-indigo-700/50 rounded-full whitespace-nowrap">
-                    v2.0
-                  </span>
                 </div>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate hidden sm:block">
-                  Accounting Ledger & Smart Installment Knock-Off
-                </p>
               </div>
             </div>
 
@@ -612,32 +606,6 @@ export const Navbar: React.FC<NavbarProps> = ({
                   </button>
                 )}
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    onToggleView?.('FLAGGED_RECEIPTS');
-                    setShowDrawer(false);
-                  }}
-                  className={`w-full flex items-center justify-between p-3 rounded-xl border transition-colors text-left cursor-pointer ${
-                    activeView === 'FLAGGED_RECEIPTS'
-                      ? 'bg-amber-50 dark:bg-amber-950/60 border-amber-400 dark:border-amber-700'
-                      : 'bg-slate-50 hover:bg-slate-100 dark:bg-slate-800/60 dark:hover:bg-slate-800 border-slate-200 dark:border-slate-700'
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-amber-100 dark:bg-amber-950/80 text-amber-700 dark:text-amber-300">
-                      <Flag className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <div className="font-bold text-slate-900 dark:text-white text-xs flex items-center gap-1.5">
-                        Shared Receipts
-                        {flaggedReceiptCount > 0 && <span className="rounded bg-emerald-600 px-1.5 text-[9px] font-bold text-white">{flaggedReceiptCount}</span>}
-                      </div>
-                      <div className="text-[11px] text-slate-500 dark:text-slate-400">Confirmed sibling payment splits</div>
-                    </div>
-                  </div>
-                  <ChevronRight className="w-4 h-4 text-slate-400" />
-                </button>
               </div>
 
               {/* Main Features & Modules List */}
@@ -844,19 +812,6 @@ export const Navbar: React.FC<NavbarProps> = ({
                   </label>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (window.confirm('Reset all data to official spreadsheet default state?')) {
-                      onResetDemo();
-                      setShowDrawer(false);
-                    }
-                  }}
-                  className="w-full flex items-center justify-center gap-1.5 p-2 rounded-xl text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-xs font-semibold transition-colors mt-2"
-                >
-                  <RotateCcw className="w-3.5 h-3.5" />
-                  <span>Reset to V2 September Master Data</span>
-                </button>
               </div>
             </div>
 

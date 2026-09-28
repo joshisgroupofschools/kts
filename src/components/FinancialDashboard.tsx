@@ -593,7 +593,7 @@ export const FinancialDashboard: React.FC<FinancialDashboardProps> = ({
 
       </div>
 
-      {/* Interactive Accountant Filter Bar */}
+      {false && (
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3 shadow-xs space-y-3">
         {/* Row 1: Workflow Tiers & Class Filter */}
         <div className="flex flex-wrap items-center justify-between gap-2.5 pb-2.5 border-b border-slate-100 dark:border-slate-800">
@@ -792,6 +792,7 @@ export const FinancialDashboard: React.FC<FinancialDashboardProps> = ({
           </div>
         )}
       </div>
+      )}
 
       {/* Month-wise Outstanding Matrix */}
       {monthWiseOutstandingAnalysis.length > 0 && (

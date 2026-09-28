@@ -47,15 +47,15 @@ export const DualA5ReceiptModal: React.FC<DualA5ReceiptModalProps> = ({
   };
 
   const SingleReceiptCard = ({ copyType }: { copyType: 'PARENT COPY' | 'OFFICE COPY' }) => (
-    <div className="receipt-single-box border-2 border-black bg-white p-3.5 rounded flex flex-col justify-between text-black text-[11px] leading-tight select-none shadow-none font-sans">
+    <div className="receipt-single-box border-2 border-black bg-white p-3 rounded text-black text-[10px] leading-tight select-none shadow-none font-sans">
       <div>
         {/* School Header */}
-        <div className="border-b-2 border-black pb-2 mb-2 flex items-start justify-between">
+        <div className="border-b-2 border-black pb-1.5 mb-1.5 flex items-start justify-between">
           <div>
             <h2 className="text-base font-black text-black uppercase tracking-tight leading-tight">
               {schoolName}
             </h2>
-            <p className="text-[10px] text-gray-700 font-medium">
+            <p className="text-[9px] text-gray-700 font-medium">
               Boduppal, Hyderabad • Phone: {schoolProfile.phone || '98480xxxxx'}
             </p>
           </div>
@@ -67,7 +67,7 @@ export const DualA5ReceiptModal: React.FC<DualA5ReceiptModalProps> = ({
         </div>
 
         {/* Student & Receipt Metadata */}
-        <div className="border border-black mb-2 divide-y divide-black text-[11px]">
+        <div className="border border-black mb-1.5 divide-y divide-black text-[10px]">
           <div className="grid grid-cols-2 divide-x divide-black bg-gray-50">
             <div className="p-1 px-2">
               <span className="text-gray-600 font-semibold">Receipt No: </span>
@@ -116,8 +116,8 @@ export const DualA5ReceiptModal: React.FC<DualA5ReceiptModalProps> = ({
         </div>
 
         {/* Allocations Table with Standardized Installment Names */}
-        <div className="border border-black mb-2 overflow-hidden">
-          <table className="w-full text-left text-[11px] border-collapse">
+        <div className="border border-black mb-1.5 overflow-hidden">
+          <table className="w-full text-left text-[10px] border-collapse">
             <thead className="bg-gray-100 border-b border-black text-black font-black text-[10px] uppercase">
               <tr>
                 <th className="py-1 px-2 border-r border-black w-7 text-center">#</th>
@@ -126,7 +126,7 @@ export const DualA5ReceiptModal: React.FC<DualA5ReceiptModalProps> = ({
                 <th className="py-1 px-2 text-right w-24">Amount ({currencySymbol})</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-black font-mono text-[10.5px]">
+            <tbody className="divide-y divide-black font-mono text-[9.5px]">
               {[...transaction.allocations].sort(compareOfficialInstallmentOrder).map((alloc, idx) => {
                 const displayName = getInstallmentDisplayName(
                   alloc.headName,
@@ -167,13 +167,13 @@ export const DualA5ReceiptModal: React.FC<DualA5ReceiptModalProps> = ({
         </div>
 
         {/* Amount in Words */}
-        <div className="border border-dashed border-black p-1.5 px-2 bg-gray-50 text-[10px] text-black mb-2">
+        <div className="border border-dashed border-black p-1 px-2 bg-gray-50 text-[9px] text-black mb-1.5">
           <span className="font-bold">Amount in Words: </span>
           <span className="italic font-semibold">{amountInWords}</span>
         </div>
 
         {/* REQUIRED 3 SUMMARY ITEMS: NEXT INSTALMENT BALANCE, NEXT INSTALMENT DUE DATE, TOTAL BALANCE */}
-        <div className="border-2 border-black p-2 bg-gray-50 mb-2">
+        <div className="border-2 border-black p-1.5 bg-gray-50 mb-1.5">
           <div className="grid grid-cols-3 gap-2 text-center divide-x divide-black">
             <div className="pr-1 text-left">
               <span className="text-[9px] font-black uppercase text-gray-600 block">
@@ -208,21 +208,21 @@ export const DualA5ReceiptModal: React.FC<DualA5ReceiptModalProps> = ({
       </div>
 
       {/* Footer & Signatures */}
-      <div className="pt-2 border-t border-black mt-2">
-        <p className="text-[8.5px] text-gray-600 leading-tight mb-3">
+      <div className="pt-1.5 border-t border-black mt-1.5">
+        <p className="text-[7.5px] text-gray-600 leading-tight mb-2">
           {schoolProfile.receiptDisclaimer ||
             'Note: Fees once paid are non-refundable & non-transferable. Official computer-generated receipt.'}
         </p>
 
-        <div className="flex items-center justify-between text-[10px] pt-4 px-2">
-          <div className="text-[9px] text-gray-500 font-mono">
+        <div className="flex items-end justify-between text-[9px] pt-2 px-1">
+          <div className="text-[8px] text-gray-500 font-mono">
             {transaction.remarks ? `Note: ${transaction.remarks}` : ''}
           </div>
           <div className="text-center">
-            <div className="border-t-2 border-black w-36 pt-1 font-black text-black uppercase tracking-tight text-[10px]">
+            <div className="border-t-2 border-black w-32 pt-1 font-black text-black uppercase tracking-tight text-[9px]">
               Authorised Signatory
             </div>
-            <span className="text-[8.5px] text-gray-500 font-medium">(Accounts Officer)</span>
+            <span className="text-[7.5px] text-gray-500 font-medium">(Accounts Officer)</span>
           </div>
         </div>
       </div>
@@ -326,6 +326,9 @@ export const DualA5ReceiptModal: React.FC<DualA5ReceiptModalProps> = ({
               overflow: hidden !important;
               font-size: 10px !important;
               line-height: 1.15 !important;
+              align-self: start !important;
+              min-height: 0 !important;
+              height: auto !important;
             }
             .receipt-single-box h2 {
               font-size: 13px !important;
