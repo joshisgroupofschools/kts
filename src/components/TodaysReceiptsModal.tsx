@@ -515,7 +515,7 @@ export const TodaysReceiptsModal: React.FC<TodaysReceiptsModalProps> = ({
           <div className="flex items-center gap-2 text-amber-900 dark:text-amber-200">
             <AlertCircle className="w-4 h-4 shrink-0 text-amber-600 dark:text-amber-400" />
             <span>
-              <strong>Day Close Rule:</strong> For partial payments, please update <em>Permission To Be Given Till Date</em> and confirm <em>Slip Given or Not?</em> on each row below. Only after all receipts are updated can you close the day.
+              <strong>Day Close Rule:</strong> For partial payments, please update <em>Permission To Be Given Till Date</em> and confirm <em>Slip/Card Given or Not?</em> on each row below. Only after all receipts are updated can you close the day.
             </span>
           </div>
 
@@ -584,7 +584,7 @@ export const TodaysReceiptsModal: React.FC<TodaysReceiptsModalProps> = ({
                       Permission To Be Given Till Date
                     </th>
                     <th className="py-3 px-3 min-w-[180px]">
-                      Slip Given or Not?
+                      Slip/Card Given or Not?
                     </th>
                     <th className="py-3 px-3 text-center">Actions</th>
                   </tr>
@@ -755,7 +755,7 @@ export const TodaysReceiptsModal: React.FC<TodaysReceiptsModalProps> = ({
                           )}
                         </td>
 
-                        {/* Slip Given or Not? */}
+                        {/* Slip/Card Given or Not? */}
                         <td className="py-3 px-3">
                           {needsPermissionDate ? (
                             <div className="space-y-1">

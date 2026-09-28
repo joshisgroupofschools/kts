@@ -373,9 +373,6 @@ export function computeSystemAnalytics(
 
   installments.forEach((installment) => {
     if (!activeStudentIdSet.has(installment.studentId) || installment.balanceAmount <= 0) return;
-    const parentStruct = installment.feeStructureId ? structureMap.get(installment.feeStructureId) : null;
-    const headName = normalizeHeadName(parentStruct?.headName || installment.headName);
-    if (isExcludedFromCoreDue(headName, parentStruct?.isSpotFee)) return;
     const monthNumber = Number(installment.dueDate.slice(5, 7));
     const rowIndex = orderedRowIndex.get(monthNumber);
     if (rowIndex === undefined) return;
