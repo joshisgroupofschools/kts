@@ -5,6 +5,12 @@ const MONTHS = [
   'July', 'August', 'September', 'October', 'November', 'December',
 ];
 
+const OLD_FEE_MONTHS: Record<number, string> = {
+  1: 'FEBRUARY',
+  2: 'MARCH',
+  3: 'APRIL',
+};
+
 export function normalizeFeeHead(headName = ''): string {
   const value = headName.toLowerCase();
   if (/(school|tuition|academic)/.test(value)) return 'School Fees';
@@ -80,6 +86,10 @@ export function getInstallmentDisplayName(
 ): string {
   const head = normalizeFeeHead(headName);
   if (head === 'Books') return 'BOOKS DUE';
+  if (head === 'Old Fees') {
+    const safeInstallmentNumber = Math.min(3, Math.max(1, Number(installmentNumber || 1)));
+    return `OLD FEES – ${OLD_FEE_MONTHS[safeInstallmentNumber]} INSTALMENT ${safeInstallmentNumber}/3`;
+  }
   const parsed = parseDateOnly(dueDate);
   const month = parsed ? MONTHS[parsed.month - 1] : '';
   const count = totalInstallments || ({ 'School Fees': 7, Transport: 10, 'Old Fees': 3 }[head]);
