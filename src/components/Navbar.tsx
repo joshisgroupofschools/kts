@@ -630,10 +630,10 @@ export const Navbar: React.FC<NavbarProps> = ({
                     </div>
                     <div>
                       <div className="font-bold text-slate-900 dark:text-white text-xs flex items-center gap-1.5">
-                        Flagged Receipts
-                        {flaggedReceiptCount > 0 && <span className="rounded bg-rose-600 px-1.5 text-[9px] font-bold text-white">{flaggedReceiptCount}</span>}
+                        Shared Receipts
+                        {flaggedReceiptCount > 0 && <span className="rounded bg-emerald-600 px-1.5 text-[9px] font-bold text-white">{flaggedReceiptCount}</span>}
                       </div>
-                      <div className="text-[11px] text-slate-500 dark:text-slate-400">Review duplicate historical receipt numbers</div>
+                      <div className="text-[11px] text-slate-500 dark:text-slate-400">Confirmed sibling payment splits</div>
                     </div>
                   </div>
                   <ChevronRight className="w-4 h-4 text-slate-400" />

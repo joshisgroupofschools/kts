@@ -5,7 +5,6 @@ import {
   Banknote,
   Calendar,
   CheckCircle,
-  CheckCircle2,
   Clock,
   Coins,
   Download,
@@ -596,7 +595,8 @@ export const TodaysReceiptsModal: React.FC<TodaysReceiptsModalProps> = ({
                     const summary = studentSummaries[tx.studentId];
                     const remainingDue = (summary?.installments || []).reduce((sum, installment) =>
                       sum + (installment.dueDate <= selectedDate ? Math.max(0, installment.balanceAmount) : 0), 0);
-                    const hasRemainingBalance = remainingDue > 0;
+                    const needsPermissionDate = remainingDue > 1000;
+                    const canIssueIdCard = remainingDue <= 1000;
 
                     // Fallback default permission date if not set
                     const defaultPermDate =
@@ -605,7 +605,7 @@ export const TodaysReceiptsModal: React.FC<TodaysReceiptsModalProps> = ({
                       getNextMultipleOfFiveDate(new Date(selectedDate));
 
                     const isSlipGiven = tx.slipGiven === true;
-                    const isUpdated = tx.permissionUpdated || !hasRemainingBalance;
+                    const isUpdated = tx.permissionUpdated || (canIssueIdCard && isSlipGiven) || remainingDue === 0;
 
                     return (
                       <tr
@@ -723,7 +723,7 @@ export const TodaysReceiptsModal: React.FC<TodaysReceiptsModalProps> = ({
 
                         {/* Permission To Be Given Till Date */}
                         <td className="py-3 px-3">
-                          {hasRemainingBalance ? (
+                          {needsPermissionDate ? (
                             <div className="space-y-1">
                               <input
                                 type="date"
@@ -749,7 +749,7 @@ export const TodaysReceiptsModal: React.FC<TodaysReceiptsModalProps> = ({
                               </div>
                             </div>
                           ) : (
-                            <span className="text-[11px] text-slate-400 italic">
+                            <span className="text-[11px] text-emerald-700 dark:text-emerald-400 font-bold">
                               Issue ID Card
                             </span>
                           )}
@@ -757,7 +757,7 @@ export const TodaysReceiptsModal: React.FC<TodaysReceiptsModalProps> = ({
 
                         {/* Slip Given or Not? */}
                         <td className="py-3 px-3">
-                          {hasRemainingBalance ? (
+                          {needsPermissionDate ? (
                             <div className="space-y-1">
                               <div className="flex items-center gap-1.5">
                                 <button
@@ -804,10 +804,37 @@ export const TodaysReceiptsModal: React.FC<TodaysReceiptsModalProps> = ({
                               )}
                             </div>
                           ) : (
-                            <span className="inline-flex items-center gap-1 text-[11px] text-emerald-600 dark:text-emerald-400 font-bold">
-                              <CheckCircle2 className="w-3.5 h-3.5" />
-                              Issue ID Card
-                            </span>
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => onUpdateTransactionSlip(tx.id, true, undefined)}
+                                  className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition-all cursor-pointer ${
+                                    isSlipGiven
+                                      ? 'bg-emerald-600 text-white border-emerald-700 shadow-xs'
+                                      : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-700 hover:bg-emerald-50'
+                                  }`}
+                                >
+                                  ID Card Given
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => onUpdateTransactionSlip(tx.id, false, undefined)}
+                                  className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition-all cursor-pointer ${
+                                    !isSlipGiven && tx.permissionUpdated
+                                      ? 'bg-rose-600 text-white border-rose-700 shadow-xs'
+                                      : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-700 hover:bg-rose-50'
+                                  }`}
+                                >
+                                  Not Given
+                                </button>
+                              </div>
+                              {remainingDue > 0 && (
+                                <span className="text-[9.5px] text-emerald-600 font-semibold">
+                                  Due {formatCurrency(remainingDue, currencySymbol)}
+                                </span>
+                              )}
+                            </div>
                           )}
                         </td>
 

@@ -9,7 +9,7 @@ import {
 } from '../types';
 import { computeStudentStatus, hasOverdueBeyondToleranceMonth } from './statusResolver';
 import { getKolkataToday } from './dateUtils';
-import { compareOfficialInstallmentOrder, getOfficialInstallmentOrder, normalizeFeeHead } from './installmentFormatter';
+import { compareOfficialInstallmentOrder, normalizeFeeHead } from './installmentFormatter';
 
 /**
  * Splits an amount evenly across N installments, with any remainder placed on earlier installments.
@@ -27,7 +27,8 @@ export function generateInstallments(
   installmentsCount?: number,
   startMonthIndex?: number,
   dueDayOfMonth: number = 10,
-  academicYearStartYear: number = Number(getKolkataToday().slice(0, 4)) - (Number(getKolkataToday().slice(5, 7)) < 6 ? 1 : 0)
+  academicYearStartYear: number = Number(getKolkataToday().slice(0, 4)) - (Number(getKolkataToday().slice(5, 7)) < 6 ? 1 : 0),
+  explicitMonthIndexes?: number[]
 ): Installment[] {
   const head = normalizeFeeHead(headName);
   
@@ -35,8 +36,10 @@ export function generateInstallments(
   let finalCount = installmentsCount;
   let finalStartMonth = startMonthIndex;
 
+  const selectedMonths = explicitMonthIndexes?.filter((month) => month >= 0 && month <= 14);
+
   if (head === 'Transport') {
-    finalCount = 10;
+    finalCount = selectedMonths?.length || installmentsCount || 10;
     finalStartMonth = 5; // June
   } else if (head === 'Old Fees') {
     finalCount = 3;
@@ -65,8 +68,11 @@ export function generateInstallments(
     const amount = baseAmount + (i < remainder ? 1 : 0);
 
     // Calculate due date (monthly progression)
-    const month = (finalStartMonth + i) % 12;
-    const yearOffset = Math.floor((finalStartMonth + i) / 12);
+    const rawMonthIndex = head === 'Transport' && selectedMonths?.length
+      ? selectedMonths[i]
+      : finalStartMonth + i;
+    const month = rawMonthIndex % 12;
+    const yearOffset = Math.floor(rawMonthIndex / 12);
     const year = academicYearStartYear + yearOffset;
 
     // Format YYYY-MM-DD
@@ -292,9 +298,9 @@ export function computeStudentFinancials(
 
     if (nextInst) {
       nextDueDate = nextInst.dueDate;
-      const nextOrder = getOfficialInstallmentOrder(nextInst);
+      const targetDueDate = nextInst.dueDate;
       nextInstallmentBalance = unpaidRegularInstallments
-        .filter((inst) => getOfficialInstallmentOrder(inst) === nextOrder)
+        .filter((inst) => inst.dueDate <= targetDueDate)
         .reduce((sum, inst) => sum + inst.balanceAmount, 0);
     }
   } else if (studentInstallments.some((inst) => inst.balanceAmount > 0)) {
@@ -313,9 +319,9 @@ export function computeStudentFinancials(
 
     if (nextInst) {
       nextDueDate = nextInst.dueDate;
-      const nextOrder = getOfficialInstallmentOrder(nextInst);
+      const targetDueDate = nextInst.dueDate;
       nextInstallmentBalance = otherUnpaid
-        .filter((inst) => getOfficialInstallmentOrder(inst) === nextOrder)
+        .filter((inst) => inst.dueDate <= targetDueDate)
         .reduce((sum, inst) => sum + inst.balanceAmount, 0);
     }
   }

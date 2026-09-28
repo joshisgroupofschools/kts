@@ -31,6 +31,35 @@ import {
   X,
 } from 'lucide-react';
 
+const TRANSPORT_MONTH_OPTIONS = [
+  { label: 'June', value: 5 },
+  { label: 'July', value: 6 },
+  { label: 'August', value: 7 },
+  { label: 'September', value: 8 },
+  { label: 'October', value: 9 },
+  { label: 'November', value: 10 },
+  { label: 'December', value: 11 },
+  { label: 'January', value: 12 },
+  { label: 'February', value: 13 },
+  { label: 'March', value: 14 },
+];
+
+const getTransportMonthMetadata = (remarks?: string) => {
+  const match = (remarks || '').match(/transportMonths=([0-9,]+)/);
+  return match
+    ? match[1].split(',').map((value) => Number(value)).filter((value) => Number.isFinite(value))
+    : TRANSPORT_MONTH_OPTIONS.map((month) => month.value);
+};
+
+const stripTransportMonthMetadata = (remarks?: string) =>
+  (remarks || '').replace(/\s*\|?\s*transportMonths=[0-9,]+/g, '').trim();
+
+const buildTransportRemarks = (notes: string, selectedMonths: number[]) => {
+  const cleanNotes = stripTransportMonthMetadata(notes);
+  const metadata = `transportMonths=${selectedMonths.join(',')}`;
+  return cleanNotes ? `${cleanNotes} | ${metadata}` : metadata;
+};
+
 interface FeeStructureModalProps {
   student: Student;
   summary: StudentFinancialSummary;
@@ -108,8 +137,11 @@ export const FeeStructureModal: React.FC<FeeStructureModalProps> = ({
   const [transportInstallments, setTransportInstallments] = useState<number>(
     existingTransportFee ? existingTransportFee.installmentsCount : 10
   );
+  const [selectedTransportMonths, setSelectedTransportMonths] = useState<number[]>(
+    getTransportMonthMetadata(existingTransportFee?.remarks)
+  );
   const [transportRouteNotes, setTransportRouteNotes] = useState<string>(
-    existingTransportFee?.remarks || ''
+    stripTransportMonthMetadata(existingTransportFee?.remarks)
   );
 
   // Other Miscellaneous / Spot Fee Heads (excluding school tuition and transport)
@@ -189,6 +221,7 @@ export const FeeStructureModal: React.FC<FeeStructureModalProps> = ({
 
     // 2. Transport Fee Structure (Default 10 installments)
     if (hasTransportFee && transportAmount > 0) {
+      const sortedTransportMonths = [...selectedTransportMonths].sort((a, b) => a - b);
       newStructures.push({
         id: existingTransportFee?.id || `fs_transport_${Date.now()}`,
         studentId: student.id,
@@ -197,9 +230,9 @@ export const FeeStructureModal: React.FC<FeeStructureModalProps> = ({
         committedFee: transportAmount,
         concession: 0,
         commitmentDate: todayStr,
-        installmentsCount: transportInstallments,
+        installmentsCount: sortedTransportMonths.length || transportInstallments,
         isSpotFee: false,
-        remarks: transportRouteNotes.trim() || undefined,
+        remarks: buildTransportRemarks(transportRouteNotes, sortedTransportMonths.length ? sortedTransportMonths : TRANSPORT_MONTH_OPTIONS.map((month) => month.value)),
       });
     }
 
@@ -537,17 +570,9 @@ export const FeeStructureModal: React.FC<FeeStructureModalProps> = ({
                       <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
                         Installments:
                       </label>
-                      <select
-                        value={transportInstallments}
-                        onChange={(e) => setTransportInstallments(parseInt(e.target.value, 10))}
-                        className="w-full px-3 py-2 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-xs font-medium focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
-                      >
-                        {[1, 2, 4, 8, 10, 12].map((num) => (
-                          <option key={num} value={num}>
-                            {num} Installments {num === 10 ? '(10 Months)' : ''}
-                          </option>
-                        ))}
-                      </select>
+                      <div className="px-3 py-2 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-xs font-bold text-slate-900 dark:text-slate-100">
+                        {selectedTransportMonths.length || transportInstallments} selected
+                      </div>
                     </div>
                     <div>
                       <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
@@ -560,6 +585,41 @@ export const FeeStructureModal: React.FC<FeeStructureModalProps> = ({
                         placeholder="e.g. Route #4 - Clock Tower"
                         className="w-full px-3 py-2 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
                       />
+                    </div>
+                    <div className="sm:col-span-3">
+                      <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-2">
+                        Transport Months:
+                      </label>
+                      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                        {TRANSPORT_MONTH_OPTIONS.map((month) => {
+                          const isSelected = selectedTransportMonths.includes(month.value);
+                          return (
+                            <label
+                              key={month.value}
+                              className={`flex items-center gap-2 px-2.5 py-2 rounded-lg border text-[11px] font-bold cursor-pointer ${
+                                isSelected
+                                  ? 'bg-emerald-50 text-emerald-800 border-emerald-300 dark:bg-emerald-950/50 dark:text-emerald-300 dark:border-emerald-800'
+                                  : 'bg-white text-slate-600 border-slate-200 dark:bg-slate-950 dark:text-slate-400 dark:border-slate-800'
+                              }`}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={(e) => {
+                                  const nextMonths = e.target.checked
+                                    ? [...selectedTransportMonths, month.value]
+                                    : selectedTransportMonths.filter((value) => value !== month.value);
+                                  const sorted = nextMonths.sort((a, b) => a - b);
+                                  setSelectedTransportMonths(sorted);
+                                  setTransportInstallments(sorted.length);
+                                }}
+                                className="h-3.5 w-3.5 accent-emerald-600"
+                              />
+                              <span>{month.label}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
                     </div>
                   </div>
                 )}

@@ -305,28 +305,43 @@ export const DualA5ReceiptModal: React.FC<DualA5ReceiptModalProps> = ({
               position: fixed !important;
               left: 0 !important;
               top: 0 !important;
-              width: 287mm !important;
-              height: 200mm !important;
+              width: 285mm !important;
+              height: 198mm !important;
               margin: 0 !important;
-              padding: 4mm !important;
+              padding: 3mm !important;
               background: #ffffff !important;
               display: grid !important;
               grid-template-columns: 1fr 1fr !important;
-              gap: 4mm !important;
+              gap: 3mm !important;
               box-sizing: border-box !important;
             }
             .receipt-single-box {
               border: 2px solid #000000 !important;
               background: #ffffff !important;
               color: #000000 !important;
-              padding: 3mm !important;
+              padding: 2.5mm !important;
               border-radius: 4px !important;
               box-shadow: none !important;
               page-break-inside: avoid !important;
+              overflow: hidden !important;
+              font-size: 10px !important;
+              line-height: 1.15 !important;
+            }
+            .receipt-single-box h2 {
+              font-size: 13px !important;
+              line-height: 1.05 !important;
+            }
+            .receipt-single-box table {
+              font-size: 9.5px !important;
+            }
+            .receipt-single-box th,
+            .receipt-single-box td {
+              padding-top: 0.6mm !important;
+              padding-bottom: 0.6mm !important;
             }
             @page {
               size: A4 landscape;
-              margin: 5mm;
+              margin: 6mm;
             }
           }
         `}</style>

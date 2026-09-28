@@ -102,6 +102,13 @@ import { FlaggedReceiptsView, getDuplicateReceiptGroups } from './components/Fla
 import { generateStructuredRealData } from './data/trialSpreadsheetData';
 import { ArrowRight, CheckCircle2, Coins, FileSpreadsheet, Sparkles, Users } from 'lucide-react';
 
+const getTransportMonthsFromRemarks = (remarks?: string) => {
+  const match = (remarks || '').match(/transportMonths=([0-9,]+)/);
+  return match
+    ? match[1].split(',').map((value) => Number(value)).filter((value) => Number.isFinite(value))
+    : undefined;
+};
+
 export default function App() {
   // -------------------------------------------------------------
   // 1. Core State
@@ -498,7 +505,11 @@ export default function App() {
         studentId,
         struct.headName,
         struct.committedFee,
-        struct.installmentsCount
+        struct.installmentsCount,
+        undefined,
+        10,
+        undefined,
+        getTransportMonthsFromRemarks(struct.remarks)
       );
       const existingHeadInstallments = existingStudentInstallments
         .filter((ei) => ei.headName === struct.headName)

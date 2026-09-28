@@ -41,8 +41,12 @@ const allocationOrder = [
 const allocated = calculateFifoAllocations(allocationOrder as any, 250);
 assert.deepEqual(allocated.map(a => [a.installmentId, a.allocatedAmount]), [['books', 100], ['transport', 100], ['old', 50]]);
 assert.equal(allocated[1].totalInstallments, 10);
-const officialSchedule = ['Books', 'Transport', 'School Fees', 'Old Fees'].flatMap(head =>
-  generateInstallments(head, 'student', head, 21000, 7, undefined, 10, 2026));
+const officialSchedule = [
+  ...generateInstallments('books', 'student', 'Books', 21000, undefined, undefined, 10, 2026),
+  ...generateInstallments('transport', 'student', 'Transport', 21000, undefined, undefined, 10, 2026),
+  ...generateInstallments('school', 'student', 'School Fees', 21000, undefined, undefined, 10, 2026),
+  ...generateInstallments('old', 'student', 'Old Fees', 21000, undefined, undefined, 10, 2026),
+];
 assert.equal(officialSchedule.length, 21);
 assert.deepEqual(officialSchedule.filter(i => i.headName === 'Old Fees').map(i => i.dueDate),
   ['2027-02-10', '2027-03-10', '2027-04-10']);
