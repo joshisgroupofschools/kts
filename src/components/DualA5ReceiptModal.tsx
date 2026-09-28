@@ -47,7 +47,7 @@ export const DualA5ReceiptModal: React.FC<DualA5ReceiptModalProps> = ({
   };
 
   const SingleReceiptCard = ({ copyType }: { copyType: 'PARENT COPY' | 'OFFICE COPY' }) => (
-    <div className="receipt-single-box border-2 border-black bg-white p-3 rounded text-black text-[10px] leading-tight select-none shadow-none font-sans">
+    <div className="receipt-single-box border-2 border-black bg-white p-3 rounded flex flex-col justify-between text-black text-[10px] leading-tight select-none shadow-none font-sans">
       <div>
         {/* School Header */}
         <div className="border-b-2 border-black pb-1.5 mb-1.5 flex items-start justify-between">
@@ -328,7 +328,10 @@ export const DualA5ReceiptModal: React.FC<DualA5ReceiptModalProps> = ({
               line-height: 1.15 !important;
               align-self: start !important;
               min-height: 0 !important;
-              height: auto !important;
+              height: 190mm !important;
+              display: flex !important;
+              flex-direction: column !important;
+              justify-content: space-between !important;
             }
             .receipt-single-box h2 {
               font-size: 13px !important;

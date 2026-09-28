@@ -38,14 +38,20 @@ export function getOfficialInstallmentOrder(item: {
   const head = normalizeFeeHead(item.headName || '');
   const parsed = parseDateOnly(item.dueDate);
   const month = parsed?.month || 0;
-  const monthOrder = ACADEMIC_MONTH_ORDER.get(month) || 99;
   const installmentNumber = Number(item.installmentNumber || 0);
 
   if (head === 'Books') return 0;
-  if (head === 'Transport') return monthOrder * 10 + 2;
-  if (head === 'School Fees') return monthOrder * 10 + 1;
+  if (head === 'Transport') {
+    const transportOrder: Record<number, number> = { 6: 10, 7: 30, 8: 50, 9: 70, 10: 90, 11: 110, 12: 130, 1: 150, 2: 160, 3: 170 };
+    return transportOrder[month] ?? 900;
+  }
+  if (head === 'School Fees') {
+    const schoolOrder: Record<number, number> = { 7: 20, 8: 40, 9: 60, 10: 80, 11: 100, 12: 120, 1: 140 };
+    return schoolOrder[month] ?? 890;
+  }
   if (head === 'Old Fees') return 1000 + installmentNumber;
-  return monthOrder * 10 + 9;
+  const monthOrder = ACADEMIC_MONTH_ORDER.get(month) || 99;
+  return monthOrder * 20 + 9;
 }
 
 export function compareOfficialInstallmentOrder(a: {

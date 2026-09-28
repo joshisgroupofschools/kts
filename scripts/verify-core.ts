@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { getKolkataToday } from '../src/utils/dateUtils';
-import { formatWhatsAppReminderMessage, normalizePhoneNumber, getInstallmentDisplayName } from '../src/utils/installmentFormatter';
+import { compareOfficialInstallmentOrder, formatWhatsAppReminderMessage, normalizePhoneNumber, getInstallmentDisplayName } from '../src/utils/installmentFormatter';
 import { calculateFifoAllocations, generateInstallments } from '../src/utils/feeCalculator';
 import { normalizeInstallments, normalizeTransactions } from '../src/utils/normalizeCloudData';
 import { MONTH_WISE_OUTSTANDING_ORDER } from '../src/utils/analyticsEngine';
@@ -51,6 +51,32 @@ assert.equal(officialSchedule.length, 21);
 assert.deepEqual(officialSchedule.filter(i => i.headName === 'Old Fees').map(i => i.dueDate),
   ['2027-02-10', '2027-03-10', '2027-04-10']);
 assert.equal(officialSchedule.reduce((sum, i) => sum + i.amount, 0), 84000);
+assert.deepEqual(
+  [...officialSchedule].sort(compareOfficialInstallmentOrder).map(i => getInstallmentDisplayName(i.headName, i.installmentNumber, i.totalInstallments, i.dueDate)),
+  [
+    'BOOKS DUE',
+    'TRANSPORT – JUNE INSTALMENT 1/10',
+    'SCHOOL FEES – JULY INSTALMENT 1/7',
+    'TRANSPORT – JULY INSTALMENT 2/10',
+    'SCHOOL FEES – AUGUST INSTALMENT 2/7',
+    'TRANSPORT – AUGUST INSTALMENT 3/10',
+    'SCHOOL FEES – SEPTEMBER INSTALMENT 3/7',
+    'TRANSPORT – SEPTEMBER INSTALMENT 4/10',
+    'SCHOOL FEES – OCTOBER INSTALMENT 4/7',
+    'TRANSPORT – OCTOBER INSTALMENT 5/10',
+    'SCHOOL FEES – NOVEMBER INSTALMENT 5/7',
+    'TRANSPORT – NOVEMBER INSTALMENT 6/10',
+    'SCHOOL FEES – DECEMBER INSTALMENT 6/7',
+    'TRANSPORT – DECEMBER INSTALMENT 7/10',
+    'SCHOOL FEES – JANUARY INSTALMENT 7/7',
+    'TRANSPORT – JANUARY INSTALMENT 8/10',
+    'TRANSPORT – FEBRUARY INSTALMENT 9/10',
+    'TRANSPORT – MARCH INSTALMENT 10/10',
+    'OLD FEES – FEBRUARY INSTALMENT 1/3',
+    'OLD FEES – MARCH INSTALMENT 2/3',
+    'OLD FEES – APRIL INSTALMENT 3/3',
+  ],
+);
 const restored = normalizeTransactions([{ allocations: [{ installmentId: 'transport', installmentNumber: 1, allocatedAmount: 100 }] }], allocationOrder as any);
 assert.equal(restored[0].allocations[0].installmentNumber, 10);
 assert.equal(restored[0].allocations[0].dueDate, '2027-03-10');

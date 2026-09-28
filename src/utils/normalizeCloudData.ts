@@ -85,7 +85,7 @@ export const normalizeTransactions = (rows: any[], installments: Installment[] =
   referenceNo: asString(row.referenceNo), remarks: asString(row.remarks),
   allocations: (Array.isArray(row.allocations) ? row.allocations : []).map((allocation: any) => {
     const inst = byId.get(asString(allocation.installmentId));
-    return normalizeAllocation(inst && !allocation.dueDate ? {
+    return normalizeAllocation(inst ? {
       ...allocation, headName: inst.headName, installmentNumber: inst.installmentNumber,
       totalInstallments: inst.totalInstallments, dueDate: inst.dueDate,
     } : allocation);
