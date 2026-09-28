@@ -682,16 +682,11 @@ export const TodaysReceiptsModal: React.FC<TodaysReceiptsModalProps> = ({
                         <td className="py-3 px-3 text-slate-600 dark:text-slate-400 text-[11px]">
                           {tx.allocations && tx.allocations.length > 0 ? (
                             <div className="space-y-0.5">
-                              {[...tx.allocations].sort(compareOfficialInstallmentOrder).slice(0, 2).map((a, idx) => (
-                                <div key={idx} className="truncate max-w-[200px]">
+                              {[...tx.allocations].sort(compareOfficialInstallmentOrder).map((a, idx) => (
+                                <div key={idx} className="max-w-[260px] leading-snug">
                                   {getInstallmentDisplayName(a.headName, a.installmentNumber, a.totalInstallments, a.dueDate)}: <strong className="text-slate-800 dark:text-slate-200">{formatCurrency(a.allocatedAmount, currencySymbol)}</strong>
                                 </div>
                               ))}
-                              {tx.allocations.length > 2 && (
-                                <span className="text-[10px] text-slate-400">
-                                  +{tx.allocations.length - 2} more installments
-                                </span>
-                              )}
                             </div>
                           ) : (
                             <span className="italic text-slate-400">General fee receipt</span>

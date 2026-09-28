@@ -724,7 +724,7 @@ export default function App() {
     slipGiven: boolean,
     permissionDate?: string
   ) => {
-    const result = await updateTransactionSlipRepo(scriptUrl, txId, slipGiven);
+    const result = await updateTransactionSlipRepo(scriptUrl, txId, slipGiven, permissionDate);
     if (!result.success) throw new Error(result.error || 'Unable to update transaction slip.');
     const transaction = transactions.find((item) => item.id === txId);
     const student = transaction ? students.find((item) => item.id === transaction.studentId) : undefined;

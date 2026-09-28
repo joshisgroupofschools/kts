@@ -195,9 +195,10 @@ export async function saveFeeStructureRepo(
 export async function updateTransactionSlipRepo(
   scriptUrl: string,
   transactionId: string,
-  slipGiven: boolean
+  slipGiven: boolean,
+  permissionDate?: string
 ): Promise<GoogleSheetsResponse> {
-  return callAppsScriptAction(scriptUrl, 'updateTransactionSlip', { transactionId, slipGiven });
+  return callAppsScriptAction(scriptUrl, 'updateTransactionSlip', { transactionId, slipGiven, permissionDate });
 }
 
 export async function saveClassConfigRepo(

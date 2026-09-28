@@ -826,12 +826,14 @@ function saveFeeStructureHandler(ss, payload) {
 function updateTransactionSlipHandler(ss, payload) {
   var transactionId = payload.transactionId;
   var slipGiven = payload.slipGiven;
+  var permissionDate = payload.permissionDate || '';
   var txnsSheet = ss.getSheetByName(TAB_NAMES.TRANSACTIONS);
   var txns = getSheetDataAsJson(txnsSheet);
 
   for (var i = 0; i < txns.length; i++) {
     if (txns[i].id === transactionId) {
       txns[i].slipGiven = slipGiven;
+      if (permissionDate) txns[i].permissionDate = permissionDate;
       txns[i].permissionUpdated = true;
       upsertRows(txnsSheet, 1, [txns[i]]);
       return createJsonResponse({ success: true, data: { transaction: txns[i] }, message: 'Transaction slip updated.', serverTime: new Date().toISOString() });

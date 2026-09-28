@@ -341,6 +341,20 @@ export function getStudentMonthDue(item: StudentFinancialSummary, monthKey: Acad
   };
 }
 
+function getOldestStudentMonthDue(item: StudentFinancialSummary): {
+  hasDue: boolean;
+  dueAmount: number;
+  monthKey: string;
+} {
+  for (const month of ACADEMIC_MONTHS) {
+    const due = getStudentMonthDue(item, month.key);
+    if (due.hasDue) {
+      return { hasDue: true, dueAmount: due.dueAmount, monthKey: month.key };
+    }
+  }
+  return { hasDue: false, dueAmount: 0, monthKey: '' };
+}
+
 export const MasterStudentTable: React.FC<MasterStudentTableProps> = ({
   summaries,
   schoolProfile,
@@ -1322,6 +1336,12 @@ export const MasterStudentTable: React.FC<MasterStudentTableProps> = ({
                               <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded bg-rose-100 dark:bg-rose-950/70 text-rose-800 dark:text-rose-300 font-black text-[10px] border border-rose-300/80">
                                 <CalendarClock className="w-2.5 h-2.5" />
                                 {selectedDueMonth} Due: {formatCurrency(getStudentMonthDue(item, selectedDueMonth).dueAmount, currencySymbol)}
+                              </span>
+                            )}
+                            {selectedDueMonth === 'ALL' && getOldestStudentMonthDue(item).hasDue && (
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded bg-rose-100 dark:bg-rose-950/70 text-rose-800 dark:text-rose-300 font-black text-[10px] border border-rose-300/80">
+                                <CalendarClock className="w-2.5 h-2.5" />
+                                {getOldestStudentMonthDue(item).monthKey} Due: {formatCurrency(getOldestStudentMonthDue(item).dueAmount, currencySymbol)}
                               </span>
                             )}
                             {bk.hasTransport && (

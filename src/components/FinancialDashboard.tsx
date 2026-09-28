@@ -69,7 +69,7 @@ export const FinancialDashboard: React.FC<FinancialDashboardProps> = ({
   classList,
   onNavigateToLedger,
 }) => {
-  const currencySymbol = schoolProfile?.currencySymbol || '₹';
+  const currencySymbol = schoolProfile?.currencySymbol || 'â‚¹';
 
   // Per-card/subcard visibility state: By default all numbers are hidden (masked)
   const [revealedCards, setRevealedCards] = useState<Record<string, boolean>>(() => {
@@ -154,11 +154,26 @@ export const FinancialDashboard: React.FC<FinancialDashboardProps> = ({
     const school = headWiseBifurcation.find((h) => h.headName.toLowerCase().includes('school') || h.headName.toLowerCase().includes('tuition'));
     const transport = headWiseBifurcation.find((h) => h.headName.toLowerCase().includes('transport') || h.headName.toLowerCase().includes('bus'));
     const books = headWiseBifurcation.find((h) => h.headName.toLowerCase().includes('book'));
-    const dress = headWiseBifurcation.find((h) => h.headName.toLowerCase().includes('dress') || h.headName.toLowerCase().includes('uniform'));
     const oldDue = headWiseBifurcation.find((h) => h.headName.toLowerCase().includes('old') || h.headName.toLowerCase().includes('due'));
 
-    return { school, transport, books, dress, oldDue };
+    return { school, transport, books, oldDue };
   }, [headWiseBifurcation]);
+
+  const getHeadCollectionText = (head: typeof feeHeadMap.school) => {
+    if (!head) return `${currencySymbol}0 / ${currencySymbol}0 (0%)`;
+    const assigned = Math.max(0, head.totalCommitted || 0);
+    const collected = Math.max(0, Math.min(head.totalCollected || 0, assigned || head.totalCollected || 0));
+    const percent = assigned > 0 ? Math.round((collected / assigned) * 100) : 0;
+    return `${formatCurrency(collected, currencySymbol)} / ${formatCurrency(assigned, currencySymbol)} (${percent}%)`;
+  };
+
+  const getHeadDueAmount = (head: typeof feeHeadMap.school) => {
+    if (!head) return 0;
+    const assigned = Math.max(0, head.totalCommitted || 0);
+    const collected = Math.max(0, head.totalCollected || 0);
+    const assignedBalance = Math.max(0, assigned - collected);
+    return assigned > 0 ? Math.min(Math.max(0, head.totalBalanceDue || 0), assignedBalance) : Math.max(0, head.totalBalanceDue || 0);
+  };
 
   // Percentage calculations
   const allTimeCashPct = totalCollectedTillDate > 0 ? Math.round((totalCashCollected / totalCollectedTillDate) * 100) : 0;
@@ -300,12 +315,12 @@ export const FinancialDashboard: React.FC<FinancialDashboardProps> = ({
                 <div className="flex items-center justify-between text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-0.5">
                   <span>1. Active Students</span>
                   <span className="text-[10px] text-slate-500">
-                    Active Only: {isCardRevealed('set1') ? totalStudents : '••'}
+                    Active Only: {isCardRevealed('set1') ? totalStudents : 'â€¢â€¢'}
                   </span>
                 </div>
                 <div className="flex items-baseline justify-between">
                   <div className="text-base font-black text-slate-900 dark:text-white font-mono">
-                    {isCardRevealed('set1') ? activeStudents : <span className="text-slate-400 font-normal text-sm">••••••</span>}
+                    {isCardRevealed('set1') ? activeStudents : <span className="text-slate-400 font-normal text-sm">â€¢â€¢â€¢â€¢â€¢â€¢</span>}
                   </div>
                 </div>
               </div>
@@ -320,7 +335,7 @@ export const FinancialDashboard: React.FC<FinancialDashboardProps> = ({
                   {isCardRevealed('set1') ? (
                     formatCurrency(actualStandardFeeSum, currencySymbol)
                   ) : (
-                    <span className="text-slate-400 font-normal text-sm">••••••</span>
+                    <span className="text-slate-400 font-normal text-sm">â€¢â€¢â€¢â€¢â€¢â€¢</span>
                   )}
                 </div>
               </div>
@@ -335,7 +350,7 @@ export const FinancialDashboard: React.FC<FinancialDashboardProps> = ({
                   {isCardRevealed('set1') ? (
                     formatCurrency(totalCommittedRevenue, currencySymbol)
                   ) : (
-                    <span className="text-blue-400/60 font-normal text-sm">••••••</span>
+                    <span className="text-blue-400/60 font-normal text-sm">â€¢â€¢â€¢â€¢â€¢â€¢</span>
                   )}
                 </div>
               </div>
@@ -345,14 +360,14 @@ export const FinancialDashboard: React.FC<FinancialDashboardProps> = ({
                 <div className="flex items-center justify-between text-[11px] font-semibold text-purple-800 dark:text-purple-300 mb-0.5">
                   <span>4. Concession</span>
                   <span className="text-[10px] font-bold text-purple-700 dark:text-purple-300">
-                    {isCardRevealed('set1') ? `${concessionStudentsCount} stds` : '••'}
+                    {isCardRevealed('set1') ? `${concessionStudentsCount} stds` : 'â€¢â€¢'}
                   </span>
                 </div>
                 <div className="text-base font-black text-purple-700 dark:text-purple-400 font-mono">
                   {isCardRevealed('set1') ? (
                     formatCurrency(totalConcessionGiven, currencySymbol)
                   ) : (
-                    <span className="text-purple-400/60 font-normal text-sm">••••••</span>
+                    <span className="text-purple-400/60 font-normal text-sm">â€¢â€¢â€¢â€¢â€¢â€¢</span>
                   )}
                 </div>
               </div>
@@ -377,16 +392,16 @@ export const FinancialDashboard: React.FC<FinancialDashboardProps> = ({
                         {isCardRevealed('set1') ? (
                           formatCurrency(totalOtherFees, currencySymbol)
                         ) : (
-                          <span className="text-amber-400/60 font-normal text-sm">••••••</span>
+                          <span className="text-amber-400/60 font-normal text-sm">â€¢â€¢â€¢â€¢â€¢â€¢</span>
                         )}
                       </div>
                       <div className="flex items-center gap-2 mt-1 pt-1 border-t border-amber-200/60 dark:border-amber-900/40 text-[9.5px] font-mono text-slate-600 dark:text-slate-300 flex-wrap">
                         <span>
-                          Transport: <strong className="text-slate-900 dark:text-slate-100">{isCardRevealed('set1') ? formatCurrency(transportCommitted, currencySymbol) : '••'}</strong>
+                          Transport: <strong className="text-slate-900 dark:text-slate-100">{isCardRevealed('set1') ? formatCurrency(transportCommitted, currencySymbol) : 'â€¢â€¢'}</strong>
                         </span>
-                        <span className="text-slate-400">•</span>
+                        <span className="text-slate-400">â€¢</span>
                         <span>
-                          Old Fees: <strong className="text-slate-900 dark:text-slate-100">{isCardRevealed('set1') ? formatCurrency(oldFeeCommitted, currencySymbol) : '••'}</strong>
+                          Old Fees: <strong className="text-slate-900 dark:text-slate-100">{isCardRevealed('set1') ? formatCurrency(oldFeeCommitted, currencySymbol) : 'â€¢â€¢'}</strong>
                         </span>
                       </div>
                     </>
@@ -431,47 +446,26 @@ export const FinancialDashboard: React.FC<FinancialDashboardProps> = ({
                 <div className="flex items-center justify-between text-[11px] font-bold text-emerald-800 dark:text-emerald-300 mb-0.5">
                   <span>1. Total Collected</span>
                   <span className="text-[10px] font-black px-1.5 py-0.2 rounded bg-emerald-200/70 dark:bg-emerald-900 text-emerald-900 dark:text-emerald-200 font-mono">
-                    {isCardRevealed('set2') ? `${collectionEfficiencyPercent}% Collected` : '••%'}
+                    {isCardRevealed('set2') ? `${collectionEfficiencyPercent}% Collected` : 'â€¢â€¢%'}
                   </span>
                 </div>
                 <div className="text-lg font-black text-emerald-700 dark:text-emerald-400 font-mono tracking-tight mb-1.5">
                   {isCardRevealed('set2') ? (
                     formatCurrency(totalCollectedTillDate, currencySymbol)
                   ) : (
-                    <span className="text-emerald-400/60 font-normal text-base">••••••••</span>
+                    <span className="text-emerald-400/60 font-normal text-base">â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢</span>
                   )}
-                </div>
-                
-                {/* Detailed Fee Head Breakdown including Old Fees */}
-                <div className="pt-1.5 border-t border-emerald-200/60 dark:border-emerald-900/40 grid grid-cols-2 gap-x-2 gap-y-1 text-[10px] font-mono text-emerald-800 dark:text-emerald-300">
-                  <div>
-                    <span className="text-slate-500 dark:text-slate-400">School: </span>
-                    <strong className="font-bold">{isCardRevealed('set2') && feeHeadMap.school ? formatCurrency(feeHeadMap.school.totalCollected, currencySymbol) : '••'}</strong>
-                    {isCardRevealed('set2') && feeHeadMap.school && <span className="text-[9px] text-slate-500 ml-0.5">({feeHeadMap.school.collectionRate}%)</span>}
-                  </div>
-                  <div>
-                    <span className="text-slate-500 dark:text-slate-400">Transport: </span>
-                    <strong className="font-bold">{isCardRevealed('set2') && feeHeadMap.transport ? formatCurrency(feeHeadMap.transport.totalCollected, currencySymbol) : '••'}</strong>
-                    {isCardRevealed('set2') && feeHeadMap.transport && <span className="text-[9px] text-slate-500 ml-0.5">({feeHeadMap.transport.collectionRate}%)</span>}
-                  </div>
-                  <div>
-                    <span className="text-slate-500 dark:text-slate-400">Old Fees: </span>
-                    <strong className="font-bold">{isCardRevealed('set2') ? (feeHeadMap.oldDue ? formatCurrency(feeHeadMap.oldDue.totalCollected, currencySymbol) : `${currencySymbol}0`) : '••'}</strong>
-                  </div>
-                  <div>
-                    <span className="text-slate-500 dark:text-slate-400">Books 📚: </span>
-                    <strong className="font-bold">{isCardRevealed('set2') ? (feeHeadMap.books ? formatCurrency(feeHeadMap.books.totalCollected, currencySymbol) : `${currencySymbol}0`) : '••'}</strong>
-                  </div>
-                  <div>
-                    <span className="text-slate-500 dark:text-slate-400">Dress 👗: </span>
-                    <strong className="font-bold">{isCardRevealed('set2') ? (feeHeadMap.dress ? formatCurrency(feeHeadMap.dress.totalCollected, currencySymbol) : `${currencySymbol}0`) : '••'}</strong>
-                  </div>
+                </div>                {/* Detailed Fee Head Breakdown */}
+                <div className="pt-1.5 border-t border-emerald-200/60 dark:border-emerald-900/40 grid grid-cols-1 gap-y-1 text-[10px] font-mono text-emerald-800 dark:text-emerald-300">
+                  <div><span className="text-slate-500 dark:text-slate-400">School: </span><strong className="font-bold">{isCardRevealed('set2') ? getHeadCollectionText(feeHeadMap.school) : '••'}</strong></div>
+                  <div><span className="text-slate-500 dark:text-slate-400">Transport: </span><strong className="font-bold">{isCardRevealed('set2') ? getHeadCollectionText(feeHeadMap.transport) : '••'}</strong></div>
+                  <div><span className="text-slate-500 dark:text-slate-400">Books: </span><strong className="font-bold">{isCardRevealed('set2') ? getHeadCollectionText(feeHeadMap.books) : '••'}</strong></div>
                 </div>
 
                 {/* Cash vs UPI Sub-bar */}
                 <div className="mt-1.5 pt-1 border-t border-emerald-200/40 dark:border-emerald-900/30 flex items-center justify-between text-[9.5px] font-mono text-slate-500 dark:text-slate-400">
-                  <span>Cash: <strong className="text-slate-700 dark:text-slate-300">{isCardRevealed('set2') ? formatCurrency(totalCashCollected, currencySymbol) : '••'}</strong> ({allTimeCashPct}%)</span>
-                  <span>UPI: <strong className="text-slate-700 dark:text-slate-300">{isCardRevealed('set2') ? formatCurrency(totalUpiCollected, currencySymbol) : '••'}</strong> ({allTimeUpiPct}%)</span>
+                  <span>Cash: <strong className="text-slate-700 dark:text-slate-300">{isCardRevealed('set2') ? formatCurrency(totalCashCollected, currencySymbol) : 'â€¢â€¢'}</strong> ({allTimeCashPct}%)</span>
+                  <span>UPI: <strong className="text-slate-700 dark:text-slate-300">{isCardRevealed('set2') ? formatCurrency(totalUpiCollected, currencySymbol) : 'â€¢â€¢'}</strong> ({allTimeUpiPct}%)</span>
                 </div>
               </div>
 
@@ -487,7 +481,7 @@ export const FinancialDashboard: React.FC<FinancialDashboardProps> = ({
                   {isCardRevealed('set2') ? (
                     formatCurrency(totalOverallDue, currencySymbol)
                   ) : (
-                    <span className="text-rose-400/60 font-normal text-base">••••••••</span>
+                    <span className="text-rose-400/60 font-normal text-base">â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢</span>
                   )}
                 </div>
 
@@ -495,15 +489,15 @@ export const FinancialDashboard: React.FC<FinancialDashboardProps> = ({
                 <div className="pt-1.5 border-t border-rose-200/60 dark:border-rose-900/40 grid grid-cols-3 gap-x-2 gap-y-1 text-[10px] font-mono text-rose-800 dark:text-rose-300">
                   <div>
                     <span className="text-slate-500 dark:text-slate-400">School Due: </span>
-                    <strong className="font-bold">{isCardRevealed('set2') && feeHeadMap.school ? formatCurrency(feeHeadMap.school.totalBalanceDue, currencySymbol) : '••'}</strong>
+                    <strong className="font-bold">{isCardRevealed('set2') ? formatCurrency(getHeadDueAmount(feeHeadMap.school), currencySymbol) : '••'}</strong>
                   </div>
                   <div>
                     <span className="text-slate-500 dark:text-slate-400">Transport Due: </span>
-                    <strong className="font-bold">{isCardRevealed('set2') && feeHeadMap.transport ? formatCurrency(feeHeadMap.transport.totalBalanceDue, currencySymbol) : '••'}</strong>
+                    <strong className="font-bold">{isCardRevealed('set2') ? formatCurrency(getHeadDueAmount(feeHeadMap.transport), currencySymbol) : '••'}</strong>
                   </div>
                   <div>
                     <span className="text-slate-500 dark:text-slate-400">Old Fees Due: </span>
-                    <strong className="font-bold">{isCardRevealed('set2') ? (feeHeadMap.oldDue ? formatCurrency(feeHeadMap.oldDue.totalBalanceDue, currencySymbol) : `${currencySymbol}0`) : '••'}</strong>
+                    <strong className="font-bold">{isCardRevealed('set2') ? formatCurrency(getHeadDueAmount(feeHeadMap.oldDue), currencySymbol) : '••'}</strong>
                   </div>
                 </div>
               </div>
@@ -550,13 +544,13 @@ export const FinancialDashboard: React.FC<FinancialDashboardProps> = ({
                   {isCardRevealed('set3') ? (
                     formatCurrency(totalOverdueDeficitTillDate, currencySymbol)
                   ) : (
-                    <span className="text-rose-400/60 font-normal text-sm">••••••</span>
+                    <span className="text-rose-400/60 font-normal text-sm">â€¢â€¢â€¢â€¢â€¢â€¢</span>
                   )}
                 </div>
                 <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-1 flex items-center justify-between">
                   <span>Payable Till Date:</span>
                   <strong className="font-mono text-slate-800 dark:text-slate-200">
-                    {isCardRevealed('set3') ? formatCurrency(totalExpectedTillDate, currencySymbol) : '••'}
+                    {isCardRevealed('set3') ? formatCurrency(totalExpectedTillDate, currencySymbol) : 'â€¢â€¢'}
                   </strong>
                 </div>
               </div>
@@ -579,12 +573,12 @@ export const FinancialDashboard: React.FC<FinancialDashboardProps> = ({
                       <span className="text-[10px] font-normal text-slate-400">/day</span>
                     </>
                   ) : (
-                    <span className="text-amber-400/60 font-normal text-sm">••••••</span>
+                    <span className="text-amber-400/60 font-normal text-sm">â€¢â€¢â€¢â€¢â€¢â€¢</span>
                   )}
                 </div>
                 <div className="text-[10px] text-slate-300 mt-1.5 pt-1 border-t border-slate-800 flex items-center justify-between">
-                  <span>Backlog: <strong>{isCardRevealed('set3') ? `${formatCurrency(dailyTargetRunRate.backlogGap, currencySymbol)} ÷ ${dailyTargetRunRate.daysRemainingInCycle} days` : '••'}</strong></span>
-                  <span>Goal: <strong>{isCardRevealed('set3') ? `~${dailyTargetRunRate.suggestedStudentsPerDay} stds/d` : '••'}</strong></span>
+                  <span>Backlog: <strong>{isCardRevealed('set3') ? `${formatCurrency(dailyTargetRunRate.backlogGap, currencySymbol)} ÷ ${dailyTargetRunRate.daysRemainingInCycle} working days` : '••'}</strong></span>
+                  <span>Goal: <strong>{isCardRevealed('set3') ? `~${dailyTargetRunRate.suggestedStudentsPerDay} stds/d` : 'â€¢â€¢'}</strong></span>
                 </div>
               </div>
             </div>
@@ -776,8 +770,8 @@ export const FinancialDashboard: React.FC<FinancialDashboardProps> = ({
           <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs flex-wrap gap-2">
             <span className="text-slate-600 dark:text-slate-400">
               Filter Active: <strong className="text-slate-900 dark:text-white">
-                {selectedActionFilter !== 'ALL' ? `Tier: ${selectedActionFilter} • ` : ''}
-                {selectedStatusFilter !== 'ALL' ? `Status: ${selectedStatusFilter} • ` : ''}
+                {selectedActionFilter !== 'ALL' ? `Tier: ${selectedActionFilter} â€¢ ` : ''}
+                {selectedStatusFilter !== 'ALL' ? `Status: ${selectedStatusFilter} â€¢ ` : ''}
                 {selectedClassFilter !== 'ALL' ? `Class: ${selectedClassFilter}` : 'All Classes'}
               </strong>
             </span>
@@ -939,7 +933,7 @@ export const FinancialDashboard: React.FC<FinancialDashboardProps> = ({
             <div className="flex items-center justify-between text-xs text-slate-500 pt-1">
               <span>Days Through Next Collection Deadline:</span>
               <strong className="font-mono text-slate-800 dark:text-slate-200">
-                {dailyTargetRunRate.daysRemainingInCycle} days
+                {dailyTargetRunRate.daysRemainingInCycle} working days
               </strong>
             </div>
 

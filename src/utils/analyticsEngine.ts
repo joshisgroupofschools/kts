@@ -27,6 +27,16 @@ const getNextMonthTenth = (dateString: string): string => {
   return nextMonthTenth.toISOString().slice(0, 10);
 };
 
+const countWorkingDaysExcludingSundays = (startDate: Date, endDate: Date): number => {
+  let count = 0;
+  const cursor = new Date(startDate.getTime());
+  while (cursor <= endDate) {
+    if (cursor.getUTCDay() !== 0) count++;
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+  return Math.max(1, count);
+};
+
 export function computeSystemAnalytics(
   students: Student[],
   feeStructures: StudentFeeStructure[],
@@ -164,7 +174,7 @@ export function computeSystemAnalytics(
   const currentDate = new Date(`${currentDateString}T00:00:00Z`);
   const deadlineDate = new Date(`${nextDueDate}T00:00:00Z`);
   const collectionDeadline = deadlineDate.toISOString().slice(0, 10);
-  const daysRemainingInCycle = Math.max(1, Math.ceil((deadlineDate.getTime() - currentDate.getTime()) / 86400000));
+  const daysRemainingInCycle = countWorkingDaysExcludingSundays(currentDate, deadlineDate);
 
   const backlogGap = totalOverdueDeficitTillDate;
   const targetDailyAmount = Math.ceil(backlogGap / daysRemainingInCycle);
