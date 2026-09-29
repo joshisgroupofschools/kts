@@ -137,4 +137,22 @@ const realAnalytics = computeSystemAnalytics(
 const unmappedHead = realAnalytics.headWiseBifurcation.find((head) => head.headName === 'Unmapped / Advance Payments');
 assert(unmappedHead && unmappedHead.totalCollected >= 29000, 'Unmapped paid money must be visible separately');
 
+const oldFeeAnalytics = computeSystemAnalytics(
+  [{ id: 'old-student', name: 'Old Student', rollNo: '1', className: 'Class 1', classId: 'c1', section: 'A', isActive: true, admissionDate: '2026-06-01', createdAt: '', updatedAt: '' } as any],
+  [{ id: 'old-structure', studentId: 'old-student', headName: 'Old Due Carryover', actualFee: 300, committedFee: 300, concession: 0, installmentsCount: 3, isSpotFee: false } as any],
+  [
+    { id: 'old-1', feeStructureId: 'old-structure', studentId: 'old-student', headName: 'Old Due Carryover', installmentNumber: 1, totalInstallments: 3, amount: 100, dueDate: '2027-02-10', paidAmount: 25, balanceAmount: 75, status: 'partial' },
+    { id: 'old-2', feeStructureId: 'old-structure', studentId: 'old-student', headName: 'Old Due Carryover', installmentNumber: 2, totalInstallments: 3, amount: 100, dueDate: '2027-03-10', paidAmount: 0, balanceAmount: 100, status: 'unpaid' },
+    { id: 'old-3', feeStructureId: 'old-structure', studentId: 'old-student', headName: 'Old Due Carryover', installmentNumber: 3, totalInstallments: 3, amount: 100, dueDate: '2027-04-10', paidAmount: 0, balanceAmount: 100, status: 'unpaid' },
+  ] as any,
+  [{ id: 'old-txn', receiptNo: '1', studentId: 'old-student', studentName: 'Old Student', studentRollNo: '1', studentClass: 'Class 1', date: '2026-09-30 10:00', amount: 25, paymentMode: 'Cash', allocations: [{ installmentId: 'old-1', headName: 'Old Due Carryover', installmentNumber: 1, totalInstallments: 3, dueDate: '2027-02-10', allocatedAmount: 25 }], isCancelled: false }],
+  { mode: 'fixed_amount', value: 0 },
+  '2026-09-30',
+);
+const oldFeeHead = oldFeeAnalytics.headWiseBifurcation.find((head) => head.headName === 'Old Due Carryover');
+assert.equal(oldFeeHead?.totalCommitted, 300);
+assert.equal(oldFeeHead?.totalCollected, 25);
+assert.equal(oldFeeHead?.totalBalanceDue, 275);
+assert.equal((oldFeeHead?.totalCollected || 0) + (oldFeeHead?.totalBalanceDue || 0), oldFeeHead?.totalCommitted);
+
 console.log('Core date, cloud normalization, month-wise order, and WhatsApp verification passed.');

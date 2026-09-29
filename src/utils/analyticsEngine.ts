@@ -270,9 +270,9 @@ export function computeSystemAnalytics(
     }
   });
 
-  // 3. Rebuild the head-wise collection split from each student's total receipts
-  // using the official collection sequence. Legacy allocation labels are not trusted
-  // here because some imported receipts assigned money to Old Fees too early.
+  // 3. Rebuild the head-wise collection split from the actual receipt allocations.
+  // After historical repair, allocations are the financial source of truth:
+  // head committed = head collected + head due.
   headStatsMap.forEach((stat) => {
     stat.totalCollected = 0;
   });
@@ -281,32 +281,29 @@ export function computeSystemAnalytics(
     const officialHead = normalizeFeeHead(headName);
     return Array.from(headStatsMap.keys()).find((key) => normalizeFeeHead(key) === officialHead);
   };
-  const collectedByStudent = new Map<string, number>();
+  const installmentById = new Map(installments.map((inst) => [inst.id, inst]));
   allActiveTransactions.forEach((txn) => {
-    collectedByStudent.set(txn.studentId, (collectedByStudent.get(txn.studentId) || 0) + txn.amount);
-  });
-  collectedByStudent.forEach((collected, studentId) => {
-    let remaining = collected;
-    const ordered = installments
-      .filter((inst) => inst.studentId === studentId && inst.amount > 0)
-      .sort(compareOfficialInstallmentOrder);
-    ordered.forEach((inst) => {
-      if (remaining <= 0) return;
-      const sourceHead = structureMap.get(inst.feeStructureId)?.headName || inst.headName;
-      if (normalizeFeeHead(sourceHead) === 'Old Fees' && inst.dueDate > currentDateString) return;
-      const allocated = Math.min(inst.amount, remaining);
+    let allocatedTotal = 0;
+    (txn.allocations || []).forEach((allocation) => {
+      const amount = Number(allocation.allocatedAmount || 0);
+      if (amount <= 0) return;
+      const linkedInstallment = installmentById.get(allocation.installmentId);
+      const sourceHead = structureMap.get(linkedInstallment?.feeStructureId || '')?.headName || linkedInstallment?.headName || allocation.headName;
       const headKey = matchHeadKey(sourceHead) || normalizeHeadName(sourceHead);
       if (!headStatsMap.has(headKey)) headStatsMap.set(headKey, createEmptyHeadStat(headKey, false));
-      headStatsMap.get(headKey)!.totalCollected += allocated;
-      remaining -= allocated;
+      const stat = headStatsMap.get(headKey)!;
+      stat.totalCollected += amount;
+      stat.studentIds.add(txn.studentId);
+      allocatedTotal += amount;
     });
+    const remaining = Math.max(0, Number(txn.amount || 0) - allocatedTotal);
     if (remaining > 0) {
       if (!headStatsMap.has(UNMAPPED_PAYMENT_HEAD)) {
         headStatsMap.set(UNMAPPED_PAYMENT_HEAD, createEmptyHeadStat(UNMAPPED_PAYMENT_HEAD, false));
       }
       const unmappedStat = headStatsMap.get(UNMAPPED_PAYMENT_HEAD)!;
       unmappedStat.totalCollected += remaining;
-      unmappedStat.studentIds.add(studentId);
+      unmappedStat.studentIds.add(txn.studentId);
     }
   });
 
