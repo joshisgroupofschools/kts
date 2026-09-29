@@ -273,11 +273,18 @@ export const StudentLedgerModal: React.FC<StudentLedgerModalProps> = ({
                             {txn.referenceNo && <span>• Ref: {txn.referenceNo}</span>}
                             {txn.remarks && <span>• Note: {txn.remarks}</span>}
                           </div>
-                          {(!txn.allocations || txn.allocations.length === 0) && (
-                            <div className="mt-1 text-[10px] font-bold text-amber-700 dark:text-amber-300">
-                              Unmapped historical payment – fee not assigned
-                            </div>
-                          )}
+                          {(() => {
+                            const allocationTotal = (txn.allocations || []).reduce(
+                              (sum, allocation) => sum + Number(allocation.allocatedAmount || 0),
+                              0
+                            );
+                            const unmappedAmount = Math.max(0, Number(txn.amount || 0) - allocationTotal);
+                            return unmappedAmount > 0.01 ? (
+                              <div className="mt-1 text-[10px] font-bold text-amber-700 dark:text-amber-300">
+                                Unmapped historical payment – fee not assigned: {formatCurrency(unmappedAmount, schoolProfile.currencySymbol)}
+                              </div>
+                            ) : null;
+                          })()}
                         </div>
                       </div>
 

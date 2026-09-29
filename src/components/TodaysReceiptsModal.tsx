@@ -680,19 +680,28 @@ export const TodaysReceiptsModal: React.FC<TodaysReceiptsModalProps> = ({
 
                         {/* Allocations Breakdown */}
                         <td className="py-3 px-3 text-slate-600 dark:text-slate-400 text-[11px]">
-                          {tx.allocations && tx.allocations.length > 0 ? (
-                            <div className="space-y-0.5">
-                              {[...tx.allocations].sort(compareOfficialInstallmentOrder).map((a, idx) => (
-                                <div key={idx} className="max-w-[260px] leading-snug">
-                                  {getInstallmentDisplayName(a.headName, a.installmentNumber, a.totalInstallments, a.dueDate)}: <strong className="text-slate-800 dark:text-slate-200">{formatCurrency(a.allocatedAmount, currencySymbol)}</strong>
-                                </div>
-                              ))}
-                            </div>
-                          ) : (
-                            <span className="font-bold text-amber-700 dark:text-amber-300">
-                              Unmapped historical payment – fee not assigned
-                            </span>
-                          )}
+                          {(() => {
+                            const allocationTotal = (tx.allocations || []).reduce(
+                              (sum, allocation) => sum + Number(allocation.allocatedAmount || 0),
+                              0
+                            );
+                            const unmappedAmount = Math.max(0, Number(tx.amount || 0) - allocationTotal);
+                            return (
+                              <div className="space-y-0.5">
+                                {(tx.allocations || []).length > 0 &&
+                                  [...tx.allocations].sort(compareOfficialInstallmentOrder).map((a, idx) => (
+                                    <div key={idx} className="max-w-[260px] leading-snug">
+                                      {getInstallmentDisplayName(a.headName, a.installmentNumber, a.totalInstallments, a.dueDate)}: <strong className="text-slate-800 dark:text-slate-200">{formatCurrency(a.allocatedAmount, currencySymbol)}</strong>
+                                    </div>
+                                  ))}
+                                {unmappedAmount > 0.01 && (
+                                  <div className="font-bold text-amber-700 dark:text-amber-300">
+                                    Unmapped historical payment – fee not assigned: {formatCurrency(unmappedAmount, currencySymbol)}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })()}
                         </td>
 
                         {/* Remaining Balance Till Date */}

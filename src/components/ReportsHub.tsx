@@ -1286,20 +1286,30 @@ export const ReportsHub: React.FC<ReportsHubProps> = ({
                             {txn.remarks || '-'}
                           </td>
                           <td className="py-2.5 px-3 text-[10px]">
-                            {txn.allocations && txn.allocations.length > 0 ? (
-                              <div className="flex flex-wrap gap-1">
-                                {txn.allocations.map((a, i) => (
-                                  <span
-                                    key={i}
-                                    className="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-mono"
-                                  >
-                                    {a.headName.split(' ')[0]}: {formatCurrency(a.allocatedAmount)}
-                                  </span>
-                                ))}
-                              </div>
-                            ) : (
-                              <span className="text-slate-400 italic">Direct Realization</span>
-                            )}
+                            {(() => {
+                              const allocationTotal = (txn.allocations || []).reduce(
+                                (sum, allocation) => sum + Number(allocation.allocatedAmount || 0),
+                                0
+                              );
+                              const unmappedAmount = Math.max(0, Number(txn.amount || 0) - allocationTotal);
+                              return (
+                                <div className="flex flex-wrap gap-1">
+                                  {(txn.allocations || []).map((a, i) => (
+                                    <span
+                                      key={i}
+                                      className="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-mono"
+                                    >
+                                      {a.headName.split(' ')[0]}: {formatCurrency(a.allocatedAmount)}
+                                    </span>
+                                  ))}
+                                  {unmappedAmount > 0.01 && (
+                                    <span className="px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 font-bold">
+                                      Unmapped: {formatCurrency(unmappedAmount)}
+                                    </span>
+                                  )}
+                                </div>
+                              );
+                            })()}
                           </td>
                           <td className="py-2.5 px-2 text-center">
                             {onOpenReceiptModal && (

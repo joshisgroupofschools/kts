@@ -41,19 +41,26 @@ export const DualA5ReceiptModal: React.FC<DualA5ReceiptModalProps> = ({
       : 0;
 
   const schoolName = schoolProfile.schoolName || 'KAKATIYA SCHOOL BODUPPAL';
+  const mappedAllocations = transaction.allocations || [];
+  const mappedAllocationTotal = mappedAllocations.reduce(
+    (sum, allocation) => sum + Number(allocation.allocatedAmount || 0),
+    0
+  );
+  const unmappedPaymentAmount = Math.max(0, Number(transaction.amount || 0) - mappedAllocationTotal);
   const printableAllocations =
-    transaction.allocations.length > 0
-      ? transaction.allocations
-      : [
+    unmappedPaymentAmount > 0.01
+      ? [
+          ...mappedAllocations,
           {
             installmentId: '__unmapped_historical_payment__',
             headName: 'Unmapped Historical Payment',
             installmentNumber: 1,
             totalInstallments: 1,
             dueDate: transaction.date,
-            allocatedAmount: transaction.amount,
+            allocatedAmount: unmappedPaymentAmount,
           },
-        ];
+        ]
+      : mappedAllocations;
 
   const handlePrint = () => {
     window.print();

@@ -115,6 +115,17 @@ assert(saiParipuran, 'SAI PARIPURAN Roll #31 must exist in imported data');
 const saiPayments = realData.payments.filter((payment) => payment.studentId === saiParipuran.id && !payment.isCancelled);
 assert.equal(saiPayments.reduce((sum, payment) => sum + payment.amount, 0), 5000);
 assert.equal(saiPayments[0].allocations.length, 0);
+const historicalUnmappedAmount = realData.payments.reduce((sum, payment) => {
+  const allocationTotal = (payment.allocations || []).reduce((allocSum, allocation) => allocSum + Number(allocation.allocatedAmount || 0), 0);
+  return sum + Math.max(0, Number(payment.amount || 0) - allocationTotal);
+}, 0);
+assert.equal(historicalUnmappedAmount, 29000);
+const receipt1128 = realData.payments.find((payment) => String(payment.receiptNo) === '1128');
+assert(receipt1128, 'Receipt 1128 must exist in imported data');
+assert.equal(
+  Number(receipt1128.amount || 0) - receipt1128.allocations.reduce((sum, allocation) => sum + Number(allocation.allocatedAmount || 0), 0),
+  4500,
+);
 const realAnalytics = computeSystemAnalytics(
   realData.students,
   realData.feeStructures,
@@ -124,6 +135,6 @@ const realAnalytics = computeSystemAnalytics(
   '2026-09-30',
 );
 const unmappedHead = realAnalytics.headWiseBifurcation.find((head) => head.headName === 'Unmapped / Advance Payments');
-assert(unmappedHead && unmappedHead.totalCollected >= 5000, 'Unmapped paid money must be visible separately');
+assert(unmappedHead && unmappedHead.totalCollected >= 29000, 'Unmapped paid money must be visible separately');
 
 console.log('Core date, cloud normalization, month-wise order, and WhatsApp verification passed.');
