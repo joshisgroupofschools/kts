@@ -121,6 +121,9 @@ function handleAction(action, payload) {
     case 'cancelPayment':
       return cancelPaymentHandler(ss, payload);
 
+    case 'repairAllPaymentAllocations':
+      return repairAllPaymentAllocationsHandler(ss, payload);
+
     case 'updateTransactionSlip':
       return updateTransactionSlipHandler(ss, payload);
 
@@ -264,6 +267,87 @@ function upsertRows(sheet, idColumnIndex, rows) {
         idToRowIndex[rowId] = sheet.getLastRow();
       }
     }
+  }
+}
+
+function normalizeFeeHeadForOrder(headName) {
+  var value = String(headName || '').toLowerCase();
+  if (/(book|stationery)/.test(value)) return 'Books';
+  if (/(transport|bus|van)/.test(value)) return 'Transport';
+  if (/(old|previous|arrear|carryover)/.test(value)) return 'Old Fees';
+  if (/(school|tuition|academic)/.test(value)) return 'School Fees';
+  return String(headName || '').trim() || 'Fees';
+}
+
+function officialInstallmentOrder(item) {
+  var head = normalizeFeeHeadForOrder(item.headName);
+  var dueDate = String(item.dueDate || '');
+  var month = Number(dueDate.slice(5, 7));
+  var installmentNumber = Number(item.installmentNumber || 0);
+  if (head === 'Books') return 0;
+  if (head === 'Transport') {
+    var transportOrder = { 6: 10, 7: 30, 8: 50, 9: 70, 10: 90, 11: 110, 12: 130, 1: 150, 2: 160, 3: 170 };
+    return transportOrder[month] || 900;
+  }
+  if (head === 'School Fees') {
+    var schoolOrder = { 7: 20, 8: 40, 9: 60, 10: 80, 11: 100, 12: 120, 1: 140 };
+    return schoolOrder[month] || 890;
+  }
+  if (head === 'Old Fees') return 1000 + installmentNumber;
+  return 9999;
+}
+
+function compareOfficialInstallments(a, b) {
+  var orderDiff = officialInstallmentOrder(a) - officialInstallmentOrder(b);
+  if (orderDiff) return orderDiff;
+  var dateDiff = String(a.dueDate || '').localeCompare(String(b.dueDate || ''));
+  if (dateDiff) return dateDiff;
+  return Number(a.installmentNumber || 0) - Number(b.installmentNumber || 0);
+}
+
+function calculateOfficialFifoAllocationsForStudent(allInstallments, studentId, paymentAmount) {
+  var pending = [];
+  for (var i = 0; i < allInstallments.length; i++) {
+    var inst = allInstallments[i];
+    if (String(inst.studentId) === String(studentId) && Number(inst.balanceAmount || 0) > 0) {
+      pending.push(inst);
+    }
+  }
+  pending.sort(compareOfficialInstallments);
+
+  var remaining = Number(paymentAmount || 0);
+  var allocations = [];
+  for (var p = 0; p < pending.length && remaining > 0; p++) {
+    var current = pending[p];
+    var amount = Math.min(Number(current.balanceAmount || 0), remaining);
+    if (amount > 0) {
+      allocations.push({
+        installmentId: current.id,
+        headName: current.headName,
+        installmentNumber: Number(current.installmentNumber || 1),
+        totalInstallments: Number(current.totalInstallments || 1),
+        dueDate: current.dueDate,
+        allocatedAmount: amount
+      });
+      remaining -= amount;
+    }
+  }
+  return allocations;
+}
+
+function allocationsMatchOfficialFifo(clientAllocations, officialAllocations) {
+  if (clientAllocations.length !== officialAllocations.length) return false;
+  for (var i = 0; i < officialAllocations.length; i++) {
+    if (String(clientAllocations[i].installmentId) !== String(officialAllocations[i].installmentId)) return false;
+    if (Math.abs(Number(clientAllocations[i].allocatedAmount || 0) - Number(officialAllocations[i].allocatedAmount || 0)) > 0.01) return false;
+  }
+  return true;
+}
+
+function clearSheetDataRows(sheet) {
+  var lastRow = sheet.getLastRow();
+  if (lastRow > 1) {
+    sheet.getRange(2, 1, lastRow - 1, sheet.getLastColumn()).clearContent();
   }
 }
 
@@ -511,6 +595,16 @@ function recordPaymentHandler(ss, payload) {
     return createJsonResponse({ success: false, error: 'Payment must allocate amount to at least one installment.', serverTime: new Date().toISOString() });
   }
 
+  var officialAllocations = calculateOfficialFifoAllocationsForStudent(allInstallments, txn.studentId, txn.amount);
+  if (!allocationsMatchOfficialFifo(allocations, officialAllocations)) {
+    return createJsonResponse({
+      success: false,
+      error: 'Payment allocation order is stale/wrong. Refresh the page and collect again. Fees must be allocated in official 21-head order before Old Fees.',
+      data: { expectedAllocations: officialAllocations },
+      serverTime: new Date().toISOString()
+    });
+  }
+
   var seenInstIds = {};
   var sumAllocated = 0;
   var updatedInstallmentRows = [];
@@ -641,6 +735,133 @@ function recordPaymentHandler(ss, payload) {
     success: true,
     data: { transaction: txn, nextReceiptSequence: nextSeq + 1 },
     message: 'Payment recorded successfully with Receipt No. ' + receiptNo,
+    serverTime: new Date().toISOString()
+  });
+}
+
+function repairAllPaymentAllocationsHandler(ss, payload) {
+  var confirm = payload && payload.confirm === 'REBUILD_ALLOCATIONS_OFFICIAL_FIFO';
+  if (!confirm) {
+    return createJsonResponse({
+      success: false,
+      error: 'Repair confirmation missing. This action rebuilds PaymentAllocations and installment balances from saved receipts.',
+      serverTime: new Date().toISOString()
+    });
+  }
+
+  var instSheet = ss.getSheetByName(TAB_NAMES.INSTALLMENTS);
+  var allocSheet = ss.getSheetByName(TAB_NAMES.PAYMENT_ALLOCATIONS);
+  var txnsSheet = ss.getSheetByName(TAB_NAMES.TRANSACTIONS);
+
+  var installments = getSheetDataAsJson(instSheet);
+  var transactions = getSheetDataAsJson(txnsSheet);
+
+  for (var i = 0; i < installments.length; i++) {
+    var inst = installments[i];
+    var amount = Number(inst.amount || 0);
+    inst.paidAmount = 0;
+    inst.balanceAmount = amount;
+    inst.status = amount <= 0 ? 'paid' : 'unpaid';
+  }
+
+  transactions.sort(function(a, b) {
+    var dateDiff = String(a.date || '').localeCompare(String(b.date || ''));
+    if (dateDiff) return dateDiff;
+    var aReceipt = String(a.receiptNo || '').match(/(\d+)$/);
+    var bReceipt = String(b.receiptNo || '').match(/(\d+)$/);
+    return Number(aReceipt ? aReceipt[1] : 0) - Number(bReceipt ? bReceipt[1] : 0);
+  });
+
+  var installmentMap = {};
+  for (var m = 0; m < installments.length; m++) {
+    installmentMap[installments[m].id] = installments[m];
+  }
+
+  var newAllocationRows = [];
+  var totalReceiptAmount = 0;
+  var totalAllocatedAmount = 0;
+  var unmappedReceipts = [];
+
+  for (var t = 0; t < transactions.length; t++) {
+    var txn = transactions[t];
+    if (txn.isCancelled === true || String(txn.isCancelled).toLowerCase() === 'true') continue;
+    var txnAmount = Number(txn.amount || 0);
+    if (txnAmount <= 0) continue;
+    totalReceiptAmount += txnAmount;
+
+    var officialAllocations = calculateOfficialFifoAllocationsForStudent(installments, txn.studentId, txnAmount);
+    var allocatedForTxn = 0;
+
+    for (var a = 0; a < officialAllocations.length; a++) {
+      var alloc = officialAllocations[a];
+      var targetInst = installmentMap[alloc.installmentId];
+      if (!targetInst) continue;
+
+      var allocAmount = Number(alloc.allocatedAmount || 0);
+      if (allocAmount <= 0) continue;
+      targetInst.paidAmount = Number(targetInst.paidAmount || 0) + allocAmount;
+      targetInst.balanceAmount = Math.max(0, Number(targetInst.amount || 0) - Number(targetInst.paidAmount || 0));
+      targetInst.status = targetInst.balanceAmount <= 0.01 ? 'paid' : (targetInst.paidAmount > 0 ? 'partial' : 'unpaid');
+
+      allocatedForTxn += allocAmount;
+      totalAllocatedAmount += allocAmount;
+      newAllocationRows.push({
+        id: 'alc_' + txn.id + '_' + alloc.installmentId,
+        transactionId: txn.id,
+        installmentId: alloc.installmentId,
+        studentId: txn.studentId,
+        headName: targetInst.headName || alloc.headName || '',
+        allocatedAmount: allocAmount,
+        createdAt: txn.date || new Date().toISOString()
+      });
+    }
+
+    var unmapped = Math.max(0, txnAmount - allocatedForTxn);
+    if (unmapped > 0.01) {
+      unmappedReceipts.push({
+        receiptNo: txn.receiptNo,
+        studentId: txn.studentId,
+        amount: txnAmount,
+        unmappedAmount: unmapped
+      });
+    }
+  }
+
+  upsertRows(instSheet, 1, installments);
+
+  clearSheetDataRows(allocSheet);
+  if (newAllocationRows.length > 0) {
+    var headers = allocSheet.getRange(1, 1, 1, allocSheet.getLastColumn()).getValues()[0];
+    var values = [];
+    for (var r = 0; r < newAllocationRows.length; r++) {
+      var row = [];
+      for (var h = 0; h < headers.length; h++) {
+        row.push(escapeFormula(newAllocationRows[r][headers[h]]));
+      }
+      values.push(row);
+    }
+    allocSheet.getRange(2, 1, values.length, headers.length).setValues(values);
+  }
+
+  logAudit(ss, {
+    eventId: 'evt_repair_fifo_' + Date.now(),
+    action: 'REPAIR_ALLOCATIONS_OFFICIAL_FIFO',
+    entityType: 'PAYMENT_ALLOCATIONS',
+    entityId: 'ALL',
+    afterSummary: 'Rebuilt ' + newAllocationRows.length + ' allocation rows from ' + transactions.length + ' receipts. Unmapped receipts: ' + unmappedReceipts.length,
+    success: true
+  });
+
+  return createJsonResponse({
+    success: true,
+    data: {
+      allocationRows: newAllocationRows.length,
+      installmentRows: installments.length,
+      receiptAmount: totalReceiptAmount,
+      allocatedAmount: totalAllocatedAmount,
+      unmappedReceipts: unmappedReceipts
+    },
+    message: 'All payment allocations rebuilt using official 21-head FIFO order.',
     serverTime: new Date().toISOString()
   });
 }
