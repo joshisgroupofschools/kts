@@ -44,6 +44,12 @@ export const StudentLedgerModal: React.FC<StudentLedgerModalProps> = ({
 }) => {
   const [cancellingTxnId, setCancellingTxnId] = useState<string | null>(null);
   const [cancelReason, setCancelReason] = useState('');
+  const visibleInstallments = summary.installments.filter(
+    (inst) =>
+      Number(inst.amount || 0) > 0 ||
+      Number(inst.paidAmount || 0) > 0 ||
+      Number(inst.balanceAmount || 0) > 0
+  );
 
   const handleConfirmCancel = async (txnId: string) => {
     if (!cancelReason.trim()) {
@@ -129,7 +135,7 @@ export const StudentLedgerModal: React.FC<StudentLedgerModalProps> = ({
             <div className="bg-slate-100 dark:bg-slate-800 px-4 py-2.5 flex items-center justify-between">
               <span className="font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
                 <Layers className="w-4 h-4 text-emerald-600" />
-                Assigned Installments Schedule ({summary.installments.length} Total)
+                Assigned Installments Schedule ({visibleInstallments.length} Total)
               </span>
               {summary.nextDueDate && (
                 <span className="text-xs text-indigo-600 dark:text-indigo-400 font-semibold flex items-center gap-1">
@@ -152,7 +158,7 @@ export const StudentLedgerModal: React.FC<StudentLedgerModalProps> = ({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                  {[...summary.installments].sort(compareOfficialInstallmentOrder).map((inst) => {
+                  {[...visibleInstallments].sort(compareOfficialInstallmentOrder).map((inst) => {
                     const isOverdue =
                       inst.balanceAmount > 0 &&
                       !!asOfDate && inst.dueDate < asOfDate;
