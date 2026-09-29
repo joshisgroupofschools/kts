@@ -689,7 +689,9 @@ export const TodaysReceiptsModal: React.FC<TodaysReceiptsModalProps> = ({
                               ))}
                             </div>
                           ) : (
-                            <span className="italic text-slate-400">General fee receipt</span>
+                            <span className="font-bold text-amber-700 dark:text-amber-300">
+                              Unmapped historical payment – fee not assigned
+                            </span>
                           )}
                         </td>
 

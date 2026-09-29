@@ -11,7 +11,7 @@ import {
 } from '../types';
 import { calculateFifoAllocations } from '../utils/feeCalculator';
 import { formatCurrency, formatDate, getNextMultipleOfFiveDate } from '../utils/numberToWords';
-import { compareOfficialInstallmentOrder, getInstallmentDisplayName } from '../utils/installmentFormatter';
+import { compareOfficialInstallmentOrder, getInstallmentDisplayName, normalizeFeeHead } from '../utils/installmentFormatter';
 import {
   AlertCircle,
   ArrowLeft,
@@ -485,10 +485,22 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                     {(() => {
+                      const allocatedByInstallmentId = new Map<string, number>(
+                        allocations.map((allocation) => [
+                          allocation.installmentId,
+                          Number(allocation.allocatedAmount || 0),
+                        ])
+                      );
+                      const hasOldFeesAllocation = summary.installments.some(
+                        (inst) =>
+                          normalizeFeeHead(inst.headName) === 'Old Fees' &&
+                          (allocatedByInstallmentId.get(inst.id) || 0) > 0
+                      );
                       const sortedInstallments = [...summary.installments].sort(compareOfficialInstallmentOrder);
                       return sortedInstallments.map((inst) => {
                       const alloc = allocations.find((a) => a.installmentId === inst.id);
                       const allocatedAmt = alloc ? alloc.allocatedAmount : 0;
+                      const isOldFees = normalizeFeeHead(inst.headName) === 'Old Fees';
                       const displayName = getInstallmentDisplayName(
                         inst.headName,
                         inst.installmentNumber,
@@ -498,6 +510,9 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
 
                       if (inst.balanceAmount <= 0 && allocatedAmt <= 0) {
                         return null; // Skip fully cleared in this view to keep it clean
+                      }
+                      if (isOldFees && allocatedAmt <= 0 && !hasOldFeesAllocation) {
+                        return null; // Do not show legacy 7-part old-fee rows before Old Fees are actually reached.
                       }
 
                       return (

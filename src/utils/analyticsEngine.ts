@@ -50,6 +50,7 @@ export function computeSystemAnalytics(
     const normalized = String(value ?? '').trim();
     return normalized || 'Miscellaneous Fee';
   };
+  const UNMAPPED_PAYMENT_HEAD = 'Unmapped / Advance Payments';
   const isExcludedFromCoreDue = (headName: string, isSpotFee?: boolean): boolean => {
     const normalized = headName.toLowerCase();
     return !!isSpotFee || normalized.includes('book') || normalized.includes('dress') || normalized.includes('uniform') || normalized.includes('stationery') || normalized.includes('kit');
@@ -300,8 +301,12 @@ export function computeSystemAnalytics(
       remaining -= allocated;
     });
     if (remaining > 0) {
-      const schoolKey = Array.from(headStatsMap.keys()).find((key) => normalizeFeeHead(key) === 'School Fees');
-      if (schoolKey) headStatsMap.get(schoolKey)!.totalCollected += remaining;
+      if (!headStatsMap.has(UNMAPPED_PAYMENT_HEAD)) {
+        headStatsMap.set(UNMAPPED_PAYMENT_HEAD, createEmptyHeadStat(UNMAPPED_PAYMENT_HEAD, false));
+      }
+      const unmappedStat = headStatsMap.get(UNMAPPED_PAYMENT_HEAD)!;
+      unmappedStat.totalCollected += remaining;
+      unmappedStat.studentIds.add(studentId);
     }
   });
 

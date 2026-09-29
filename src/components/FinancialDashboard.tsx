@@ -156,8 +156,9 @@ export const FinancialDashboard: React.FC<FinancialDashboardProps> = ({
     const books = headWiseBifurcation.find((h) => h.headName.toLowerCase().includes('book'));
     const dress = headWiseBifurcation.find((h) => h.headName.toLowerCase().includes('dress') || h.headName.toLowerCase().includes('uniform'));
     const oldDue = headWiseBifurcation.find((h) => h.headName.toLowerCase().includes('old') || h.headName.toLowerCase().includes('due'));
+    const unmapped = headWiseBifurcation.find((h) => h.headName.toLowerCase().includes('unmapped') || h.headName.toLowerCase().includes('advance'));
 
-    return { school, transport, books, dress, oldDue };
+    return { school, transport, books, dress, oldDue, unmapped };
   }, [headWiseBifurcation]);
 
   // Percentage calculations
@@ -462,6 +463,12 @@ export const FinancialDashboard: React.FC<FinancialDashboardProps> = ({
                     <span className="text-slate-500 dark:text-slate-400">Books : </span>
                     <strong className="font-bold">{isCardRevealed('set2') ? (feeHeadMap.books ? formatCurrency(feeHeadMap.books.totalCollected, currencySymbol) : `${currencySymbol}0`) : '••'}</strong>
                   </div>
+                  {isCardRevealed('set2') && feeHeadMap.unmapped && feeHeadMap.unmapped.totalCollected > 0 && (
+                    <div className="col-span-2 text-amber-700 dark:text-amber-300">
+                      <span className="text-slate-500 dark:text-slate-400">Unmapped/Advance: </span>
+                      <strong className="font-bold">{formatCurrency(feeHeadMap.unmapped.totalCollected, currencySymbol)}</strong>
+                    </div>
+                  )}
                 </div>
 
                 {/* Cash vs UPI Sub-bar */}

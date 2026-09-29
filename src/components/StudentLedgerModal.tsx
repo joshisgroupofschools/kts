@@ -273,6 +273,11 @@ export const StudentLedgerModal: React.FC<StudentLedgerModalProps> = ({
                             {txn.referenceNo && <span>• Ref: {txn.referenceNo}</span>}
                             {txn.remarks && <span>• Note: {txn.remarks}</span>}
                           </div>
+                          {(!txn.allocations || txn.allocations.length === 0) && (
+                            <div className="mt-1 text-[10px] font-bold text-amber-700 dark:text-amber-300">
+                              Unmapped historical payment – fee not assigned
+                            </div>
+                          )}
                         </div>
                       </div>
 

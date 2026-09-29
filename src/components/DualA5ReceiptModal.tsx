@@ -41,13 +41,26 @@ export const DualA5ReceiptModal: React.FC<DualA5ReceiptModalProps> = ({
       : 0;
 
   const schoolName = schoolProfile.schoolName || 'KAKATIYA SCHOOL BODUPPAL';
+  const printableAllocations =
+    transaction.allocations.length > 0
+      ? transaction.allocations
+      : [
+          {
+            installmentId: '__unmapped_historical_payment__',
+            headName: 'Unmapped Historical Payment',
+            installmentNumber: 1,
+            totalInstallments: 1,
+            dueDate: transaction.date,
+            allocatedAmount: transaction.amount,
+          },
+        ];
 
   const handlePrint = () => {
     window.print();
   };
 
   const SingleReceiptCard = ({ copyType }: { copyType: 'PARENT COPY' | 'OFFICE COPY' }) => (
-    <div className="receipt-single-box border-2 border-black bg-white p-4 rounded flex flex-col justify-between text-black text-[11px] leading-snug select-none shadow-none font-sans">
+    <div className="receipt-single-box border-2 border-black bg-white p-5 rounded flex flex-col text-black text-[11.5px] leading-snug select-none shadow-none font-sans">
       <div>
         {/* School Header */}
         <div className="border-b-2 border-black pb-2.5 mb-2.5 flex items-start justify-between">
@@ -127,13 +140,16 @@ export const DualA5ReceiptModal: React.FC<DualA5ReceiptModalProps> = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-black font-mono text-[10.5px]">
-              {[...transaction.allocations].sort(compareOfficialInstallmentOrder).map((alloc, idx) => {
-                const displayName = getInstallmentDisplayName(
-                  alloc.headName,
-                  alloc.installmentNumber,
-                  alloc.totalInstallments,
-                  alloc.dueDate
-                );
+              {[...printableAllocations].sort(compareOfficialInstallmentOrder).map((alloc, idx) => {
+                const displayName =
+                  alloc.installmentId === '__unmapped_historical_payment__'
+                    ? 'UNMAPPED HISTORICAL PAYMENT – FEE NOT ASSIGNED'
+                    : getInstallmentDisplayName(
+                        alloc.headName,
+                        alloc.installmentNumber,
+                        alloc.totalInstallments,
+                        alloc.dueDate
+                      );
 
                 return (
                   <tr key={idx} className="hover:bg-gray-50">
@@ -207,24 +223,14 @@ export const DualA5ReceiptModal: React.FC<DualA5ReceiptModalProps> = ({
         </div>
       </div>
 
-      {/* Footer & Signatures */}
-      <div className="pt-3 border-t border-black mt-4">
-        <div className="grid grid-cols-2 gap-3 mb-5 text-[10px]">
-          <div className="border border-black p-2 min-h-[54px]">
-            <span className="block font-black uppercase text-gray-700">Received By</span>
-            <span className="block mt-4 border-t border-black pt-1 text-center font-bold">Cashier</span>
-          </div>
-          <div className="border border-black p-2 min-h-[54px]">
-            <span className="block font-black uppercase text-gray-700">Parent Signature</span>
-            <span className="block mt-4 border-t border-black pt-1 text-center font-bold">Acknowledged</span>
-          </div>
-        </div>
+      {/* Footer & Authorised Signatory */}
+      <div className="pt-4 border-t border-black mt-5">
         <p className="text-[8.5px] text-gray-600 leading-tight mb-3">
           {schoolProfile.receiptDisclaimer ||
             'Note: Fees once paid are non-refundable & non-transferable. Official computer-generated receipt.'}
         </p>
 
-        <div className="flex items-end justify-between text-[10px] pt-3 px-1">
+        <div className="flex items-end justify-between text-[10px] pt-6 px-1">
           <div className="text-[8.5px] text-gray-500 font-mono">
             {transaction.remarks ? `Note: ${transaction.remarks}` : ''}
           </div>
@@ -329,19 +335,19 @@ export const DualA5ReceiptModal: React.FC<DualA5ReceiptModalProps> = ({
               border: 2px solid #000000 !important;
               background: #ffffff !important;
               color: #000000 !important;
-              padding: 4mm !important;
+              padding: 5mm !important;
               border-radius: 4px !important;
               box-shadow: none !important;
               page-break-inside: avoid !important;
               overflow: hidden !important;
-              font-size: 11px !important;
-              line-height: 1.28 !important;
+              font-size: 11.5px !important;
+              line-height: 1.35 !important;
               align-self: start !important;
               min-height: 0 !important;
-              height: 190mm !important;
+              height: 160mm !important;
               display: flex !important;
               flex-direction: column !important;
-              justify-content: space-between !important;
+              justify-content: flex-start !important;
             }
             .receipt-single-box h2 {
               font-size: 15px !important;

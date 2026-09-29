@@ -3,7 +3,8 @@ import { getKolkataToday } from '../src/utils/dateUtils';
 import { compareOfficialInstallmentOrder, formatWhatsAppReminderMessage, normalizePhoneNumber, getInstallmentDisplayName } from '../src/utils/installmentFormatter';
 import { calculateFifoAllocations, generateInstallments } from '../src/utils/feeCalculator';
 import { normalizeInstallments, normalizeTransactions } from '../src/utils/normalizeCloudData';
-import { MONTH_WISE_OUTSTANDING_ORDER } from '../src/utils/analyticsEngine';
+import { computeSystemAnalytics, MONTH_WISE_OUTSTANDING_ORDER } from '../src/utils/analyticsEngine';
+import { generateStructuredRealData } from '../src/data/trialSpreadsheetData';
 
 assert.equal(getKolkataToday(new Date('2026-09-25T20:00:00Z')), '2026-09-26');
 assert.equal(normalizePhoneNumber('98765 43210'), '919876543210');
@@ -107,5 +108,22 @@ assert.deepEqual(
 );
 assert.equal(MONTH_WISE_OUTSTANDING_ORDER[0].rowLabel, 'JUNE');
 assert.equal(MONTH_WISE_OUTSTANDING_ORDER[9].rowLabel, 'MARCH');
+
+const realData = generateStructuredRealData();
+const saiParipuran = realData.students.find((student) => student.name === 'SAI PARIPURAN' && student.rollNo === '31');
+assert(saiParipuran, 'SAI PARIPURAN Roll #31 must exist in imported data');
+const saiPayments = realData.payments.filter((payment) => payment.studentId === saiParipuran.id && !payment.isCancelled);
+assert.equal(saiPayments.reduce((sum, payment) => sum + payment.amount, 0), 5000);
+assert.equal(saiPayments[0].allocations.length, 0);
+const realAnalytics = computeSystemAnalytics(
+  realData.students,
+  realData.feeStructures,
+  realData.installments,
+  realData.payments,
+  { mode: 'fixed_amount', value: 0 },
+  '2026-09-30',
+);
+const unmappedHead = realAnalytics.headWiseBifurcation.find((head) => head.headName === 'Unmapped / Advance Payments');
+assert(unmappedHead && unmappedHead.totalCollected >= 5000, 'Unmapped paid money must be visible separately');
 
 console.log('Core date, cloud normalization, month-wise order, and WhatsApp verification passed.');
