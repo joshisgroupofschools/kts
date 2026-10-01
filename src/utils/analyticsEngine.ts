@@ -1,7 +1,7 @@
 import { AnalyticsSummary, FeeHeadDefinition, Installment, PaymentTransaction, Student, StudentFeeStructure, ToleranceConfig } from '../types';
 import { computeStudentFinancials } from './feeCalculator';
 import { computeStudentStatus, hasOverdueBeyondToleranceMonth } from './statusResolver';
-import { getKolkataToday } from './dateUtils';
+import { countWorkingDaysExcludingSundays, getCollectionDeadlineTenth, getKolkataToday } from './dateUtils';
 import { compareOfficialInstallmentOrder, normalizeFeeHead } from './installmentFormatter';
 
 export const MONTH_WISE_OUTSTANDING_ORDER: Array<{
@@ -20,27 +20,6 @@ export const MONTH_WISE_OUTSTANDING_ORDER: Array<{
   { key: 'FEBRUARY', rowLabel: 'FEBRUARY', monthNumber: 2 },
   { key: 'MARCH', rowLabel: 'MARCH', monthNumber: 3 },
 ];
-
-const getCollectionDeadlineTenth = (dateString: string): string => {
-  const [yearText, monthText, dayText] = dateString.split('-');
-  const year = Number(yearText);
-  const monthIndex = Number(monthText) - 1;
-  const day = Number(dayText);
-  const deadline = day <= 10
-    ? new Date(Date.UTC(year, monthIndex, 10))
-    : new Date(Date.UTC(year, monthIndex + 1, 10));
-  return deadline.toISOString().slice(0, 10);
-};
-
-const countWorkingDaysExcludingSundays = (startDate: Date, endDate: Date): number => {
-  let count = 0;
-  const cursor = new Date(startDate.getTime());
-  while (cursor <= endDate) {
-    if (cursor.getUTCDay() !== 0) count++;
-    cursor.setUTCDate(cursor.getUTCDate() + 1);
-  }
-  return Math.max(1, count);
-};
 
 export function computeSystemAnalytics(
   students: Student[],

@@ -37,6 +37,7 @@ import {
 } from '../types';
 import { formatCurrency, formatDate, getNextMultipleOfFiveDate } from '../utils/numberToWords';
 import { compareOfficialInstallmentOrder, getInstallmentDisplayName } from '../utils/installmentFormatter';
+import { countWorkingDaysExcludingSundays, getCollectionDeadlineTenth } from '../utils/dateUtils';
 
 interface TodaysReceiptsModalProps {
   currentDate: string;
@@ -130,11 +131,10 @@ export const TodaysReceiptsModal: React.FC<TodaysReceiptsModalProps> = ({
       }
     });
 
-    // Automatic target calculation: Total Overdue Deficit ÷ Days Remaining until next due date / cycle
+    // Automatic target calculation: due till date ÷ working days through the 10th collection deadline
     const todayStr = selectedDate || '2026-09-26';
     let totalOverdueDeficit = 0;
-    const [yearText, monthText] = todayStr.split('-');
-    const nextMonthTenth = new Date(Date.UTC(Number(yearText), Number(monthText), 10)).toISOString().slice(0, 10);
+    const collectionDeadline = getCollectionDeadlineTenth(todayStr);
 
     Object.values(studentSummaries).forEach((s: any) => {
       if (s.student?.isActive === false) return;
@@ -147,8 +147,10 @@ export const TodaysReceiptsModal: React.FC<TodaysReceiptsModalProps> = ({
       });
     });
 
-    const diffTime = new Date(`${nextMonthTenth}T00:00:00Z`).getTime() - new Date(`${todayStr}T00:00:00Z`).getTime();
-    const daysRemaining = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
+    const daysRemaining = countWorkingDaysExcludingSundays(
+      new Date(`${todayStr}T00:00:00Z`),
+      new Date(`${collectionDeadline}T00:00:00Z`)
+    );
 
     const target = Math.ceil(totalOverdueDeficit / daysRemaining) || 0;
     const collectionPercent = target > 0 ? Math.min(999, (totalCollected / target) * 100) : 0;
@@ -167,7 +169,7 @@ export const TodaysReceiptsModal: React.FC<TodaysReceiptsModalProps> = ({
       canCloseDay,
       totalOverdueDeficit,
       daysRemaining,
-      nextMonthTenth,
+      collectionDeadline,
     };
   }, [dayTransactions, studentSummaries, selectedDate]);
 
@@ -360,7 +362,7 @@ export const TodaysReceiptsModal: React.FC<TodaysReceiptsModalProps> = ({
                 {formatCurrency(stats.target, currencySymbol)}
               </div>
               <span className="text-[9.5px] text-slate-400 dark:text-slate-500 block mt-0.5">
-                Due till date ÷ {stats.daysRemaining} days, till {formatDate(stats.nextMonthTenth)}
+                Due till date ÷ {stats.daysRemaining} days, till {formatDate(stats.collectionDeadline)}
               </span>
             </div>
 

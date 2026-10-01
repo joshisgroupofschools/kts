@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { getKolkataToday } from '../src/utils/dateUtils';
+import { countWorkingDaysExcludingSundays, getCollectionDeadlineTenth, getKolkataToday } from '../src/utils/dateUtils';
 import { compareOfficialInstallmentOrder, formatWhatsAppReminderMessage, normalizePhoneNumber, getInstallmentDisplayName } from '../src/utils/installmentFormatter';
 import { calculateFifoAllocations, generateInstallments } from '../src/utils/feeCalculator';
 import { normalizeInstallments, normalizeTransactions } from '../src/utils/normalizeCloudData';
@@ -7,6 +7,13 @@ import { computeSystemAnalytics, MONTH_WISE_OUTSTANDING_ORDER } from '../src/uti
 import { generateStructuredRealData } from '../src/data/trialSpreadsheetData';
 
 assert.equal(getKolkataToday(new Date('2026-09-25T20:00:00Z')), '2026-09-26');
+assert.equal(getCollectionDeadlineTenth('2026-10-01'), '2026-10-10');
+assert.equal(getCollectionDeadlineTenth('2026-10-10'), '2026-10-10');
+assert.equal(getCollectionDeadlineTenth('2026-10-11'), '2026-11-10');
+assert.equal(
+  countWorkingDaysExcludingSundays(new Date('2026-10-01T00:00:00Z'), new Date('2026-10-10T00:00:00Z')),
+  9,
+);
 assert.equal(normalizePhoneNumber('98765 43210'), '919876543210');
 assert.equal(normalizePhoneNumber('12345'), '');
 

@@ -32,3 +32,22 @@ export function dateOnlyToUtcDate(value: string): Date | null {
   const parsed = parseDateOnly(value);
   return parsed ? new Date(Date.UTC(parsed.year, parsed.month - 1, parsed.day)) : null;
 }
+
+export function getCollectionDeadlineTenth(dateString: string): string {
+  const parsed = parseDateOnly(dateString);
+  if (!parsed) return getKolkataToday();
+  const deadline = parsed.day <= 10
+    ? new Date(Date.UTC(parsed.year, parsed.month - 1, 10))
+    : new Date(Date.UTC(parsed.year, parsed.month, 10));
+  return deadline.toISOString().slice(0, 10);
+}
+
+export function countWorkingDaysExcludingSundays(startDate: Date, endDate: Date): number {
+  let count = 0;
+  const cursor = new Date(startDate.getTime());
+  while (cursor <= endDate) {
+    if (cursor.getUTCDay() !== 0) count++;
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+  return Math.max(1, count);
+}
