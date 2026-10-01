@@ -572,8 +572,265 @@ export const TodaysReceiptsModal: React.FC<TodaysReceiptsModalProps> = ({
               </p>
             </div>
           ) : (
-            <div className="border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-xs bg-white dark:bg-slate-900">
-              <table className="w-full text-left text-xs">
+            <>
+            <div className="space-y-3 md:hidden">
+              {filteredList.map((tx) => {
+                const student = students.find((s) => s.id === tx.studentId);
+                const summary = studentSummaries[tx.studentId];
+                const remainingDue = (summary?.installments || []).reduce((sum, installment) =>
+                  sum + (installment.dueDate <= selectedDate ? Math.max(0, installment.balanceAmount) : 0), 0);
+                const needsPermissionDate = remainingDue > 1000;
+                const canIssueIdCard = remainingDue <= 1000;
+                const defaultPermDate =
+                  tx.permissionDate ||
+                  student?.permissionExpiresAt ||
+                  getNextMultipleOfFiveDate(new Date(selectedDate));
+                const isSlipGiven = tx.slipGiven === true;
+                const isUpdated = tx.permissionUpdated || (canIssueIdCard && isSlipGiven) || remainingDue === 0;
+                const allocationTotal = (tx.allocations || []).reduce(
+                  (sum, allocation) => sum + Number(allocation.allocatedAmount || 0),
+                  0
+                );
+                const unmappedAmount = Math.max(0, Number(tx.amount || 0) - allocationTotal);
+
+                return (
+                  <div
+                    key={`mobile-${tx.id}`}
+                    className={`rounded-2xl border p-3 shadow-xs ${
+                      !isUpdated
+                        ? 'border-amber-200 bg-amber-50/70 dark:border-amber-900/60 dark:bg-amber-950/20'
+                        : 'border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="font-mono text-xs font-black text-slate-900 dark:text-white">
+                          #{tx.receiptNo}
+                        </div>
+                        <div className="mt-0.5 flex items-center gap-1 text-[10px] text-slate-400">
+                          <Clock className="h-3 w-3" />
+                          <span>{tx.date.includes(' ') ? tx.date.split(' ')[1] : 'Recorded'}</span>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="font-mono text-base font-black text-emerald-600 dark:text-emerald-400">
+                          {formatCurrency(tx.amount, currencySymbol)}
+                        </div>
+                        <span
+                          className={`mt-1 inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold ${
+                            tx.paymentMode === 'UPI'
+                              ? 'border-purple-300 bg-purple-100 text-purple-800 dark:border-purple-800 dark:bg-purple-950 dark:text-purple-300'
+                              : tx.paymentMode === 'Cash'
+                              ? 'border-amber-300 bg-amber-100 text-amber-800 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300'
+                              : 'border-blue-300 bg-blue-100 text-blue-800 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300'
+                          }`}
+                        >
+                          {tx.paymentMode === 'UPI' ? <QrCode className="h-3 w-3" /> : <Banknote className="h-3 w-3" />}
+                          {tx.paymentMode}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="mt-3 rounded-xl bg-slate-50 p-3 dark:bg-slate-800/60">
+                      <div className="font-bold text-slate-900 dark:text-white">{tx.studentName}</div>
+                      <div className="mt-0.5 text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+                        Roll #{tx.studentRollNo} • {tx.studentClass}
+                      </div>
+                      {student?.phone && (
+                        <div className="text-[10px] text-slate-400">Ph: {student.phone}</div>
+                      )}
+                    </div>
+
+                    <div className="mt-3 space-y-1.5">
+                      <div className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                        Fees Paid For
+                      </div>
+                      <div className="space-y-1 text-[11px] leading-snug text-slate-600 dark:text-slate-300">
+                        {(tx.allocations || []).length > 0 &&
+                          [...tx.allocations].sort(compareOfficialInstallmentOrder).map((a, idx) => (
+                            <div key={idx}>
+                              {getInstallmentDisplayName(a.headName, a.installmentNumber, a.totalInstallments, a.dueDate)}:{' '}
+                              <strong className="text-slate-900 dark:text-white">
+                                {formatCurrency(a.allocatedAmount, currencySymbol)}
+                              </strong>
+                            </div>
+                          ))}
+                        {unmappedAmount > 0.01 && (
+                          <div className="font-bold text-amber-700 dark:text-amber-300">
+                            Unmapped historical payment – fee not assigned: {formatCurrency(unmappedAmount, currencySymbol)}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="mt-3 grid grid-cols-2 gap-2">
+                      <div className="rounded-xl border border-slate-200 p-2 dark:border-slate-800">
+                        <div className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                          Balance Till Date
+                        </div>
+                        {remainingDue > 0 ? (
+                          <>
+                            <div className="font-mono text-sm font-black text-rose-600 dark:text-rose-400">
+                              {formatCurrency(remainingDue, currencySymbol)}
+                            </div>
+                            <div className="text-[9.5px] font-bold uppercase text-rose-500">Partial Due</div>
+                          </>
+                        ) : (
+                          <>
+                            <div className="font-mono text-sm font-black text-emerald-600 dark:text-emerald-400">
+                              {currencySymbol}0
+                            </div>
+                            <div className="text-[9.5px] font-bold uppercase text-emerald-600">Cleared</div>
+                          </>
+                        )}
+                      </div>
+
+                      <div className="rounded-xl border border-slate-200 p-2 dark:border-slate-800">
+                        <div className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                          Permission / Card
+                        </div>
+                        {needsPermissionDate ? (
+                          <input
+                            type="date"
+                            value={tx.permissionDate || student?.permissionExpiresAt || defaultPermDate}
+                            onChange={(e) => onUpdateTransactionSlip(tx.id, tx.slipGiven || false, e.target.value)}
+                            className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs font-mono text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                          />
+                        ) : (
+                          <div className="mt-1 text-[11px] font-black text-emerald-700 dark:text-emerald-400">
+                            Issue ID Card
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {needsPermissionDate ? (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              onUpdateTransactionSlip(
+                                tx.id,
+                                true,
+                                tx.permissionDate || student?.permissionExpiresAt || defaultPermDate
+                              )
+                            }
+                            className={`flex-1 rounded-xl border px-3 py-2 text-[11px] font-black ${
+                              isSlipGiven
+                                ? 'border-emerald-700 bg-emerald-600 text-white'
+                                : 'border-slate-300 bg-white text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300'
+                            }`}
+                          >
+                            Slip Given
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              onUpdateTransactionSlip(
+                                tx.id,
+                                false,
+                                tx.permissionDate || student?.permissionExpiresAt || defaultPermDate
+                              )
+                            }
+                            className={`flex-1 rounded-xl border px-3 py-2 text-[11px] font-black ${
+                              !isSlipGiven && tx.permissionUpdated
+                                ? 'border-rose-700 bg-rose-600 text-white'
+                                : 'border-slate-300 bg-white text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300'
+                            }`}
+                          >
+                            Pending
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => onUpdateTransactionSlip(tx.id, true, undefined)}
+                            className={`flex-1 rounded-xl border px-3 py-2 text-[11px] font-black ${
+                              isSlipGiven
+                                ? 'border-emerald-700 bg-emerald-600 text-white'
+                                : 'border-slate-300 bg-white text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300'
+                            }`}
+                          >
+                            ID Card Given
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => onUpdateTransactionSlip(tx.id, false, undefined)}
+                            className={`flex-1 rounded-xl border px-3 py-2 text-[11px] font-black ${
+                              !isSlipGiven && tx.permissionUpdated
+                                ? 'border-rose-700 bg-rose-600 text-white'
+                                : 'border-slate-300 bg-white text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300'
+                            }`}
+                          >
+                            Not Given
+                          </button>
+                        </>
+                      )}
+                    </div>
+
+                    {!isUpdated && (
+                      <div className="mt-2 rounded-lg bg-amber-100 px-2 py-1 text-[10px] font-bold text-amber-700 dark:bg-amber-950/50 dark:text-amber-300">
+                        Update required for day close
+                      </div>
+                    )}
+
+                    <div className="mt-3 flex items-center gap-2 border-t border-slate-100 pt-3 dark:border-slate-800">
+                      <button
+                        type="button"
+                        onClick={() => onOpenReceiptModal(tx)}
+                        className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-[11px] font-black text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300"
+                      >
+                        <Printer className="h-3.5 w-3.5" />
+                        Receipt
+                      </button>
+                      {student?.phone && (
+                        <a
+                          href={`https://wa.me/91${student.phone.replace(/\D/g, '')}?text=${encodeURIComponent(
+                            `Dear Parent, receipt #${tx.receiptNo} of ₹${tx.amount.toLocaleString('en-IN')} has been acknowledged for ${tx.studentName} (${tx.studentClass}). Payment Mode: ${tx.paymentMode}. Remaining Balance Till ${formatDate(selectedDate)}: ₹${remainingDue.toLocaleString('en-IN')}. Thank you.`
+                          )}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-green-200 bg-green-50 px-3 py-2 text-[11px] font-black text-green-700 dark:border-green-800 dark:bg-green-950/50 dark:text-green-300"
+                        >
+                          <MessageCircle className="h-3.5 w-3.5" />
+                          WhatsApp
+                        </a>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => handleCancelReceipt(tx)}
+                        disabled={cancellingReceiptId === tx.id}
+                        className="flex items-center justify-center rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-rose-700 disabled:opacity-50 dark:border-rose-800 dark:bg-rose-950/50 dark:text-rose-300"
+                        title="Cancel / Void Receipt"
+                      >
+                        {cancellingReceiptId === tx.id ? (
+                          <RotateCcw className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <ShieldAlert className="h-3.5 w-3.5" />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+
+              <div className="rounded-2xl border border-slate-200 bg-white p-3 text-xs font-bold dark:border-slate-800 dark:bg-slate-900">
+                <div className="flex items-center justify-between">
+                  <span>Total Daily Reconciled ({filteredList.length})</span>
+                  <span className="font-mono text-sm font-black text-emerald-600 dark:text-emerald-400">
+                    {formatCurrency(filteredList.reduce((sum, tx) => sum + tx.amount, 0), currencySymbol)}
+                  </span>
+                </div>
+                <div className="mt-1 text-[11px] text-slate-500">
+                  Cash: {formatCurrency(stats.cashTotal, currencySymbol)} • UPI: {formatCurrency(stats.upiTotal, currencySymbol)}
+                </div>
+              </div>
+            </div>
+
+            <div className="hidden md:block border border-slate-200 dark:border-slate-800 rounded-2xl overflow-x-auto shadow-xs bg-white dark:bg-slate-900">
+              <table className="w-full min-w-[1180px] text-left text-xs">
                 <thead className="bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-bold border-b border-slate-200 dark:border-slate-700 sticky top-0 z-10">
                   <tr>
                     <th className="py-3 px-3">Receipt / Time</th>
@@ -909,6 +1166,7 @@ export const TodaysReceiptsModal: React.FC<TodaysReceiptsModalProps> = ({
                 </tfoot>
               </table>
             </div>
+            </>
           )}
         </div>
 
