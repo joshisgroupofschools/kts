@@ -21,10 +21,15 @@ export const MONTH_WISE_OUTSTANDING_ORDER: Array<{
   { key: 'MARCH', rowLabel: 'MARCH', monthNumber: 3 },
 ];
 
-const getNextMonthTenth = (dateString: string): string => {
-  const [yearText, monthText] = dateString.split('-');
-  const nextMonthTenth = new Date(Date.UTC(Number(yearText), Number(monthText), 10));
-  return nextMonthTenth.toISOString().slice(0, 10);
+const getCollectionDeadlineTenth = (dateString: string): string => {
+  const [yearText, monthText, dayText] = dateString.split('-');
+  const year = Number(yearText);
+  const monthIndex = Number(monthText) - 1;
+  const day = Number(dayText);
+  const deadline = day <= 10
+    ? new Date(Date.UTC(year, monthIndex, 10))
+    : new Date(Date.UTC(year, monthIndex + 1, 10));
+  return deadline.toISOString().slice(0, 10);
 };
 
 const countWorkingDaysExcludingSundays = (startDate: Date, endDate: Date): number => {
@@ -171,7 +176,7 @@ export function computeSystemAnalytics(
 
   // Smart Daily Recovery Run-Rate Target: collect current backlog by the 10th
   // of the next month, using active non-old-fee dues only.
-  const nextDueDate = getNextMonthTenth(currentDateString);
+  const nextDueDate = getCollectionDeadlineTenth(currentDateString);
   const currentDate = new Date(`${currentDateString}T00:00:00Z`);
   const deadlineDate = new Date(`${nextDueDate}T00:00:00Z`);
   const collectionDeadline = deadlineDate.toISOString().slice(0, 10);

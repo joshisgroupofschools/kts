@@ -155,4 +155,16 @@ assert.equal(oldFeeHead?.totalCollected, 25);
 assert.equal(oldFeeHead?.totalBalanceDue, 275);
 assert.equal((oldFeeHead?.totalCollected || 0) + (oldFeeHead?.totalBalanceDue || 0), oldFeeHead?.totalCommitted);
 
+const octoberRunRate = computeSystemAnalytics(
+  [{ id: 'runrate-student', name: 'Run Rate Student', rollNo: '1', className: 'Class 1', classId: 'c1', section: 'A', isActive: true, admissionDate: '2026-06-01', createdAt: '', updatedAt: '' } as any],
+  [],
+  [{ id: 'runrate-inst', feeStructureId: 'runrate-structure', studentId: 'runrate-student', headName: 'School Fees', installmentNumber: 1, totalInstallments: 7, amount: 9000, dueDate: '2026-09-10', paidAmount: 0, balanceAmount: 9000, status: 'unpaid' } as any],
+  [],
+  { mode: 'fixed_amount', value: 0 },
+  '2026-10-01',
+);
+assert.equal(octoberRunRate.dailyTargetRunRate.nextDueDate, '2026-10-10');
+assert.equal(octoberRunRate.dailyTargetRunRate.collectionDeadline, '2026-10-10');
+assert.equal(octoberRunRate.dailyTargetRunRate.daysRemainingInCycle, 9);
+
 console.log('Core date, cloud normalization, month-wise order, and WhatsApp verification passed.');

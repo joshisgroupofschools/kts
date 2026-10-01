@@ -207,6 +207,11 @@ export default function App() {
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
   const [collectInitialFeeType, setCollectInitialFeeType] = useState<'ALL' | 'BOOKS' | 'DRESS'>('ALL');
   const [activeReceiptTransaction, setActiveReceiptTransaction] = useState<PaymentTransaction | null>(null);
+  const [activeReceiptBalanceSnapshot, setActiveReceiptBalanceSnapshot] = useState<{
+    totalBalance: number;
+    nextDueDate: string | null;
+    nextInstallmentBalance: number;
+  } | null>(null);
 
   // -------------------------------------------------------------
   // 3. LocalStorage Persistence Sync
@@ -435,7 +440,42 @@ export default function App() {
     if (!result.success || !result.data?.transaction) {
       throw new Error(result.error || 'Unable to record payment in the central database.');
     }
-    await refreshFromSheets(true);
+
+    let receiptSnapshot: typeof activeReceiptBalanceSnapshot = null;
+    const freshResponse = await getBootstrapDataRepo(scriptUrl);
+    if (freshResponse.success && freshResponse.data) {
+      applyBootstrapData(freshResponse.data);
+      revisionRef.current = Number(freshResponse.revision ?? freshResponse.data.revision ?? revisionRef.current);
+      setIsSheetsConnected(true);
+      setIsOnline(true);
+      setSyncError(null);
+      setLastSyncTime(new Date().toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata' }));
+
+      const freshStudents = normalizeStudents(freshResponse.data.students);
+      const freshStructures = normalizeStructures(freshResponse.data.structures);
+      const freshInstallments = normalizeInstallments(freshResponse.data.installments);
+      const freshTransactions = normalizeTransactions(freshResponse.data.transactions, freshInstallments);
+      const freshStudent = freshStudents.find((student) => student.id === result.data.transaction.studentId);
+      if (freshStudent) {
+        const freshSummary = computeStudentFinancialSummary(
+          freshStudent,
+          freshStructures,
+          freshInstallments,
+          freshTransactions,
+          tolerance,
+          asOfDate
+        );
+        receiptSnapshot = {
+          totalBalance: freshSummary.totalDue,
+          nextDueDate: freshSummary.nextDueDate,
+          nextInstallmentBalance: freshSummary.nextInstallmentBalance || 0,
+        };
+      }
+    } else {
+      await refreshFromSheets(true);
+    }
+
+    setActiveReceiptBalanceSnapshot(receiptSnapshot);
     setActiveReceiptTransaction(result.data.transaction);
     setActiveModal('RECEIPT');
   };
@@ -889,6 +929,7 @@ export default function App() {
                 setActiveModal('LEDGER');
               }}
               onOpenReceiptModal={(txn) => {
+                setActiveReceiptBalanceSnapshot(null);
                 setActiveReceiptTransaction(txn);
                 setActiveModal('RECEIPT');
               }}
@@ -928,19 +969,26 @@ export default function App() {
           student={students.find((s) => s.id === activeReceiptTransaction.studentId)}
           schoolProfile={safeSchoolProfile}
           remainingDueBalance={
-            studentSummaries[activeReceiptTransaction.studentId]?.totalDue || 0
+            activeReceiptBalanceSnapshot?.totalBalance ??
+            studentSummaries[activeReceiptTransaction.studentId]?.totalDue ??
+            0
           }
           totalBalance={
-            studentSummaries[activeReceiptTransaction.studentId]?.totalDue || 0
+            activeReceiptBalanceSnapshot?.totalBalance ??
+            studentSummaries[activeReceiptTransaction.studentId]?.totalDue ??
+            0
           }
-          nextDueDate={studentSummaries[activeReceiptTransaction.studentId]?.nextDueDate}
-          nextInstallmentDueDate={studentSummaries[activeReceiptTransaction.studentId]?.nextDueDate}
+          nextDueDate={activeReceiptBalanceSnapshot?.nextDueDate ?? studentSummaries[activeReceiptTransaction.studentId]?.nextDueDate}
+          nextInstallmentDueDate={activeReceiptBalanceSnapshot?.nextDueDate ?? studentSummaries[activeReceiptTransaction.studentId]?.nextDueDate}
           nextInstallmentBalance={
-            studentSummaries[activeReceiptTransaction.studentId]?.nextInstallmentBalance || 0
+            activeReceiptBalanceSnapshot?.nextInstallmentBalance ??
+            studentSummaries[activeReceiptTransaction.studentId]?.nextInstallmentBalance ??
+            0
           }
           onClose={() => {
             setActiveModal('NONE');
             setActiveReceiptTransaction(null);
+            setActiveReceiptBalanceSnapshot(null);
           }}
         />
       )}
@@ -962,6 +1010,7 @@ export default function App() {
           schoolProfile={safeSchoolProfile}
           onClose={() => setActiveModal('NONE')}
           onPrintReceipt={(txn) => {
+            setActiveReceiptBalanceSnapshot(null);
             setActiveReceiptTransaction(txn);
             setActiveModal('RECEIPT');
           }}
@@ -1095,6 +1144,7 @@ export default function App() {
           onReopenDay={handleReopenDay}
           onUpdateTransactionSlip={handleUpdateTransactionSlip}
           onOpenReceiptModal={(tx) => {
+            setActiveReceiptBalanceSnapshot(null);
             setActiveReceiptTransaction(tx);
             setActiveModal('RECEIPT');
           }}
