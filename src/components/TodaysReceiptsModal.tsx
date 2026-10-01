@@ -573,7 +573,7 @@ export const TodaysReceiptsModal: React.FC<TodaysReceiptsModalProps> = ({
             </div>
           ) : (
             <>
-            <div className="space-y-3 md:hidden">
+            <div className="space-y-3 xl:hidden">
               {filteredList.map((tx) => {
                 const student = students.find((s) => s.id === tx.studentId);
                 const summary = studentSummaries[tx.studentId];
@@ -829,7 +829,7 @@ export const TodaysReceiptsModal: React.FC<TodaysReceiptsModalProps> = ({
               </div>
             </div>
 
-            <div className="hidden md:block border border-slate-200 dark:border-slate-800 rounded-2xl overflow-x-auto shadow-xs bg-white dark:bg-slate-900">
+            <div className="hidden xl:block border border-slate-200 dark:border-slate-800 rounded-2xl overflow-x-auto shadow-xs bg-white dark:bg-slate-900">
               <table className="w-full min-w-[1180px] text-left text-xs">
                 <thead className="bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-bold border-b border-slate-200 dark:border-slate-700 sticky top-0 z-10">
                   <tr>
