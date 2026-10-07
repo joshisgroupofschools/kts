@@ -78,7 +78,8 @@ export const TodaysReceiptsModal: React.FC<TodaysReceiptsModalProps> = ({
   onCancelReceipt,
   onClose,
 }) => {
-  const [selectedDate, setSelectedDate] = useState<string>(currentDate);
+  const [fromDate, setFromDate] = useState<string>(currentDate);
+  const [toDate, setToDate] = useState<string>(currentDate);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterMode, setFilterMode] = useState<'ALL' | 'Cash' | 'UPI' | 'Other'>('ALL');
   const [filterSlipStatus, setFilterSlipStatus] = useState<'ALL' | 'PENDING' | 'GIVEN'>('ALL');
@@ -89,14 +90,23 @@ export const TodaysReceiptsModal: React.FC<TodaysReceiptsModalProps> = ({
 
   const currencySymbol = schoolProfile?.currencySymbol || '₹';
 
-  // Filter transactions for the selected date
+  const reportStartDate = fromDate <= toDate ? fromDate : toDate;
+  const reportEndDate = fromDate <= toDate ? toDate : fromDate;
+  const isSingleDayReport = reportStartDate === reportEndDate;
+  const reportPeriodLabel = isSingleDayReport
+    ? formatDate(reportStartDate)
+    : `${formatDate(reportStartDate)} to ${formatDate(reportEndDate)}`;
+  const closeRecordKey = isSingleDayReport ? reportStartDate : `${reportStartDate}_to_${reportEndDate}`;
+  const periodWord = isSingleDayReport ? 'Today' : 'Period';
+
+  // Filter transactions for the selected date range
   const dayTransactions = useMemo(() => {
     return transactions.filter((tx) => {
       if (tx.isCancelled) return false;
       const txDateOnly = tx.date.split(' ')[0];
-      return txDateOnly === selectedDate;
+      return txDateOnly >= reportStartDate && txDateOnly <= reportEndDate;
     });
-  }, [transactions, selectedDate]);
+  }, [transactions, reportStartDate, reportEndDate]);
 
   // Aggregate stats
   const stats = useMemo(() => {
@@ -132,7 +142,7 @@ export const TodaysReceiptsModal: React.FC<TodaysReceiptsModalProps> = ({
     });
 
     // Automatic target calculation: due till date ÷ working days through the 10th collection deadline
-    const todayStr = selectedDate || '2026-09-26';
+    const todayStr = reportEndDate || currentDate;
     let totalOverdueDeficit = 0;
     const collectionDeadline = getCollectionDeadlineTenth(todayStr);
 
@@ -171,10 +181,10 @@ export const TodaysReceiptsModal: React.FC<TodaysReceiptsModalProps> = ({
       daysRemaining,
       collectionDeadline,
     };
-  }, [dayTransactions, studentSummaries, selectedDate]);
+  }, [dayTransactions, studentSummaries, reportEndDate, currentDate]);
 
   // Check if day is already closed
-  const existingDayClose = dayCloseRecords[selectedDate];
+  const existingDayClose = dayCloseRecords[closeRecordKey];
 
   // Filtered list for UI table
   const filteredList = useMemo(() => {
@@ -226,7 +236,7 @@ export const TodaysReceiptsModal: React.FC<TodaysReceiptsModalProps> = ({
     if (!stats.canCloseDay) return;
 
     const record: DayCloseRecord = {
-      date: selectedDate,
+      date: closeRecordKey,
       closedAt: new Date().toISOString(),
       closedBy: 'Head Cashier / Accounts Dept',
       target: stats.target,
@@ -236,7 +246,7 @@ export const TodaysReceiptsModal: React.FC<TodaysReceiptsModalProps> = ({
       upiTotal: stats.upiTotal,
       otherTotal: stats.otherTotal,
       totalReceiptsCount: stats.totalCount,
-      notes: `Day closed successfully with ${stats.totalCount} receipts reconciled.`,
+      notes: `Reconciliation closed for ${reportPeriodLabel} with ${stats.totalCount} receipts.`,
     };
 
     onCloseDay(record);
@@ -304,16 +314,24 @@ export const TodaysReceiptsModal: React.FC<TodaysReceiptsModalProps> = ({
           </div>
 
           <div className="flex items-center gap-2.5">
-            {/* Date Selector */}
+            {/* Date Range Selector */}
             <div className="flex items-center bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-2.5 py-1.5 gap-2 text-xs">
               <Calendar className="w-3.5 h-3.5 text-slate-400" />
+              <span className="text-[10px] font-bold text-slate-500 uppercase">From</span>
               <input
                 type="date"
-                value={selectedDate}
+                value={fromDate}
                 onChange={(e) => {
-                  setSelectedDate(e.target.value);
+                  setFromDate(e.target.value);
                   onChangeDate(e.target.value);
                 }}
+                className="bg-transparent text-slate-900 dark:text-white font-medium text-xs focus:outline-none cursor-pointer"
+              />
+              <span className="text-[10px] font-bold text-slate-500 uppercase">To</span>
+              <input
+                type="date"
+                value={toDate}
+                onChange={(e) => setToDate(e.target.value)}
                 className="bg-transparent text-slate-900 dark:text-white font-medium text-xs focus:outline-none cursor-pointer"
               />
             </div>
@@ -344,32 +362,32 @@ export const TodaysReceiptsModal: React.FC<TodaysReceiptsModalProps> = ({
           <div className="bg-emerald-500 text-white px-5 py-2.5 flex items-center justify-between text-xs font-bold shadow-md animate-fadeIn">
             <div className="flex items-center gap-2">
               <CheckCircle className="w-4 h-4" />
-              <span>Day closed successfully! Today's receipts reconciled and archived.</span>
+              <span>Reconciliation closed successfully for {reportPeriodLabel}.</span>
             </div>
             <button onClick={() => setCloseDaySuccess(false)} className="text-emerald-100 hover:text-white">✕</button>
           </div>
         )}
 
-        {/* Daily collection summary */}
+        {/* Collection summary */}
         <div className="p-4 sm:p-5 bg-slate-50 dark:bg-slate-850/50 border-b border-slate-200 dark:border-slate-800">
           <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-7 gap-3">
             {/* 1. TODAY YOU MUST COLLECT */}
             <div className="p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-2xs">
               <div className="text-slate-500 dark:text-slate-400 text-[11px] font-bold uppercase tracking-wider mb-1">
-                Day Wise Target
+                {isSingleDayReport ? 'Day Wise Target' : 'Period Target'}
               </div>
               <div className="text-base sm:text-lg font-black font-mono text-slate-800 dark:text-slate-100">
                 {formatCurrency(stats.target, currencySymbol)}
               </div>
               <span className="text-[9.5px] text-slate-400 dark:text-slate-500 block mt-0.5">
-                Due till date ÷ {stats.daysRemaining} days, till {formatDate(stats.collectionDeadline)}
+                Due till {formatDate(reportEndDate)} ÷ {stats.daysRemaining} days, till {formatDate(stats.collectionDeadline)}
               </span>
             </div>
 
             {/* 2. TOTAL COLLECTED */}
             <div className="p-3 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/80 rounded-xl shadow-2xs">
               <span className="text-emerald-700 dark:text-emerald-300 text-[11px] font-bold uppercase tracking-wider block mb-1">
-                Today Collected
+                {periodWord} Collected
               </span>
               <div className="text-base sm:text-lg font-black font-mono text-emerald-700 dark:text-emerald-300">
                 {formatCurrency(stats.totalCollected, currencySymbol)}
@@ -378,7 +396,7 @@ export const TodaysReceiptsModal: React.FC<TodaysReceiptsModalProps> = ({
 
             <div className="p-3 bg-orange-50 dark:bg-orange-950/40 border border-orange-200 dark:border-orange-800/80 rounded-xl shadow-2xs">
               <span className="text-orange-700 dark:text-orange-300 text-[11px] font-bold uppercase tracking-wider block mb-1">
-                Today Yet to Collect
+                {periodWord} Yet to Collect
               </span>
               <div className="text-base sm:text-lg font-black font-mono text-orange-700 dark:text-orange-300">
                 {formatCurrency(Math.max(0, stats.target - stats.totalCollected), currencySymbol)}
@@ -525,14 +543,14 @@ export const TodaysReceiptsModal: React.FC<TodaysReceiptsModalProps> = ({
             {existingDayClose ? (
               <div className="flex items-center gap-2">
                 <span className="text-emerald-700 dark:text-emerald-300 font-bold">
-                  ✓ Day was closed on {formatDate(existingDayClose.closedAt.split('T')[0])}
+                  Reconciliation closed for {reportPeriodLabel} on {formatDate(existingDayClose.closedAt.split('T')[0])}
                 </span>
                 <button
                   type="button"
-                  onClick={() => onReopenDay(selectedDate)}
+                  onClick={() => onReopenDay(closeRecordKey)}
                   className="px-2.5 py-1 rounded-lg bg-amber-100 hover:bg-amber-200 text-amber-900 font-bold border border-amber-300 transition-colors cursor-pointer text-[11px]"
                 >
-                  Re-Open Day
+                  Re-Open
                 </button>
               </div>
             ) : (
@@ -548,12 +566,12 @@ export const TodaysReceiptsModal: React.FC<TodaysReceiptsModalProps> = ({
                 }`}
                 title={
                   stats.canCloseDay
-                    ? 'All receipts verified. Click to finalize day reconciliation!'
-                    : `Cannot close day: ${stats.pendingCount} receipt(s) still need slip verification.`
+                    ? 'All receipts verified. Click to finalize reconciliation.'
+                    : `Cannot close: ${stats.pendingCount} receipt(s) still need slip verification.`
                 }
               >
                 <Lock className="w-3.5 h-3.5" />
-                <span>{stats.canCloseDay ? 'Close That Day & Reconcile' : `Update ${stats.pendingCount} Slips To Close Day`}</span>
+                <span>{stats.canCloseDay ? 'Close & Reconcile' : `Update ${stats.pendingCount} Slips To Close`}</span>
               </button>
             )}
           </div>
@@ -565,7 +583,7 @@ export const TodaysReceiptsModal: React.FC<TodaysReceiptsModalProps> = ({
             <div className="text-center py-16 px-4 bg-slate-50 dark:bg-slate-850/50 rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-800">
               <Receipt className="w-12 h-12 text-slate-300 dark:text-slate-600 mx-auto mb-3" />
               <h3 className="text-sm font-bold text-slate-700 dark:text-slate-300">
-                No receipts recorded for {formatDate(selectedDate)}
+                No receipts recorded for {isSingleDayReport ? formatDate(reportStartDate) : `${formatDate(reportStartDate)} to ${formatDate(reportEndDate)}`}
               </h3>
               <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
                 No fee collection transactions found matching your current search or date filters. Select another date or generate a receipt from the Student Ledger.
@@ -578,13 +596,13 @@ export const TodaysReceiptsModal: React.FC<TodaysReceiptsModalProps> = ({
                 const student = students.find((s) => s.id === tx.studentId);
                 const summary = studentSummaries[tx.studentId];
                 const remainingDue = (summary?.installments || []).reduce((sum, installment) =>
-                  sum + (installment.dueDate <= selectedDate ? Math.max(0, installment.balanceAmount) : 0), 0);
+                  sum + (installment.dueDate <= reportEndDate ? Math.max(0, installment.balanceAmount) : 0), 0);
                 const needsPermissionDate = remainingDue > 1000;
                 const canIssueIdCard = remainingDue <= 1000;
                 const defaultPermDate =
                   tx.permissionDate ||
                   student?.permissionExpiresAt ||
-                  getNextMultipleOfFiveDate(new Date(selectedDate));
+                  getNextMultipleOfFiveDate(new Date(reportEndDate));
                 const isSlipGiven = tx.slipGiven === true;
                 const isUpdated = tx.permissionUpdated || (canIssueIdCard && isSlipGiven) || remainingDue === 0;
                 const allocationTotal = (tx.allocations || []).reduce(
@@ -788,7 +806,7 @@ export const TodaysReceiptsModal: React.FC<TodaysReceiptsModalProps> = ({
                       {student?.phone && (
                         <a
                           href={`https://wa.me/91${student.phone.replace(/\D/g, '')}?text=${encodeURIComponent(
-                            `Dear Parent, receipt #${tx.receiptNo} of ₹${tx.amount.toLocaleString('en-IN')} has been acknowledged for ${tx.studentName} (${tx.studentClass}). Payment Mode: ${tx.paymentMode}. Remaining Balance Till ${formatDate(selectedDate)}: ₹${remainingDue.toLocaleString('en-IN')}. Thank you.`
+                            `Dear Parent, receipt #${tx.receiptNo} of ₹${tx.amount.toLocaleString('en-IN')} has been acknowledged for ${tx.studentName} (${tx.studentClass}). Payment Mode: ${tx.paymentMode}. Remaining Balance Till ${formatDate(reportEndDate)}: ₹${remainingDue.toLocaleString('en-IN')}. Thank you.`
                           )}`}
                           target="_blank"
                           rel="noreferrer"
@@ -818,7 +836,7 @@ export const TodaysReceiptsModal: React.FC<TodaysReceiptsModalProps> = ({
 
               <div className="rounded-2xl border border-slate-200 bg-white p-3 text-xs font-bold dark:border-slate-800 dark:bg-slate-900">
                 <div className="flex items-center justify-between">
-                  <span>Total Daily Reconciled ({filteredList.length})</span>
+                  <span>Total Reconciled ({filteredList.length})</span>
                   <span className="font-mono text-sm font-black text-emerald-600 dark:text-emerald-400">
                     {formatCurrency(filteredList.reduce((sum, tx) => sum + tx.amount, 0), currencySymbol)}
                   </span>
@@ -853,7 +871,7 @@ export const TodaysReceiptsModal: React.FC<TodaysReceiptsModalProps> = ({
                     const student = students.find((s) => s.id === tx.studentId);
                     const summary = studentSummaries[tx.studentId];
                     const remainingDue = (summary?.installments || []).reduce((sum, installment) =>
-                      sum + (installment.dueDate <= selectedDate ? Math.max(0, installment.balanceAmount) : 0), 0);
+                      sum + (installment.dueDate <= reportEndDate ? Math.max(0, installment.balanceAmount) : 0), 0);
                     const needsPermissionDate = remainingDue > 1000;
                     const canIssueIdCard = remainingDue <= 1000;
 
@@ -861,7 +879,7 @@ export const TodaysReceiptsModal: React.FC<TodaysReceiptsModalProps> = ({
                     const defaultPermDate =
                       tx.permissionDate ||
                       student?.permissionExpiresAt ||
-                      getNextMultipleOfFiveDate(new Date(selectedDate));
+                      getNextMultipleOfFiveDate(new Date(reportEndDate));
 
                     const isSlipGiven = tx.slipGiven === true;
                     const isUpdated = tx.permissionUpdated || (canIssueIdCard && isSlipGiven) || remainingDue === 0;
@@ -1003,7 +1021,7 @@ export const TodaysReceiptsModal: React.FC<TodaysReceiptsModalProps> = ({
                                 <button
                                   type="button"
                                   onClick={() => {
-                                      const nextDate = getNextMultipleOfFiveDate(selectedDate);
+                                      const nextDate = getNextMultipleOfFiveDate(reportEndDate);
                                     onUpdateTransactionSlip(tx.id, tx.slipGiven || false, nextDate);
                                   }}
                                   className="text-[9.5px] text-indigo-600 dark:text-indigo-400 hover:underline font-bold"
@@ -1118,7 +1136,7 @@ export const TodaysReceiptsModal: React.FC<TodaysReceiptsModalProps> = ({
                             {student?.phone && (
                               <a
                                 href={`https://wa.me/91${student.phone.replace(/\D/g, '')}?text=${encodeURIComponent(
-                                  `Dear Parent, receipt #${tx.receiptNo} of ₹${tx.amount.toLocaleString('en-IN')} has been acknowledged for ${tx.studentName} (${tx.studentClass}). Payment Mode: ${tx.paymentMode}. Remaining Balance Till ${formatDate(selectedDate)}: ₹${remainingDue.toLocaleString('en-IN')}. Thank you.`
+                                  `Dear Parent, receipt #${tx.receiptNo} of ₹${tx.amount.toLocaleString('en-IN')} has been acknowledged for ${tx.studentName} (${tx.studentClass}). Payment Mode: ${tx.paymentMode}. Remaining Balance Till ${formatDate(reportEndDate)}: ₹${remainingDue.toLocaleString('en-IN')}. Thank you.`
                                 )}`}
                                 target="_blank"
                                 rel="noreferrer"
@@ -1151,7 +1169,7 @@ export const TodaysReceiptsModal: React.FC<TodaysReceiptsModalProps> = ({
                 <tfoot className="bg-slate-50 dark:bg-slate-800 font-bold border-t-2 border-slate-300 dark:border-slate-700 text-xs">
                   <tr>
                     <td colSpan={2} className="py-3 px-3 uppercase tracking-wider text-slate-700 dark:text-slate-300 font-black">
-                      Total Daily Reconciled ({filteredList.length} Receipts):
+                      Total Reconciled ({filteredList.length} Receipts):
                     </td>
                     <td className="py-3 px-3 text-right font-mono font-black text-emerald-600 dark:text-emerald-400 text-sm">
                       {formatCurrency(
@@ -1173,7 +1191,7 @@ export const TodaysReceiptsModal: React.FC<TodaysReceiptsModalProps> = ({
         {/* Modal Footer Controls */}
         <div className="px-5 py-3.5 bg-slate-50 dark:bg-slate-850 border-t border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3">
           <div className="text-xs text-slate-500 dark:text-slate-400">
-            Reconciliation Date: <strong>{formatDate(selectedDate)}</strong> • Generated Receipts: <strong>{stats.totalCount}</strong>
+            Reconciliation Period: <strong>{isSingleDayReport ? formatDate(reportStartDate) : `${formatDate(reportStartDate)} to ${formatDate(reportEndDate)}`}</strong> • Generated Receipts: <strong>{stats.totalCount}</strong>
           </div>
 
           <div className="flex items-center gap-2">
@@ -1197,7 +1215,7 @@ export const TodaysReceiptsModal: React.FC<TodaysReceiptsModalProps> = ({
                 }`}
               >
                 <Lock className="w-3.5 h-3.5" />
-                <span>{stats.canCloseDay ? 'Finalize & Close Day' : `Update ${stats.pendingCount} Slips To Close Day`}</span>
+                <span>{stats.canCloseDay ? 'Finalize & Close' : `Update ${stats.pendingCount} Slips To Close`}</span>
               </button>
             )}
           </div>

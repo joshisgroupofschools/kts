@@ -163,7 +163,7 @@ function ensureTabsExist(ss) {
   var schema = {};
   schema[TAB_NAMES.STUDENTS] = ['id', 'rollNo', 'name', 'classId', 'className', 'section', 'parentName', 'phone', 'altPhone', 'address', 'admissionDate', 'isActive', 'notes', 'permissionExpiresAt', 'permissionReason', 'manualCategoryOverride', 'createdAt', 'updatedAt'];
   schema[TAB_NAMES.FEE_STRUCTURES] = ['id', 'studentId', 'headName', 'actualFee', 'committedFee', 'concession', 'concessionReason', 'commitmentReceiptNo', 'commitmentDate', 'installmentsCount', 'isSpotFee', 'remarks'];
-  schema[TAB_NAMES.INSTALLMENTS] = ['id', 'feeStructureId', 'studentId', 'headName', 'installmentNumber', 'totalInstallments', 'amount', 'dueDate', 'paidAmount', 'balanceAmount', 'status'];
+  schema[TAB_NAMES.INSTALLMENTS] = ['id', 'feeStructureId', 'studentId', 'headName', 'installmentName', 'installmentNumber', 'totalInstallments', 'amount', 'dueDate', 'paidAmount', 'balanceAmount', 'status'];
   schema[TAB_NAMES.TRANSACTIONS] = ['id', 'receiptNo', 'studentId', 'studentName', 'studentRollNo', 'studentClass', 'date', 'amount', 'paymentMode', 'referenceNo', 'remarks', 'isCancelled', 'cancellationReason', 'cancelledAt', 'collectedBy', 'permissionDate', 'slipGiven', 'permissionUpdated', 'status', 'idempotencyKey'];
   schema[TAB_NAMES.PAYMENT_ALLOCATIONS] = ['id', 'transactionId', 'installmentId', 'studentId', 'headName', 'allocatedAmount', 'createdAt'];
   schema[TAB_NAMES.CLASS_CONFIGS] = ['id', 'className', 'actualFee', 'defaultInstallments', 'defaultDueDayOfMonth', 'startMonth'];
@@ -181,6 +181,15 @@ function ensureTabsExist(ss) {
       sheet.appendRow(schema[tabName]);
       sheet.getRange(1, 1, 1, schema[tabName].length).setFontWeight('bold').setBackground('#f1f5f9');
       sheet.setFrozenRows(1);
+    } else {
+      var existingHeaders = sheet.getRange(1, 1, 1, Math.max(1, sheet.getLastColumn())).getValues()[0].map(String);
+      var missingHeaders = schema[tabName].filter(function(header) {
+        return existingHeaders.indexOf(header) === -1;
+      });
+      if (missingHeaders.length > 0) {
+        sheet.getRange(1, existingHeaders.length + 1, 1, missingHeaders.length).setValues([missingHeaders]);
+        sheet.getRange(1, 1, 1, existingHeaders.length + missingHeaders.length).setFontWeight('bold').setBackground('#f1f5f9');
+      }
     }
   }
 }

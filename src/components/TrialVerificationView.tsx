@@ -12,7 +12,6 @@ import {
   ArrowUpDown,
   BookOpen,
   Bus,
-  CheckCircle,
   CheckCircle2,
   ChevronDown,
   ChevronRight,
@@ -32,13 +31,11 @@ import {
 
 interface TrialVerificationViewProps {
   schoolProfile: SchoolProfile;
-  onApplyRealData: () => void;
   onBackToApp: () => void;
 }
 
 export const TrialVerificationView: React.FC<TrialVerificationViewProps> = ({
   schoolProfile,
-  onApplyRealData,
   onBackToApp,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -47,7 +44,6 @@ export const TrialVerificationView: React.FC<TrialVerificationViewProps> = ({
   const [statusFilter, setStatusFilter] = useState('ALL'); // ALL, EXCESS, EXACTLY PAID, DUE
   const [expandedRow, setExpandedRow] = useState<number | null>(null);
   const [verifiedRows, setVerifiedRows] = useState<Record<number, boolean>>({});
-  const [showApplyConfirm, setShowApplyConfirm] = useState(false);
 
   const currencySymbol = schoolProfile.currencySymbol || '₹';
 
@@ -299,14 +295,6 @@ export const TrialVerificationView: React.FC<TrialVerificationViewProps> = ({
               <span>Back to Live Dashboard</span>
             </button>
 
-            <button
-              type="button"
-              onClick={() => setShowApplyConfirm(true)}
-              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-black text-xs shadow-md flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer"
-            >
-              <CheckCircle className="w-4 h-4" />
-              <span>Confirm & Apply To Live Database</span>
-            </button>
           </div>
         </div>
 
@@ -854,73 +842,6 @@ export const TrialVerificationView: React.FC<TrialVerificationViewProps> = ({
           </table>
         </div>
       </div>
-
-      {/* Confirmation Modal */}
-      {showApplyConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-xs animate-fadeIn">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 dark:border-slate-800 space-y-4">
-            <div className="w-12 h-12 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mx-auto">
-              <CheckCircle className="w-6 h-6" />
-            </div>
-
-            <div className="text-center space-y-1">
-              <h3 className="text-base font-black text-slate-900 dark:text-white">
-                Confirm Database Sync to Version 2.0
-              </h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-                This will synchronize the live database with all <strong>229 students</strong> from your September master sheet, establishing <strong>₹64,48,344 committed</strong> and <strong>₹21,98,847 collected</strong> with individual receipts.
-              </p>
-            </div>
-
-            <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl space-y-1.5 text-xs text-slate-700 dark:text-slate-300">
-              <div className="flex justify-between">
-                <span>Roster Count:</span>
-                <strong className="font-mono text-emerald-600">229 Students</strong>
-              </div>
-              <div className="flex justify-between">
-                <span>Committed School Tuition:</span>
-                <strong className="font-mono text-slate-900 dark:text-white">{formatCurrency(summaryMetrics.totalSchool)}</strong>
-              </div>
-              <div className="flex justify-between">
-                <span>Transport Fees:</span>
-                <strong className="font-mono text-amber-600">{formatCurrency(summaryMetrics.totalTransport)}</strong>
-              </div>
-              <div className="flex justify-between">
-                <span>Old Due Carryovers:</span>
-                <strong className="font-mono text-purple-600">{formatCurrency(summaryMetrics.totalOldDue)}</strong>
-              </div>
-              <div className="flex justify-between">
-                <span>Books & Stationery:</span>
-                <strong className="font-mono text-sky-600">{formatCurrency(summaryMetrics.totalBooks)}</strong>
-              </div>
-              <div className="flex justify-between border-t border-slate-200 dark:border-slate-700 pt-1.5 font-bold">
-                <span>Total Collections Realized:</span>
-                <strong className="font-mono text-teal-600">{formatCurrency(summaryMetrics.totalPaid)}</strong>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2 pt-2">
-              <button
-                type="button"
-                onClick={() => setShowApplyConfirm(false)}
-                className="flex-1 py-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl font-bold text-xs cursor-pointer transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setShowApplyConfirm(false);
-                  onApplyRealData();
-                }}
-                className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-black text-xs cursor-pointer shadow-md transition-all active:scale-95"
-              >
-                Apply & Activate Now
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

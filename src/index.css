@@ -64,11 +64,134 @@
 
 /* Print Styles for Dual A5 Receipts */
 @media print {
+  @page {
+    size: A4 landscape;
+    margin: 8mm;
+  }
+
   body {
     background: white !important;
     color: black !important;
   }
   #app-navbar, #financial-dashboard, #master-student-table-container, .no-print {
     display: none !important;
+  }
+
+  body:has(#modal-student-ledger) > *:not(#root) {
+    display: none !important;
+  }
+
+  #modal-student-ledger {
+    position: static !important;
+    inset: auto !important;
+    display: block !important;
+    padding: 0 !important;
+    background: white !important;
+    overflow: visible !important;
+    font-size: 8px !important;
+    line-height: 1.15 !important;
+  }
+
+  #modal-student-ledger > div {
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    color: black !important;
+    background: white !important;
+  }
+
+  #modal-student-ledger .max-h-\[80vh\] {
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  #modal-student-ledger * {
+    color: black !important;
+    background: white !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+
+  #modal-student-ledger .bg-slate-900 {
+    border-bottom: 2px solid black !important;
+  }
+
+  #modal-student-ledger .p-5 {
+    padding: 6px !important;
+  }
+
+  #modal-student-ledger .py-4 {
+    padding-top: 6px !important;
+    padding-bottom: 6px !important;
+  }
+
+  #modal-student-ledger .px-5 {
+    padding-left: 8px !important;
+    padding-right: 8px !important;
+  }
+
+  #modal-student-ledger .space-y-5 > :not([hidden]) ~ :not([hidden]) {
+    margin-top: 6px !important;
+  }
+
+  #modal-student-ledger .rounded-xl,
+  #modal-student-ledger .rounded-2xl,
+  #modal-student-ledger .rounded-lg {
+    border-radius: 0 !important;
+  }
+
+  #modal-student-ledger .grid {
+    gap: 3px !important;
+  }
+
+  #modal-student-ledger table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    page-break-inside: auto;
+    font-size: 7.2px !important;
+  }
+
+  #modal-student-ledger th,
+  #modal-student-ledger td {
+    border: 1px solid #111 !important;
+    padding: 2px 3px !important;
+    vertical-align: top !important;
+  }
+
+  #modal-student-ledger th {
+    font-weight: 800 !important;
+  }
+
+  #modal-student-ledger tr {
+    page-break-inside: avoid;
+  }
+
+  #modal-student-ledger .divide-y > :not([hidden]) ~ :not([hidden]) {
+    border-top: 1px solid #111 !important;
+  }
+
+  #modal-student-ledger .p-3,
+  #modal-student-ledger .p-3\.5,
+  #modal-student-ledger .p-2,
+  #modal-student-ledger .p-1\.5,
+  #modal-student-ledger .py-2,
+  #modal-student-ledger .py-2\.5,
+  #modal-student-ledger .px-3,
+  #modal-student-ledger .px-4 {
+    padding: 2px 3px !important;
+  }
+
+  #modal-student-ledger .text-sm,
+  #modal-student-ledger .text-base {
+    font-size: 9px !important;
+  }
+
+  #modal-student-ledger .text-xs,
+  #modal-student-ledger .text-\[11px\],
+  #modal-student-ledger .text-\[10px\] {
+    font-size: 7px !important;
   }
 }

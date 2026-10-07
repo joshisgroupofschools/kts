@@ -9,7 +9,7 @@ import {
 } from '../types';
 import { computeStudentStatus, hasOverdueBeyondToleranceMonth } from './statusResolver';
 import { getKolkataToday } from './dateUtils';
-import { compareOfficialInstallmentOrder, normalizeFeeHead } from './installmentFormatter';
+import { compareOfficialInstallmentOrder, getInstallmentDisplayName, normalizeFeeHead } from './installmentFormatter';
 
 /**
  * Splits an amount evenly across N installments, with any remainder placed on earlier installments.
@@ -85,6 +85,7 @@ export function generateInstallments(
       feeStructureId,
       studentId,
       headName,
+      installmentName: getInstallmentDisplayName(headName, i + 1, finalCount, dueDate),
       installmentNumber: i + 1,
       totalInstallments: finalCount,
       amount,

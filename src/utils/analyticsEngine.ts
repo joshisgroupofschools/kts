@@ -19,6 +19,7 @@ export const MONTH_WISE_OUTSTANDING_ORDER: Array<{
   { key: 'JANUARY', rowLabel: 'JANUARY', monthNumber: 1 },
   { key: 'FEBRUARY', rowLabel: 'FEBRUARY', monthNumber: 2 },
   { key: 'MARCH', rowLabel: 'MARCH', monthNumber: 3 },
+  { key: 'APRIL', rowLabel: 'APRIL', monthNumber: 4 },
 ];
 
 export function computeSystemAnalytics(

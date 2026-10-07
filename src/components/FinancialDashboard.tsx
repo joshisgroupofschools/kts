@@ -813,7 +813,7 @@ export const FinancialDashboard: React.FC<FinancialDashboardProps> = ({
               </div>
             </div>
             <span className="text-[11px] font-mono text-slate-500">
-              10 Months + Total
+              11 Months + Total
             </span>
           </div>
 

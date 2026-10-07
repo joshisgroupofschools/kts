@@ -280,7 +280,8 @@ export type AcademicMonth =
   | 'DECEMBER'
   | 'JANUARY'
   | 'FEBRUARY'
-  | 'MARCH';
+  | 'MARCH'
+  | 'APRIL';
 
 export interface AcademicMonthInfo {
   key: AcademicMonth;
@@ -300,6 +301,7 @@ export const ACADEMIC_MONTHS: AcademicMonthInfo[] = [
   { key: 'JANUARY', label: 'January 2027', shortLabel: 'January', monthIndex: 1 },
   { key: 'FEBRUARY', label: 'February 2027', shortLabel: 'February', monthIndex: 2 },
   { key: 'MARCH', label: 'March 2027', shortLabel: 'March', monthIndex: 3 },
+  { key: 'APRIL', label: 'April 2027', shortLabel: 'April', monthIndex: 4 },
 ];
 
 export function getStudentMonthDue(item: StudentFinancialSummary, monthKey: AcademicMonth): {
@@ -592,6 +594,7 @@ export const MasterStudentTable: React.FC<MasterStudentTableProps> = ({
       JANUARY: { total: 0, exclusive: 0 },
       FEBRUARY: { total: 0, exclusive: 0 },
       MARCH: { total: 0, exclusive: 0 },
+      APRIL: { total: 0, exclusive: 0 },
     };
 
     ACADEMIC_MONTHS.forEach((m, idx) => {

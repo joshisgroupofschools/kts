@@ -79,13 +79,24 @@ export const StudentLedgerModal: React.FC<StudentLedgerModalProps> = ({
               </p>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-2 no-print">
+            <button
+              type="button"
+              onClick={() => window.print()}
+              className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center gap-1.5 transition-colors"
+              title="Print full student ledger"
+            >
+              <Printer className="w-3.5 h-3.5" />
+              <span>Print Ledger</span>
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         {/* Content Body */}
@@ -295,7 +306,7 @@ export const StudentLedgerModal: React.FC<StudentLedgerModalProps> = ({
                       </div>
 
                       {/* Action Controls for this Receipt */}
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 no-print">
                         {!txn.isCancelled && (
                           <>
                             <button
@@ -324,7 +335,7 @@ export const StudentLedgerModal: React.FC<StudentLedgerModalProps> = ({
 
                     {/* Cancellation confirmation drawer */}
                     {cancellingTxnId === txn.id && (
-                      <div className="mt-3 p-3 bg-rose-50 dark:bg-rose-950/60 border border-rose-300 dark:border-rose-800 rounded-xl space-y-2 text-rose-900 dark:text-rose-200">
+                      <div className="mt-3 p-3 bg-rose-50 dark:bg-rose-950/60 border border-rose-300 dark:border-rose-800 rounded-xl space-y-2 text-rose-900 dark:text-rose-200 no-print">
                         <div className="flex items-center gap-2 font-bold text-xs">
                           <AlertOctagon className="w-4 h-4 text-rose-600" />
                           <span>Confirm Receipt Voiding ({txn.receiptNo})</span>
@@ -373,7 +384,7 @@ export const StudentLedgerModal: React.FC<StudentLedgerModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="bg-slate-50 dark:bg-slate-800/80 px-5 py-3.5 border-t border-slate-200 dark:border-slate-800 flex items-center justify-end">
+        <div className="bg-slate-50 dark:bg-slate-800/80 px-5 py-3.5 border-t border-slate-200 dark:border-slate-800 flex items-center justify-end no-print">
           <button
             type="button"
             onClick={onClose}

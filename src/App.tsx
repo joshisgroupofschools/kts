@@ -99,7 +99,6 @@ import { TrialVerificationView } from './components/TrialVerificationView';
 import { TodaysReceiptsModal } from './components/TodaysReceiptsModal';
 import { PasscodeGate } from './components/PasscodeGate';
 import { FlaggedReceiptsView, getDuplicateReceiptGroups } from './components/FlaggedReceiptsView';
-import { generateStructuredRealData } from './data/trialSpreadsheetData';
 import { ArrowRight, CheckCircle2, Coins, FileSpreadsheet, Sparkles, Users } from 'lucide-react';
 
 const getTransportMonthsFromRemarks = (remarks?: string) => {
@@ -701,23 +700,6 @@ export default function App() {
     await refreshFromSheets(true);
   };
 
-  const handleApplyRealSpreadsheetData = async () => {
-    const realData = generateStructuredRealData();
-    const result = await importChunkRepo(scriptUrl, Date.now(), {
-      students: realData.students,
-      structures: realData.feeStructures,
-      installments: realData.installments,
-      transactions: realData.payments,
-    });
-    if (!result.success) throw new Error(result.error || 'Unable to import spreadsheet data.');
-    await refreshFromSheets(true);
-    setAppliedSuccessToast(true);
-    setDismissedCrossCheckBanner(true);
-    localStorage.setItem('sfc_cross_check_dismissed', 'true');
-    handleSetCurrentView('LEDGER');
-    setTimeout(() => setAppliedSuccessToast(false), 8000);
-  };
-
   const handleDismissCrossCheckBanner = () => {
     setDismissedCrossCheckBanner(true);
     localStorage.setItem('sfc_cross_check_dismissed', 'true');
@@ -870,7 +852,6 @@ export default function App() {
         {currentView === 'TRIAL_VERIFICATION' ? (
           <TrialVerificationView
             schoolProfile={safeSchoolProfile}
-            onApplyRealData={handleApplyRealSpreadsheetData}
             onBackToApp={() => handleSetCurrentView('LEDGER')}
           />
         ) : currentView === 'ANALYTICS' ? (

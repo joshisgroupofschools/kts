@@ -8,6 +8,7 @@ import {
   StudentFeeStructure,
 } from '../types';
 import { getKolkataToday } from './dateUtils';
+import { getInstallmentDisplayName } from './installmentFormatter';
 
 const asString = (value: unknown): string => String(value ?? '').trim();
 const asNumber = (value: unknown): number => {
@@ -62,7 +63,14 @@ export const normalizeStructures = (rows: any[]): StudentFeeStructure[] => (Arra
 export const normalizeInstallments = (rows: any[]): Installment[] => (Array.isArray(rows) ? rows : []).map((row) => ({
   ...row,
   id: asString(row.id), feeStructureId: asString(row.feeStructureId), studentId: asString(row.studentId),
-  headName: asString(row.headName) || 'Miscellaneous Fee', installmentNumber: asNumber(row.installmentNumber),
+  headName: asString(row.headName) || 'Miscellaneous Fee',
+  installmentName: asString(row.installmentName) || getInstallmentDisplayName(
+    asString(row.headName) || 'Miscellaneous Fee',
+    asNumber(row.installmentNumber),
+    asNumber(row.totalInstallments),
+    normalizeDateOnlyValue(row.dueDate)
+  ),
+  installmentNumber: asNumber(row.installmentNumber),
   totalInstallments: asNumber(row.totalInstallments), amount: asNumber(row.amount),
   dueDate: normalizeDateOnlyValue(row.dueDate), paidAmount: asNumber(row.paidAmount),
   balanceAmount: asNumber(row.balanceAmount), status: asString(row.status).toLowerCase() as Installment['status'],

@@ -47,6 +47,7 @@ export interface Installment {
   feeStructureId: string;
   studentId: string;
   headName: string;
+  installmentName?: string;
   installmentNumber: number;
   totalInstallments: number;
   amount: number;

@@ -110,7 +110,7 @@ assert.deepEqual(
   MONTH_WISE_OUTSTANDING_ORDER.map((row) => row.key),
   [
     'JUNE', 'JULY', 'AUGUST', 'SEPTEMBER', 'OCTOBER',
-    'NOVEMBER', 'DECEMBER', 'JANUARY', 'FEBRUARY', 'MARCH',
+    'NOVEMBER', 'DECEMBER', 'JANUARY', 'FEBRUARY', 'MARCH', 'APRIL',
   ]
 );
 assert.equal(MONTH_WISE_OUTSTANDING_ORDER[0].rowLabel, 'JUNE');
