@@ -38,6 +38,7 @@ import {
   TrendingUp,
   Users,
   Wallet,
+  X,
 } from 'lucide-react';
 
 interface FinancialDashboardProps {
@@ -70,6 +71,7 @@ export const FinancialDashboard: React.FC<FinancialDashboardProps> = ({
   onNavigateToLedger,
 }) => {
   const currencySymbol = schoolProfile?.currencySymbol || '₹';
+  const [selectedMetricKey, setSelectedMetricKey] = useState<string | null>(null);
 
   // Per-card/subcard visibility state: By default all numbers are hidden (masked)
   const [revealedCards, setRevealedCards] = useState<Record<string, boolean>>(() => {
@@ -164,6 +166,151 @@ export const FinancialDashboard: React.FC<FinancialDashboardProps> = ({
   // Percentage calculations
   const allTimeCashPct = totalCollectedTillDate > 0 ? Math.round((totalCashCollected / totalCollectedTillDate) * 100) : 0;
   const allTimeUpiPct = totalCollectedTillDate > 0 ? Math.round((totalUpiCollected / totalCollectedTillDate) * 100) : 0;
+
+  const headBreakdownRows = useMemo(() => {
+    const rows = [
+      { key: 'school', label: 'School Fees', stat: feeHeadMap.school },
+      { key: 'transport', label: 'Transport Fees', stat: feeHeadMap.transport },
+      { key: 'old', label: 'Old Fees', stat: feeHeadMap.oldDue },
+      { key: 'books', label: 'Books Fees', stat: feeHeadMap.books },
+    ];
+    return rows.map((row) => ({
+      ...row,
+      committed: row.stat?.totalCommitted || 0,
+      collected: row.stat?.totalCollected || 0,
+      due: row.stat?.totalBalanceDue || 0,
+      dueTillDate: row.stat?.totalDueTillDate || 0,
+      students: row.stat?.activeStudentsCount || 0,
+    }));
+  }, [feeHeadMap]);
+
+  const committedTransportFees = feeHeadMap.transport?.totalCommitted || 0;
+  const committedOldFees = feeHeadMap.oldDue?.totalCommitted || 0;
+  const committedBooksFees = feeHeadMap.books?.totalCommitted || 0;
+  const totalCommittedFees =
+    totalCommittedRevenue + committedTransportFees + committedOldFees + committedBooksFees;
+  const todayMustCollect = dailyTargetRunRate?.targetDailyAmount || 0;
+
+  const metricCards = [
+    {
+      key: 'active_students',
+      title: 'No. of Active Students',
+      value: String(activeStudents),
+      note: 'Active records only',
+      icon: Users,
+      tone: 'blue',
+      valueType: 'count',
+    },
+    {
+      key: 'actual_school_fees',
+      title: 'Actual School Fees',
+      value: actualStandardFeeSum,
+      note: 'Standard class fee total',
+      icon: GraduationCap,
+      tone: 'slate',
+    },
+    {
+      key: 'concession',
+      title: 'Concession',
+      value: totalConcessionGiven,
+      note: `${concessionStudentsCount} students`,
+      icon: Percent,
+      tone: 'purple',
+    },
+    {
+      key: 'committed_school_fees',
+      title: 'Committed School Fees',
+      value: totalCommittedRevenue,
+      note: 'After concession',
+      icon: Building2,
+      tone: 'blue',
+    },
+    {
+      key: 'committed_transport_fees',
+      title: 'Committed Transport Fees',
+      value: committedTransportFees,
+      note: `${feeHeadMap.transport?.activeStudentsCount || 0} students`,
+      icon: Bus,
+      tone: 'amber',
+    },
+    {
+      key: 'committed_old_fees',
+      title: 'Committed Old Fees',
+      value: committedOldFees,
+      note: `${feeHeadMap.oldDue?.activeStudentsCount || 0} students`,
+      icon: Clock,
+      tone: 'rose',
+    },
+    {
+      key: 'committed_books_fees',
+      title: 'Committed Books Fees',
+      value: committedBooksFees,
+      note: `${feeHeadMap.books?.activeStudentsCount || 0} students`,
+      icon: BookOpen,
+      tone: 'emerald',
+    },
+    {
+      key: 'total_committed_fees',
+      title: 'Total Committed Fees',
+      value: totalCommittedFees,
+      note: 'School + transport + old + books',
+      icon: Layers,
+      tone: 'indigo',
+    },
+    {
+      key: 'total_collected',
+      title: 'Total Collected',
+      value: totalCollectedTillDate,
+      note: `${collectionEfficiencyPercent}% of due-till-date efficiency`,
+      icon: Wallet,
+      tone: 'emerald',
+    },
+    {
+      key: 'total_due',
+      title: 'Total Due',
+      value: totalOverallDue,
+      note: 'All pending balances',
+      icon: Receipt,
+      tone: 'rose',
+    },
+    {
+      key: 'due_till_date',
+      title: 'Due Till Date',
+      value: totalOverdueDeficitTillDate,
+      note: `Payable till date: ${formatCurrency(totalExpectedTillDate, currencySymbol)}`,
+      icon: AlertCircle,
+      tone: 'orange',
+    },
+    {
+      key: 'today_must_collect',
+      title: 'Today You Must Collect',
+      value: todayMustCollect,
+      note: `${dailyTargetRunRate?.daysRemainingInCycle || 0} working days till ${dailyTargetRunRate?.collectionDeadline ? formatDateOnly(dailyTargetRunRate.collectionDeadline, 'short') : 'deadline'}`,
+      icon: Target,
+      tone: 'slate',
+    },
+  ];
+
+  const selectedMetric = metricCards.find((card) => card.key === selectedMetricKey);
+
+  const getMetricBreakdownValue = (cardKey: string, row: (typeof headBreakdownRows)[number]) => {
+    if (cardKey.includes('committed') || cardKey === 'actual_school_fees' || cardKey === 'concession') return row.committed;
+    if (cardKey === 'total_collected') return row.collected;
+    if (cardKey === 'due_till_date' || cardKey === 'today_must_collect') return row.dueTillDate;
+    if (cardKey === 'total_due') return row.due;
+    return row.committed;
+  };
+
+  const metricToneClasses: Record<string, string> = {
+    blue: 'border-blue-200 bg-blue-50/70 text-blue-800 dark:border-blue-900 dark:bg-blue-950/30 dark:text-blue-200',
+    slate: 'border-slate-200 bg-white text-slate-900 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100',
+    purple: 'border-purple-200 bg-purple-50/70 text-purple-800 dark:border-purple-900 dark:bg-purple-950/30 dark:text-purple-200',
+    amber: 'border-amber-200 bg-amber-50/70 text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200',
+    rose: 'border-rose-200 bg-rose-50/70 text-rose-800 dark:border-rose-900 dark:bg-rose-950/30 dark:text-rose-200',
+    emerald: 'border-emerald-200 bg-emerald-50/70 text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-200',
+    indigo: 'border-indigo-200 bg-indigo-50/70 text-indigo-800 dark:border-indigo-900 dark:bg-indigo-950/30 dark:text-indigo-200',
+    orange: 'border-orange-200 bg-orange-50/70 text-orange-800 dark:border-orange-900 dark:bg-orange-950/30 dark:text-orange-200',
+  };
 
   const getHeadIcon = (headName: string) => {
     const lower = headName.toLowerCase();
@@ -264,8 +411,95 @@ export const FinancialDashboard: React.FC<FinancialDashboardProps> = ({
         </div>
       </div>
 
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+        {metricCards.map((card) => {
+          const Icon = card.icon;
+          const valueText = card.valueType === 'count'
+            ? String(card.value)
+            : formatCurrency(Number(card.value || 0), currencySymbol);
+          return (
+            <button
+              key={card.key}
+              type="button"
+              onClick={() => setSelectedMetricKey(card.key)}
+              className={`text-left rounded-2xl border p-4 shadow-xs hover:shadow-md hover:-translate-y-0.5 transition-all cursor-pointer ${metricToneClasses[card.tone] || metricToneClasses.slate}`}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-[10px] uppercase tracking-wider font-black opacity-70 truncate">
+                    {card.title}
+                  </p>
+                  <p className="mt-1 text-xl sm:text-2xl font-black font-mono tracking-tight">
+                    {valueText}
+                  </p>
+                </div>
+                <span className="p-2 rounded-xl bg-white/70 dark:bg-slate-950/40 border border-white/70 dark:border-white/10 shrink-0">
+                  <Icon className="w-4 h-4" />
+                </span>
+              </div>
+              <p className="mt-2 text-[11px] font-semibold opacity-75 truncate">
+                {card.note}
+              </p>
+            </button>
+          );
+        })}
+      </div>
+
+      {selectedMetric && (
+        <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-2xl bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden">
+            <div className="px-5 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-wider">
+                  {selectedMetric.title} Bifurcation
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Head-wise split from the current active student data.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedMetricKey(null)}
+                className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {headBreakdownRows.map((row) => (
+                  <div key={row.key} className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/40 p-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-xs font-black text-slate-700 dark:text-slate-200 uppercase tracking-wide">{row.label}</span>
+                      <span className="text-sm font-black font-mono text-slate-900 dark:text-white">
+                        {formatCurrency(getMetricBreakdownValue(selectedMetric.key, row), currencySymbol)}
+                      </span>
+                    </div>
+                    <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-[11px] text-slate-500 dark:text-slate-400">
+                      <span>Committed: <strong>{formatCurrency(row.committed, currencySymbol)}</strong></span>
+                      <span>Collected: <strong>{formatCurrency(row.collected, currencySymbol)}</strong></span>
+                      <span>Total Due: <strong>{formatCurrency(row.due, currencySymbol)}</strong></span>
+                      <span>Due Till Date: <strong>{formatCurrency(row.dueTillDate, currencySymbol)}</strong></span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="rounded-xl bg-slate-900 text-white dark:bg-white dark:text-slate-900 p-3 flex items-center justify-between">
+                <span className="text-xs font-black uppercase tracking-wider">Selected Card Total</span>
+                <span className="text-lg font-black font-mono">
+                  {selectedMetric.valueType === 'count'
+                    ? String(selectedMetric.value)
+                    : formatCurrency(Number(selectedMetric.value || 0), currencySymbol)}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* EXACT 3 MAIN CARDS GRID */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
+      <div className="hidden">
 
         {/* ============================================================ */}
         {/* CARD 1: SET 1 (Active Students, Actual School Fees, Committed School Fees, Concession, Committed Other Fees) */}
@@ -809,7 +1043,7 @@ export const FinancialDashboard: React.FC<FinancialDashboardProps> = ({
                 <h3 className="text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white">
                   Month-wise Outstanding Student Analysis
                 </h3>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400">Month-wise pending fees for active students.</p>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400">Cumulative pending fees up to each month for active students.</p>
               </div>
             </div>
             <span className="text-[11px] font-mono text-slate-500">
@@ -823,7 +1057,7 @@ export const FinancialDashboard: React.FC<FinancialDashboardProps> = ({
                 <tr className="border-b border-slate-200 dark:border-slate-700 text-[10px] text-slate-500 uppercase tracking-wider bg-slate-50 dark:bg-slate-850">
                   <th className="py-2 px-3 font-bold">Month</th>
                   <th className="py-2 px-3 font-bold text-center">Students Due Count</th>
-                  <th className="py-2 px-3 font-bold text-right">Total Due Amount</th>
+                  <th className="py-2 px-3 font-bold text-right">Due Up To Month</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">

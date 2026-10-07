@@ -38,7 +38,7 @@ export function computeSystemAnalytics(
   const UNMAPPED_PAYMENT_HEAD = 'Unmapped / Advance Payments';
   const isExcludedFromCoreDue = (headName: string, isSpotFee?: boolean): boolean => {
     const normalized = headName.toLowerCase();
-    return !!isSpotFee || normalized.includes('book') || normalized.includes('dress') || normalized.includes('uniform') || normalized.includes('stationery') || normalized.includes('kit');
+    return !!isSpotFee || normalized.includes('dress') || normalized.includes('uniform') || normalized.includes('kit');
   };
   const activeStudentsList = students.filter((s) => s.isActive);
   const inactiveStudentsList = students.filter((s) => !s.isActive);
