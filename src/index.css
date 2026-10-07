@@ -1,4 +1,4 @@
-@import "tailwindcss";
+﻿@import "tailwindcss";
 
 @variant dark (&:where(.dark, .dark *));
 
@@ -65,7 +65,7 @@
 /* Print Styles for Dual A5 Receipts */
 @media print {
   @page {
-    size: A4 landscape;
+    size: A4 portrait;
     margin: 8mm;
   }
 
@@ -108,6 +108,14 @@
     overflow: visible !important;
   }
 
+
+  #modal-student-ledger .print-only {
+    display: block !important;
+  }
+
+  #modal-student-ledger .hidden.print-only {
+    display: block !important;
+  }
   #modal-student-ledger * {
     color: black !important;
     background: white !important;
@@ -195,3 +203,5 @@
     font-size: 7px !important;
   }
 }
+
+

@@ -101,6 +101,20 @@ export const StudentLedgerModal: React.FC<StudentLedgerModalProps> = ({
 
         {/* Content Body */}
         <div className="p-5 space-y-5 text-xs text-slate-700 dark:text-slate-300 max-h-[80vh] overflow-y-auto">
+          <div className="print-only hidden">
+            <div className="text-center border-b-2 border-black pb-2 mb-2">
+              <div className="text-sm font-black uppercase">{schoolProfile.schoolName || 'KTS Boduppal Fees ERP Software'}</div>
+              <div className="text-[9px] font-bold">Student Ledger Statement</div>
+              <div className="text-[8px]">Generated till {asOfDate ? formatDate(asOfDate) : 'current date'}</div>
+            </div>
+            <div className="grid grid-cols-4 gap-1 text-[8px] mb-2">
+              <div><strong>Student:</strong> {student.name}</div>
+              <div><strong>Roll:</strong> {student.rollNo}</div>
+              <div><strong>Class:</strong> {student.className} ({student.section || 'A'})</div>
+              <div><strong>Phone:</strong> {student.phone || '-'}</div>
+            </div>
+          </div>
+
           {/* Top Key Financial Summary Grid */}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 bg-slate-50 dark:bg-slate-800/50 p-3 rounded-xl border border-slate-200 dark:border-slate-700">
             <div>
@@ -142,7 +156,7 @@ export const StudentLedgerModal: React.FC<StudentLedgerModalProps> = ({
           </div>
 
           {/* Section 1: Assigned Installment Schedule Tracker */}
-          <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-xs">
+          <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-xs no-print">
             <div className="bg-slate-100 dark:bg-slate-800 px-4 py-2.5 flex items-center justify-between">
               <span className="font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
                 <Layers className="w-4 h-4 text-emerald-600" />
@@ -380,6 +394,40 @@ export const StudentLedgerModal: React.FC<StudentLedgerModalProps> = ({
                 ))}
               </div>
             )}
+          </div>
+
+          <div className="print-only hidden border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-xs">
+            <div className="bg-slate-100 dark:bg-slate-800 px-4 py-2.5 font-bold">
+              Payment Receipt Ledger ({summary.transactions.length} Records)
+            </div>
+            <table className="w-full text-left text-xs">
+              <thead>
+                <tr>
+                  <th>Receipt</th>
+                  <th>Date</th>
+                  <th>Mode</th>
+                  <th className="text-right">Amount</th>
+                  <th>Status</th>
+                  <th>Fees Paid For</th>
+                </tr>
+              </thead>
+              <tbody>
+                {summary.transactions.map((txn) => (
+                  <tr key={txn.id}>
+                    <td>{txn.receiptNo}</td>
+                    <td>{txn.date}</td>
+                    <td>{txn.paymentMode}</td>
+                    <td className="text-right">{formatCurrency(txn.amount, schoolProfile.currencySymbol)}</td>
+                    <td>{txn.isCancelled ? 'Cancelled' : 'Active'}</td>
+                    <td>
+                      {(txn.allocations || []).map((allocation) =>
+                        `${getInstallmentDisplayName(allocation.headName, allocation.installmentNumber, allocation.totalInstallments, allocation.dueDate)}: ${formatCurrency(allocation.allocatedAmount, schoolProfile.currencySymbol)}`
+                      ).join('; ') || '-'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
 
