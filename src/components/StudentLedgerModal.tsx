@@ -50,6 +50,25 @@ export const StudentLedgerModal: React.FC<StudentLedgerModalProps> = ({
       Number(inst.paidAmount || 0) > 0 ||
       Number(inst.balanceAmount || 0) > 0
   );
+  const installmentPaymentDetails = new Map<
+    string,
+    Array<{ receiptNo: string; date: string; mode: string; amount: number }>
+  >();
+  summary.transactions
+    .filter((txn) => !txn.isCancelled)
+    .forEach((txn) => {
+      (txn.allocations || []).forEach((allocation) => {
+        if (!allocation.installmentId || Number(allocation.allocatedAmount || 0) <= 0) return;
+        const existing = installmentPaymentDetails.get(allocation.installmentId) || [];
+        existing.push({
+          receiptNo: txn.receiptNo,
+          date: txn.date,
+          mode: txn.paymentMode,
+          amount: Number(allocation.allocatedAmount || 0),
+        });
+        installmentPaymentDetails.set(allocation.installmentId, existing);
+      });
+    });
 
   const handleConfirmCancel = async (txnId: string) => {
     if (!cancelReason.trim()) {
@@ -100,19 +119,35 @@ export const StudentLedgerModal: React.FC<StudentLedgerModalProps> = ({
                   <th className="text-right">Paid</th>
                   <th className="text-right">Balance</th>
                   <th>Status</th>
+                  <th>When / Receipt Cleared</th>
                 </tr>
               </thead>
               <tbody>
-                {[...visibleInstallments].sort(compareOfficialInstallmentOrder).map((inst) => (
-                  <tr key={`print-inst-${inst.id}`}>
-                    <td>{getInstallmentDisplayName(inst.headName, inst.installmentNumber, inst.totalInstallments, inst.dueDate)}</td>
-                    <td>{formatDate(inst.dueDate)}</td>
-                    <td className="text-right">{formatCurrency(inst.amount, schoolProfile.currencySymbol)}</td>
-                    <td className="text-right">{formatCurrency(inst.paidAmount, schoolProfile.currencySymbol)}</td>
-                    <td className="text-right">{formatCurrency(inst.balanceAmount, schoolProfile.currencySymbol)}</td>
-                    <td>{inst.status}</td>
-                  </tr>
-                ))}
+                {[...visibleInstallments].sort(compareOfficialInstallmentOrder).map((inst) => {
+                  const payments = installmentPaymentDetails.get(inst.id) || [];
+                  const clearedPayment = payments.length > 0 ? payments[payments.length - 1] : null;
+                  const statusLabel =
+                    inst.balanceAmount <= 0 && inst.paidAmount > 0 && clearedPayment
+                      ? `Cleared on ${formatDate(clearedPayment.date.split(' ')[0])}`
+                      : inst.status;
+                  return (
+                    <tr key={`print-inst-${inst.id}`}>
+                      <td>{getInstallmentDisplayName(inst.headName, inst.installmentNumber, inst.totalInstallments, inst.dueDate)}</td>
+                      <td>{formatDate(inst.dueDate)}</td>
+                      <td className="text-right">{formatCurrency(inst.amount, schoolProfile.currencySymbol)}</td>
+                      <td className="text-right">{formatCurrency(inst.paidAmount, schoolProfile.currencySymbol)}</td>
+                      <td className="text-right">{formatCurrency(inst.balanceAmount, schoolProfile.currencySymbol)}</td>
+                      <td>{statusLabel}</td>
+                      <td>
+                        {payments.length > 0
+                          ? payments.map((payment) =>
+                              `Rcpt ${payment.receiptNo} • ${formatDate(payment.date.split(' ')[0])} • ${formatCurrency(payment.amount, schoolProfile.currencySymbol)}`
+                            ).join('; ')
+                          : 'No payment yet'}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
