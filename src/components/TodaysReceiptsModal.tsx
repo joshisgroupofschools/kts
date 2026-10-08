@@ -612,7 +612,7 @@ export const TodaysReceiptsModal: React.FC<TodaysReceiptsModalProps> = ({
         </div>
 
         {/* Main Receipts Table Workspace */}
-        <div className="flex-1 overflow-auto p-4 sm:p-5">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden p-2 sm:p-5">
           {filteredList.length === 0 ? (
             <div className="text-center py-16 px-4 bg-slate-50 dark:bg-slate-850/50 rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-800">
               <Receipt className="w-12 h-12 text-slate-300 dark:text-slate-600 mx-auto mb-3" />
@@ -625,7 +625,7 @@ export const TodaysReceiptsModal: React.FC<TodaysReceiptsModalProps> = ({
             </div>
           ) : (
             <>
-            <div className="space-y-3 xl:hidden">
+            <div className="space-y-3 lg:hidden">
               {filteredList.map((tx) => {
                 const student = students.find((s) => s.id === tx.studentId);
                 const summary = studentSummaries[tx.studentId];
@@ -881,7 +881,7 @@ export const TodaysReceiptsModal: React.FC<TodaysReceiptsModalProps> = ({
               </div>
             </div>
 
-            <div className="hidden xl:block border border-slate-200 dark:border-slate-800 rounded-2xl overflow-x-auto shadow-xs bg-white dark:bg-slate-900">
+            <div className="hidden lg:block border border-slate-200 dark:border-slate-800 rounded-2xl overflow-x-auto shadow-xs bg-white dark:bg-slate-900">
               <table className="w-full min-w-[1180px] text-left text-xs">
                 <thead className="bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-bold border-b border-slate-200 dark:border-slate-700 sticky top-0 z-10">
                   <tr>

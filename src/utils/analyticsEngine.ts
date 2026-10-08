@@ -387,18 +387,15 @@ export function computeSystemAnalytics(
     let previousDueStudentsAmount = 0;
 
     studentRowBalances.forEach((balances) => {
-      const amount = Array.from(balances.entries())
-        .filter(([otherIndex]) => otherIndex <= rowIndex)
-        .reduce((sum, [, otherAmount]) => sum + otherAmount, 0);
+      const amount = balances.get(rowIndex) || 0;
       if (amount <= 0) return;
       outstandingStudentsCount++;
       totalAmountToReceive += amount;
-      const currentMonthAmount = balances.get(rowIndex) || 0;
       const hasPreviousDue = Array.from(balances.entries()).some(([otherIndex, otherAmount]) => otherIndex < rowIndex && otherAmount > 0);
       if (hasPreviousDue) {
         previousDueStudentsCount++;
         previousDueStudentsAmount += amount;
-      } else if (currentMonthAmount > 0) {
+      } else {
         exclusiveStudentsCount++;
         exclusiveStudentsAmount += amount;
       }
@@ -419,8 +416,8 @@ export function computeSystemAnalytics(
     ...monthRows,
     monthRows.reduce((total, row) => ({
       key: 'TOTAL', rowLabel: 'TOTAL',
-      totalAmountToReceive: Math.max(total.totalAmountToReceive, row.totalAmountToReceive),
-      outstandingStudentsCount: Math.max(total.outstandingStudentsCount, row.outstandingStudentsCount),
+      totalAmountToReceive: total.totalAmountToReceive + row.totalAmountToReceive,
+      outstandingStudentsCount: total.outstandingStudentsCount + row.outstandingStudentsCount,
       exclusiveStudentsCount: total.exclusiveStudentsCount + row.exclusiveStudentsCount,
       exclusiveStudentsAmount: total.exclusiveStudentsAmount + row.exclusiveStudentsAmount,
       previousDueStudentsCount: total.previousDueStudentsCount + row.previousDueStudentsCount,

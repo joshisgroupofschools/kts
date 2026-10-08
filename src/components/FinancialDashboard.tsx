@@ -98,7 +98,20 @@ export const FinancialDashboard: React.FC<FinancialDashboardProps> = ({
     });
   };
 
-  const allCardKeys = ['set1', 'set2', 'set3'];
+  const allCardKeys = [
+    'active_students',
+    'actual_school_fees',
+    'concession',
+    'committed_school_fees',
+    'committed_transport_fees',
+    'committed_old_fees',
+    'committed_books_fees',
+    'total_committed_fees',
+    'total_collected',
+    'total_due',
+    'due_till_date',
+    'today_must_collect',
+  ];
 
   const areAllCardsRevealed = useMemo(() => {
     return allCardKeys.every((k) => !!revealedCards[k]);
@@ -302,14 +315,14 @@ export const FinancialDashboard: React.FC<FinancialDashboardProps> = ({
   };
 
   const metricToneClasses: Record<string, string> = {
-    blue: 'border-blue-200 bg-blue-50/70 text-blue-800 dark:border-blue-900 dark:bg-blue-950/30 dark:text-blue-200',
-    slate: 'border-slate-200 bg-white text-slate-900 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100',
-    purple: 'border-purple-200 bg-purple-50/70 text-purple-800 dark:border-purple-900 dark:bg-purple-950/30 dark:text-purple-200',
-    amber: 'border-amber-200 bg-amber-50/70 text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200',
-    rose: 'border-rose-200 bg-rose-50/70 text-rose-800 dark:border-rose-900 dark:bg-rose-950/30 dark:text-rose-200',
-    emerald: 'border-emerald-200 bg-emerald-50/70 text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-200',
-    indigo: 'border-indigo-200 bg-indigo-50/70 text-indigo-800 dark:border-indigo-900 dark:bg-indigo-950/30 dark:text-indigo-200',
-    orange: 'border-orange-200 bg-orange-50/70 text-orange-800 dark:border-orange-900 dark:bg-orange-950/30 dark:text-orange-200',
+    blue: 'border-blue-200 bg-blue-50/70 text-blue-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100',
+    slate: 'border-slate-200 bg-white text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100',
+    purple: 'border-purple-200 bg-purple-50/70 text-purple-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100',
+    amber: 'border-amber-200 bg-amber-50/70 text-amber-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100',
+    rose: 'border-rose-200 bg-rose-50/70 text-rose-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100',
+    emerald: 'border-emerald-200 bg-emerald-50/70 text-emerald-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100',
+    indigo: 'border-indigo-200 bg-indigo-50/70 text-indigo-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100',
+    orange: 'border-orange-200 bg-orange-50/70 text-orange-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100',
   };
 
   const getHeadIcon = (headName: string) => {
@@ -414,6 +427,7 @@ export const FinancialDashboard: React.FC<FinancialDashboardProps> = ({
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
         {metricCards.map((card) => {
           const Icon = card.icon;
+          const isVisible = isCardRevealed(card.key);
           const valueText = card.valueType === 'count'
             ? String(card.value)
             : formatCurrency(Number(card.value || 0), currencySymbol);
@@ -430,15 +444,15 @@ export const FinancialDashboard: React.FC<FinancialDashboardProps> = ({
                     {card.title}
                   </p>
                   <p className="mt-1 text-xl sm:text-2xl font-black font-mono tracking-tight">
-                    {valueText}
+                    {isVisible ? valueText : '••••••'}
                   </p>
                 </div>
-                <span className="p-2 rounded-xl bg-white/70 dark:bg-slate-950/40 border border-white/70 dark:border-white/10 shrink-0">
+                <span className="p-2 rounded-xl bg-white/70 dark:bg-slate-800 border border-white/70 dark:border-slate-700 shrink-0">
                   <Icon className="w-4 h-4" />
                 </span>
               </div>
               <p className="mt-2 text-[11px] font-semibold opacity-75 truncate">
-                {card.note}
+                {isVisible ? card.note : 'Click Reveal All Numbers to view'}
               </p>
             </button>
           );
@@ -1043,7 +1057,7 @@ export const FinancialDashboard: React.FC<FinancialDashboardProps> = ({
                 <h3 className="text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white">
                   Month-wise Outstanding Student Analysis
                 </h3>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400">Cumulative pending fees up to each month for active students.</p>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400">Pending fees of that month only for active students.</p>
               </div>
             </div>
             <span className="text-[11px] font-mono text-slate-500">
@@ -1057,7 +1071,7 @@ export const FinancialDashboard: React.FC<FinancialDashboardProps> = ({
                 <tr className="border-b border-slate-200 dark:border-slate-700 text-[10px] text-slate-500 uppercase tracking-wider bg-slate-50 dark:bg-slate-850">
                   <th className="py-2 px-3 font-bold">Month</th>
                   <th className="py-2 px-3 font-bold text-center">Students Due Count</th>
-                  <th className="py-2 px-3 font-bold text-right">Due Up To Month</th>
+                  <th className="py-2 px-3 font-bold text-right">Due Amount</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">

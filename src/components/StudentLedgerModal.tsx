@@ -64,6 +64,93 @@ export const StudentLedgerModal: React.FC<StudentLedgerModalProps> = ({
   return (
     <div id="modal-student-ledger" className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-xs overflow-y-auto">
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl max-w-4xl w-full overflow-hidden my-6 animate-in fade-in zoom-in-95 duration-150">
+        <div className="ledger-print-sheet print-only hidden">
+          <div className="ledger-print-header">
+            <div>
+              <div className="ledger-school-name">{schoolProfile.schoolName || 'KAKATIYA SCHOOL BODUPPAL'}</div>
+              <div>Student Ledger Statement • Generated till {asOfDate ? formatDate(asOfDate) : 'current date'}</div>
+            </div>
+            <div className="ledger-print-title">A4 LEDGER</div>
+          </div>
+
+          <div className="ledger-student-row">
+            <div><strong>Student:</strong> {student.name}</div>
+            <div><strong>Roll:</strong> {student.rollNo}</div>
+            <div><strong>Class:</strong> {student.className} ({student.section || 'A'})</div>
+            <div><strong>Phone:</strong> {student.phone || '-'}</div>
+          </div>
+
+          <div className="ledger-summary-grid">
+            <div><span>Actual Fees</span><strong>{formatCurrency(summary.actualFees, schoolProfile.currencySymbol)}</strong></div>
+            <div><span>Concession</span><strong>{formatCurrency(summary.concession, schoolProfile.currencySymbol)}</strong></div>
+            <div><span>Other Fees</span><strong>{formatCurrency(summary.otherFees, schoolProfile.currencySymbol)}</strong></div>
+            <div><span>Total Payable</span><strong>{formatCurrency(summary.totalPayable, schoolProfile.currencySymbol)}</strong></div>
+            <div><span>Total Paid</span><strong>{formatCurrency(summary.totalPaid, schoolProfile.currencySymbol)}</strong></div>
+            <div><span>Net Balance</span><strong>{formatCurrency(summary.totalDue, schoolProfile.currencySymbol)}</strong></div>
+          </div>
+
+          <div className="ledger-print-section">
+            <div className="ledger-section-title">Assigned Installment Schedule ({visibleInstallments.length})</div>
+            <table className="ledger-print-table">
+              <thead>
+                <tr>
+                  <th>Fee Head</th>
+                  <th>Due Date</th>
+                  <th className="text-right">Amount</th>
+                  <th className="text-right">Paid</th>
+                  <th className="text-right">Balance</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[...visibleInstallments].sort(compareOfficialInstallmentOrder).map((inst) => (
+                  <tr key={`print-inst-${inst.id}`}>
+                    <td>{getInstallmentDisplayName(inst.headName, inst.installmentNumber, inst.totalInstallments, inst.dueDate)}</td>
+                    <td>{formatDate(inst.dueDate)}</td>
+                    <td className="text-right">{formatCurrency(inst.amount, schoolProfile.currencySymbol)}</td>
+                    <td className="text-right">{formatCurrency(inst.paidAmount, schoolProfile.currencySymbol)}</td>
+                    <td className="text-right">{formatCurrency(inst.balanceAmount, schoolProfile.currencySymbol)}</td>
+                    <td>{inst.status}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="ledger-print-section">
+            <div className="ledger-section-title">Payment Receipt Ledger ({summary.transactions.length})</div>
+            <table className="ledger-print-table">
+              <thead>
+                <tr>
+                  <th>Receipt</th>
+                  <th>Date</th>
+                  <th>Mode</th>
+                  <th className="text-right">Amount</th>
+                  <th>Status</th>
+                  <th>Fees Paid For</th>
+                </tr>
+              </thead>
+              <tbody>
+                {summary.transactions.map((txn) => (
+                  <tr key={`print-txn-${txn.id}`}>
+                    <td>{txn.receiptNo}</td>
+                    <td>{txn.date}</td>
+                    <td>{txn.paymentMode}</td>
+                    <td className="text-right">{formatCurrency(txn.amount, schoolProfile.currencySymbol)}</td>
+                    <td>{txn.isCancelled ? 'Cancelled' : 'Active'}</td>
+                    <td>
+                      {(txn.allocations || []).map((allocation) =>
+                        `${getInstallmentDisplayName(allocation.headName, allocation.installmentNumber, allocation.totalInstallments, allocation.dueDate)}: ${formatCurrency(allocation.allocatedAmount, schoolProfile.currencySymbol)}`
+                      ).join('; ') || '-'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div className="ledger-screen">
         {/* Header */}
         <div className="bg-slate-900 text-white px-5 py-4 flex items-center justify-between border-b border-slate-800">
           <div className="flex items-center gap-3">
@@ -440,6 +527,7 @@ export const StudentLedgerModal: React.FC<StudentLedgerModalProps> = ({
           >
             Close Ledger
           </button>
+        </div>
         </div>
       </div>
     </div>
