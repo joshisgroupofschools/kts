@@ -158,8 +158,8 @@
     box-sizing: border-box !important;
     padding: 0 !important;
     margin: 0 !important;
-    font-size: 9px !important;
-    line-height: 1.22 !important;
+    font-size: 10.5px !important;
+    line-height: 1.32 !important;
   }
 
   #modal-student-ledger .ledger-print-header {
@@ -167,21 +167,21 @@
     align-items: flex-start !important;
     justify-content: space-between !important;
     border-bottom: 2px solid #111 !important;
-    padding-bottom: 5px !important;
-    margin-bottom: 5px !important;
+    padding-bottom: 7px !important;
+    margin-bottom: 7px !important;
   }
 
   #modal-student-ledger .ledger-school-name {
-    font-size: 15px !important;
+    font-size: 17px !important;
     font-weight: 900 !important;
     text-transform: uppercase !important;
   }
 
   #modal-student-ledger .ledger-print-title {
-    font-size: 11px !important;
+    font-size: 12px !important;
     font-weight: 900 !important;
     border: 1px solid #111 !important;
-    padding: 2px 6px !important;
+    padding: 3px 8px !important;
   }
 
   #modal-student-ledger .ledger-student-row {
@@ -189,58 +189,64 @@
     grid-template-columns: 2fr 1fr 1.3fr 1.3fr !important;
     gap: 4px !important;
     border-bottom: 1px solid #111 !important;
-    padding-bottom: 4px !important;
-    margin-bottom: 5px !important;
-    font-size: 9px !important;
+    padding-bottom: 6px !important;
+    margin-bottom: 7px !important;
+    font-size: 10px !important;
   }
 
   #modal-student-ledger .ledger-summary-grid {
     display: grid !important;
     grid-template-columns: repeat(6, 1fr) !important;
     gap: 4px !important;
-    margin-bottom: 6px !important;
+    margin-bottom: 8px !important;
   }
 
   #modal-student-ledger .ledger-summary-grid > div {
     border: 1px solid #111 !important;
-    padding: 3px 4px !important;
+    padding: 5px 6px !important;
   }
 
   #modal-student-ledger .ledger-summary-grid span {
     display: block !important;
-    font-size: 6.8px !important;
+    font-size: 7.8px !important;
     text-transform: uppercase !important;
     font-weight: 800 !important;
   }
 
   #modal-student-ledger .ledger-summary-grid strong {
     display: block !important;
-    font-size: 10px !important;
+    font-size: 11.5px !important;
     font-weight: 900 !important;
   }
 
   #modal-student-ledger .ledger-print-section {
-    margin-top: 7px !important;
+    margin-top: 9px !important;
     page-break-inside: avoid !important;
   }
 
   #modal-student-ledger .ledger-section-title {
-    font-size: 10px !important;
+    font-size: 11px !important;
     font-weight: 900 !important;
     text-transform: uppercase !important;
     background: #f1f5f9 !important;
     border: 1px solid #111 !important;
     border-bottom: 0 !important;
-    padding: 3px 4px !important;
+    padding: 5px 6px !important;
   }
 
   #modal-student-ledger .ledger-print-table {
-    font-size: 8.1px !important;
+    font-size: 9.2px !important;
+    line-height: 1.28 !important;
+  }
+
+  #modal-student-ledger .ledger-print-table tr {
+    min-height: 7.2mm !important;
+    height: 7.2mm !important;
   }
 
   #modal-student-ledger .ledger-print-table th,
   #modal-student-ledger .ledger-print-table td {
-    padding: 2.8px 3.5px !important;
+    padding: 5px 5px !important;
   }
   #modal-student-ledger * {
     color: black !important;
